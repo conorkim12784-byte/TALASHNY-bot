@@ -51,6 +51,35 @@ try:
 except Exception as e:
     print(f"[PATCH] Time sync patch warning: {e}")
 
+# ─── Fix missing ChatJoinRequest in pyrogram.types ─────────────────────────
+try:
+    from pyrogram.types import ChatJoinRequest
+except ImportError:
+    try:
+        import pyrogram.types as _ptypes
+        from pyrogram import Client as _Client
+
+        class ChatJoinRequest:
+            """Fake ChatJoinRequest for pyrogram 1.2.9 compatibility"""
+            def __init__(self, *args, **kwargs):
+                self.chat = kwargs.get("chat")
+                self.from_user = kwargs.get("from_user")
+                self.date = kwargs.get("date")
+
+        _ptypes.ChatJoinRequest = ChatJoinRequest
+
+        # Patch on_chat_join_request decorator to do nothing safely
+        if not hasattr(_Client, "on_chat_join_request"):
+            def _on_chat_join_request(*args, **kwargs):
+                def decorator(func):
+                    return func
+                return decorator
+            _Client.on_chat_join_request = staticmethod(_on_chat_join_request)
+
+        print("[PATCH] ChatJoinRequest patched successfully!")
+    except Exception as e:
+        print(f"[PATCH] ChatJoinRequest patch warning: {e}")
+
 # ─── Fix missing pyrogram raw types ────────────────────────────────────────
 
 class UpdateGroupCallConnection:
