@@ -1,5 +1,10 @@
 import fix_pyrogram
 import asyncio
+import os
+
+# Fix time sync issue
+os.system("ntpdate -u time.google.com 2>/dev/null || true")
+
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
 
