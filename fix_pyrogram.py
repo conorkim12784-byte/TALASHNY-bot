@@ -1,11 +1,58 @@
 """
-Patch to fix missing pyrogram raw types for old py-tgcalls compatibility
+Patch to fix:
+1. Missing pyrogram raw types for old py-tgcalls compatibility
+2. msg_id too low / time sync error
 Run this before starting the bot
 """
 import sys
 import types
+import time
 
-# Create fake UpdateGroupCallConnection class
+# ─── Fix Pyrogram session time sync (msg_id too low) ───────────────────────
+try:
+    from pyrogram.session import Session
+
+    _original_invoke = Session.invoke.__wrapped__ if hasattr(Session.invoke, '__wrapped__') else None
+
+    # Patch the internal time offset in pyrogram session
+    # This forces pyrogram to recalculate msg_id based on server time
+    try:
+        import pyrogram.session.session as _sess_module
+        # Override the time_offset to 0 and let it re-sync automatically
+        if hasattr(_sess_module, 'Session'):
+            original_start = _sess_module.Session.start
+
+            async def patched_start(self):
+                # Reset time offset before connecting
+                self.server_time_offset = 0
+                max_tries = 5
+                for i in range(max_tries):
+                    try:
+                        await original_start(self)
+                        break
+                    except Exception as e:
+                        if "msg_id too low" in str(e) or "synchronized" in str(e):
+                            if i < max_tries - 1:
+                                import asyncio
+                                print(f"[PATCH] msg_id retry {i+1}/{max_tries}...")
+                                await asyncio.sleep(3)
+                                # Try to reset offset
+                                self.server_time_offset = 0
+                            else:
+                                raise
+                        else:
+                            raise
+
+            _sess_module.Session.start = patched_start
+            print("[PATCH] Session start patched for time sync!")
+    except Exception as e:
+        print(f"[PATCH] Session patch warning: {e}")
+
+except Exception as e:
+    print(f"[PATCH] Time sync patch warning: {e}")
+
+# ─── Fix missing pyrogram raw types ────────────────────────────────────────
+
 class UpdateGroupCallConnection:
     ID = 0x2e3a3200
     def __init__(self, *args, **kwargs):
