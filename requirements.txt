@@ -11,7 +11,7 @@ python-dotenv
 dnspython
 gitpython
 aiofiles
-aiohttp
+aiohttp==3.8.6
 requests
 pillow
 motor
