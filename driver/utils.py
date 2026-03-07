@@ -3,31 +3,25 @@ import asyncio
 from driver.queues import QUEUE, clear_queue, get_queue, pop_an_item
 from driver.veez import bot, call_py
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
+from pytgcalls import filters as tgfilters
 from pytgcalls.types import Update
-from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
-from pytgcalls.types.input_stream.quality import (
-    HighQualityAudio,
-    HighQualityVideo,
-    LowQualityVideo,
-    MediumQualityVideo,
-)
-from pytgcalls.types.stream import StreamAudioEnded
 
 
 keyboard = InlineKeyboardMarkup(
     [
-            [
-                InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data="cbmenu"),
-                InlineKeyboardButton("• الـتـحـديـثـات♪",url=f"https://t.me/Ch_World_Music"),
-            ],
-            [
-                InlineKeyboardButton(
-                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
-                        url=f"https://t.me/WorldMusicly_Bot?startgroup=true"
-                )
-            ],
-        ]
-    )
+        [
+            InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data="cbmenu"),
+            InlineKeyboardButton("• الـتـحـديـثـات♪", url="https://t.me/Ch_World_Music"),
+        ],
+        [
+            InlineKeyboardButton(
+                "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
+                url="https://t.me/WorldMusicly_Bot?startgroup=true"
+            )
+        ],
+    ]
+)
 
 
 async def skip_current_song(chat_id):
@@ -47,25 +41,18 @@ async def skip_current_song(chat_id):
                 if type == "Audio":
                     await call_py.change_stream(
                         chat_id,
-                        AudioPiped(
-                            url,
-                            HighQualityAudio(),
-                        ),
+                        MediaStream(url, audio_quality=AudioQuality.HIGH),
                     )
                 elif type == "Video":
                     if Q == 720:
-                        hm = HighQualityVideo()
+                        vq = VideoQuality.HD_720p
                     elif Q == 480:
-                        hm = MediumQualityVideo()
-                    elif Q == 360:
-                        hm = LowQualityVideo()
+                        vq = VideoQuality.SD_480p
+                    else:
+                        vq = VideoQuality.SD_360p
                     await call_py.change_stream(
                         chat_id,
-                        AudioVideoPiped(
-                            url,
-                            HighQualityAudio(),
-                            hm
-                        )
+                        MediaStream(url, audio_quality=AudioQuality.HIGH, video_quality=vq),
                     )
                 pop_an_item(chat_id)
                 return [songname, link, type]
@@ -111,27 +98,23 @@ async def left_handler(_, chat_id: int):
 
 
 @call_py.on_stream_end()
-async def stream_end_handler(_, u: Update):
-    if isinstance(u, StreamAudioEnded):
-        chat_id = u.chat_id
-        print(chat_id)
-        op = await skip_current_song(chat_id)
-        if op == 1:
-            pass
-        elif op == 2:
-            await bot.send_message(
-                chat_id,
-                "❌ an error occurred\n\n» **Clearing** __Queues__ and leaving video chat.",
-            )
-        else:
-            await bot.send_message(
-                chat_id,
-                f"💡 **تم التخطي الئ المسار التالي**\n\n🗂 **الاسم:** [{op[0]}]({op[1]}) | `{op[2]}`\n💭 **المجموعه:** `{chat_id}`",
-                disable_web_page_preview=True,
-                reply_markup=keyboard,
-            )
-    else:
+async def stream_end_handler(_, update: Update):
+    chat_id = update.chat_id
+    op = await skip_current_song(chat_id)
+    if op == 1:
         pass
+    elif op == 2:
+        await bot.send_message(
+            chat_id,
+            "❌ an error occurred\n\n» **Clearing** __Queues__ and leaving video chat.",
+        )
+    else:
+        await bot.send_message(
+            chat_id,
+            f"💡 **تم التخطي الئ المسار التالي**\n\n🗂 **الاسم:** [{op[0]}]({op[1]}) | `{op[2]}`\n💭 **المجموعه:** `{chat_id}`",
+            disable_web_page_preview=True,
+            reply_markup=keyboard,
+        )
 
 
 async def bash(cmd):
