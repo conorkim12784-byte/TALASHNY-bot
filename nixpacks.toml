@@ -2,4 +2,4 @@
 nixPkgs = ["python310", "ffmpeg", "ntp", "ntpdate"]
 
 [start]
-cmd = "ntpdate -u time.google.com || ntpdate -u pool.ntp.org || true && python main.py"
+cmd = "ntpdate -u time.google.com; ntpdate -u time.cloudflare.com; python main.py"
