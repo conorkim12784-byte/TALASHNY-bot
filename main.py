@@ -1,4 +1,5 @@
 import asyncio
+from pytgcalls import idle
 from driver.veez import call_py, bot, user
 
 
@@ -9,9 +10,9 @@ async def start_bot():
     print("[INFO]: PY-TGCALLS CLIENT STARTED !!")
     await user.join_chat("Gr_World_Music")
     await user.join_chat("Ch_World_Music")
-    print("[INFO]: BOT IS RUNNING ...")
-    await asyncio.Future()  # بديل idle - يخلي البوت شغال للأبد
-
+    await idle()
+    print("[INFO]: STOPPING BOT & USERBOT")
+    await bot.stop()
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(start_bot())

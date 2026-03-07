@@ -9,19 +9,6 @@ COPY . /app/
 WORKDIR /app/
 
 RUN pip3 install --no-cache-dir -U pip setuptools wheel
-RUN pip3 install --no-cache-dir \
-    "pyrogram==2.0.106" \
-    "TgCrypto" \
-    "py-tgcalls==0.9.2" \
-    "motor" \
-    "pymongo" \
-    "dnspython" \
-    "python-dotenv" \
-    "yt-dlp" \
-    "aiohttp" \
-    "aiofiles" \
-    "Pillow" \
-    "requests" \
-    "psutil"
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 CMD ["python3", "main.py"]
