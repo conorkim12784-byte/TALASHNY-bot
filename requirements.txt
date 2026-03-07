@@ -1,12 +1,10 @@
 pyrogram==2.0.106
-pytgcalls==3.0.0.dev24
 TgCrypto
-TgCrypto
+py-tgcalls
 motor
 pymongo
 dnspython
 python-dotenv
-youtube-dl
 yt-dlp
 aiohttp
 aiofiles
