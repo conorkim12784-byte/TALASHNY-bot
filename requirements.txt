@@ -1,7 +1,7 @@
 tgcrypto
 ffmpeg-python
 py-tgcalls==0.9.7
-pyrogram==1.2.9
+pyrogram==1.2.20
 youtube-search-python
 yt-dlp
 lyricsgenius
