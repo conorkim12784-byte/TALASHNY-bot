@@ -1,9 +1,8 @@
+# IMPORTANT: fix_pyrogram must be first import - it patches time.time() and pyrogram internals
 import fix_pyrogram
+
 import asyncio
 import os
-
-# Try to sync system time
-os.system("ntpdate -u time.google.com 2>/dev/null || ntpdate -u pool.ntp.org 2>/dev/null || true")
 
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
@@ -19,6 +18,7 @@ async def start_bot():
     await idle()
     print("[INFO]: STOPPING BOT & USERBOT")
     await bot.stop()
+
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(start_bot())
