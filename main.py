@@ -1,8 +1,5 @@
-# IMPORTANT: fix_pyrogram must be first import - it patches time.time() and pyrogram internals
 import fix_pyrogram
-
 import asyncio
-import os
 
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
