@@ -34,10 +34,10 @@ async def help_cmd(client: Client, message: Message):
             [
                 [
                     InlineKeyboardButton(
-                        "📣 المطور", url=f"https://t.me/I0_I6"
+                        "📣 المطور", url=f"https://t.me/WORLD_MUSIC_F"
                     ),
                     InlineKeyboardButton(
-                        "📣 قناة البوت", url=f"https://t.me/FW_TF"
+                        "📣 قناة البوت", url=f"https://t.me/Ch_World_Music"
                     )
                 ],
                 [

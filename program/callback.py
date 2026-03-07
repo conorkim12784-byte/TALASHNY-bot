@@ -28,7 +28,7 @@ async def cbstart(_, query: CallbackQuery):
  لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
 
 
-  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/I0_I6)
+  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/WORLD_MUSIC_F)
 ━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -46,7 +46,7 @@ async def cbstart(_, query: CallbackQuery):
                         "👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"
                     ),
                     InlineKeyboardButton(
-                        "📣 قناة البوت", url=f"https://t.me/FW_TF"
+                        "📣 قناة البوت", url=f"https://t.me/Ch_World_Music"
                     ),
                 ],
             ]
