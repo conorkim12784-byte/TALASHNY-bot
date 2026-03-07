@@ -1,17 +1,11 @@
-import asyncio
-from driver.veez import call_py, bot, user
-
-
-async def start_bot():
-    await bot.start()
-    print("[INFO]: BOT & UBOT CLIENT STARTED !!")
-    await call_py.start()
-    print("[INFO]: PY-TGCALLS CLIENT STARTED !!")
-    await user.join_chat("Gr_World_Music")
-    await user.join_chat("Ch_World_Music")
-    print("[INFO]: BOT IS RUNNING ...")
-    await asyncio.Future()  # بديل idle - يخلي البوت شغال للأبد
-
-
-loop = asyncio.get_event_loop()
-loop.run_until_complete(start_bot())
+# Fixed: using Python 3.10 for pytgcalls compatibility
+FROM nikolaik/python-nodejs:python3.10-nodejs18
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+COPY . /app/
+WORKDIR /app/
+RUN pip3 install --no-cache-dir -U pip
+RUN pip3 install --no-cache-dir -r requirements.txt
+CMD ["python3", "main.py"]
