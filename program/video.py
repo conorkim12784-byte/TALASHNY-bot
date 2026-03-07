@@ -13,7 +13,7 @@ from driver.filters import command, other_filters
 from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
-from pyrogram import Client
+from pyrogram import Client, enums
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls import StreamType
@@ -73,7 +73,7 @@ async def vplay(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status != enums.ChatMemberStatus.ADMINISTRATOR:
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
@@ -94,7 +94,7 @@ async def vplay(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot) 
-        if b.status == "kicked":
+        if b.status == enums.ChatMemberStatus.BANNED:
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):
@@ -334,7 +334,7 @@ async def vstream(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status != enums.ChatMemberStatus.ADMINISTRATOR:
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
@@ -355,7 +355,7 @@ async def vstream(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot)
-        if b.status == "kicked":
+        if b.status == enums.ChatMemberStatus.BANNED:
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):

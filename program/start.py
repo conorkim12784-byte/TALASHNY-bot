@@ -64,7 +64,7 @@ async def start_(client: Client, message: Message):
     await message.reply_photo(
         photo=f"{BOT_PHOTO}",
         caption=f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention()} !
+اهـلا يـبـنـي.؟ {message.from_user.mention} !
 مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
 يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
  +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات
@@ -169,7 +169,7 @@ async def approve_join_chat(c: Client, m: ChatJoinRequest):
     try:
         await c.approve_chat_join_request(m.chat.id, m.from_user.id)
     except FloodWait as e:
-        await asyncio.sleep(e.x + 2)
+        await asyncio.sleep(e.value + 2)
         await c.approve_chat_join_request(m.chat.id, m.from_user.id)
 
 
