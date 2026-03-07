@@ -1,7 +1,8 @@
 tgcrypto
+asyncio
 ffmpeg-python
-py-tgcalls==0.9.7
-pyrogram==1.2.9
+py-tgcalls
+pyrogram==1.4.16
 youtube-search-python
 yt-dlp
 lyricsgenius
@@ -11,7 +12,7 @@ python-dotenv
 dnspython
 gitpython
 aiofiles
-aiohttp==3.8.6
+aiohttp
 requests
 pillow
 motor

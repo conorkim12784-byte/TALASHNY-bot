@@ -1,15 +1,18 @@
-FROM nikolaik/python-nodejs:python3.8-nodejs18
+import asyncio
+from pytgcalls import idle
+from driver.veez import call_py, bot, user
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ntpdate \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
-COPY . /app/
-WORKDIR /app/
+async def start_bot():
+    await bot.start()
+    print("[INFO]: BOT & UBOT CLIENT STARTED !!")
+    await call_py.start()
+    print("[INFO]: PY-TGCALLS CLIENT STARTED !!")
+    await user.join_chat("Gr_World_Music")
+    await user.join_chat("Ch_World_Music")
+    await idle()
+    print("[INFO]: STOPPING BOT & USERBOT")
+    await bot.stop()
 
-RUN pip3 install --no-cache-dir --upgrade --requirement requirements.txt
-
-RUN python3 patch_session.py
-
-CMD ["sh", "-c", "ntpdate -u time.google.com 2>/dev/null || true; python3 main.py"]
+loop = asyncio.get_event_loop()
+loop.run_until_complete(start_bot())
