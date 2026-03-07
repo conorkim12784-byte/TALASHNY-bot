@@ -27,7 +27,12 @@ from driver.database.dbpunish import is_gbanned_user
 from pyrogram import Client, filters, __version__ as pyrover
 from pyrogram.errors import FloodWait, MessageNotModified
 from pytgcalls import (__version__ as pytover)
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, ChatJoinRequest
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+try:
+    from pyrogram.types import ChatJoinRequest
+except ImportError:
+    import pyrogram.types as _pt
+    ChatJoinRequest = getattr(_pt, "ChatJoinRequest", type("ChatJoinRequest", (), {}))
 
 __major__ = 0
 __minor__ = 2
@@ -224,4 +229,3 @@ async def chat_watcher_func(_, message: Message):
         await message.reply_text(
             f"👮🏼 (> {suspect} <)\n\n**Gbanned** user detected, that user has been gbanned by sudo user and was blocked from this Chat !\n\n🚫 **Reason:** potential spammer and abuser."
         )
-
