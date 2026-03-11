@@ -5,8 +5,9 @@ from config import COMMAND_PREFIXES
 
 COMMAND_YYYBD = None
 
-# pyrofork removed filters.edited - create it manually
+# pyrofork removed filters.edited - patch it back globally
 edited = filters.create(lambda _, __, m: bool(m.edit_date) if isinstance(m, Message) else False)
+filters.edited = edited  # patch pyrogram.filters so all files can use filters.edited
 
 other_filters = filters.group & ~edited & ~filters.via_bot & ~filters.forwarded
 other_filters2 = filters.private & ~edited & ~filters.via_bot & ~filters.forwarded
