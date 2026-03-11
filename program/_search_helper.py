@@ -1,65 +1,84 @@
 import asyncio
+from urllib.parse import unquote
 
-# yt_dlp بس - بدون youtube_search أو youtubesearchpython
-YDL_BASE = {
-    "quiet": True,
-    "no_warnings": True,
-    "noplaylist": True,
-    "skip_download": True,
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["android", "web"],
-            "player_skip": ["webpage", "js"],
-        }
-    },
-    "http_headers": {
-        "User-Agent": "com.google.android.youtube/17.36.4 (Linux; U; Android 11) gzip",
-    },
-}
+
+def _fix_thumbnail(url: str, vid_id: str = "") -> str:
+    """إصلاح روابط الـ thumbnail المكسورة"""
+    if not url:
+        return f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+    # لو الرابط مشفر URL encoding فكه
+    if "%" in url:
+        url = unquote(url)
+    # لو لسه مش http استخدم الـ fallback
+    if not url.startswith("http"):
+        return f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+    return url
 
 
 def _search_sync(query: str):
+    """بحث على يوتيوب باستخدام yt_dlp"""
     import yt_dlp
-    opts = dict(YDL_BASE)
-    opts["extract_flat"] = True
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-        if not info or not info.get("entries"):
-            return None
-        v = info["entries"][0]
-        dur = v.get("duration", 0) or 0
-        m, s = divmod(int(dur), 60)
-        vid_id = v.get("id", "")
-        return [
-            v.get("title", "Unknown"),
-            f"https://www.youtube.com/watch?v={vid_id}",
-            f"{m}:{s:02d}",
-            v.get("thumbnail", "") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
-        ]
+
+    # طريقة 1: extract_flat مع android client
+    for client in [["android_vr"], ["android"], ["mweb"], ["web_creator"]]:
+        try:
+            opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "extract_flat": True,
+                "extractor_args": {"youtube": {"player_client": client}},
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+                if not info or not info.get("entries"):
+                    continue
+                v = info["entries"][0]
+                vid_id = v.get("id", "")
+                dur = v.get("duration", 0) or 0
+                m, s = divmod(int(dur), 60)
+                thumb = _fix_thumbnail(v.get("thumbnail", ""), vid_id)
+                return [
+                    v.get("title", "Unknown"),
+                    f"https://www.youtube.com/watch?v={vid_id}",
+                    f"{m}:{s:02d}",
+                    thumb
+                ]
+        except Exception:
+            continue
+    return None
 
 
 def _get_url_sync(link: str, is_video: bool = False):
+    """جيب الرابط المباشر من يوتيوب"""
     import yt_dlp
+
     fmt = "best[height<=720]/best" if is_video else "bestaudio/best"
-    for client in [["android"], ["android_vr"], ["web"]]:
+
+    for client in [["android_vr"], ["android"], ["mweb"], ["web_creator"]]:
         try:
-            opts = dict(YDL_BASE)
-            opts["format"] = fmt
-            opts["extractor_args"] = {
-                "youtube": {
-                    "player_client": client,
-                    "player_skip": ["webpage", "js"],
-                }
+            opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": fmt,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": client,
+                        "player_skip": ["webpage", "js"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "com.google.android.youtube/17.36.4 (Linux; U; Android 11) gzip",
+                },
             }
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(link, download=False)
                 if not info:
                     continue
-                # جيب أول URL شغال
-                if info.get("url"):
+                if info.get("url") and info["url"].startswith("http"):
                     return info["url"]
-                fmts = info.get("formats", [])
-                for f in reversed(fmts):
+                for f in reversed(info.get("formats", [])):
                     u = f.get("url", "")
                     if u.startswith("http"):
                         return u
