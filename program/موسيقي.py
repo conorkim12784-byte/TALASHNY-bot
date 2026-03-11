@@ -7,9 +7,7 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 # pytgcalls stuff
-from pytgcalls import StreamType
-from pytgcalls.types.input_stream import AudioPiped
-from pytgcalls.types.input_stream.quality import HighQualityAudio
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 # repository stuff
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
@@ -147,14 +145,7 @@ async def play(c: Client, m: Message):
                     thumbnail = f"{IMG_5}"
                     image = await thumb(thumbnail, title, userid, ctitle)
                     await suhu.edit("🔄 **يتم التشغيل...**")
-                    await call_py.join_group_call(
-                        chat_id,
-                        AudioPiped(
-                            dl,
-                            HighQualityAudio(),
-                        ),
-                        stream_type=StreamType().local_stream,
-                    )
+                    await call_py.play(chat_id, MediaStream(dl, audio_parameters=AudioQuality.HIGH))
                     add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                     await suhu.delete()
                     buttons = stream_markup(user_id)
@@ -209,14 +200,7 @@ async def play(c: Client, m: Message):
                         else:
                             try:
                                 await suhu.edit("🔄 **يتم التشغيل...**")
-                                await call_py.join_group_call(
-                                    chat_id,
-                                    AudioPiped(
-                                        ytlink,
-                                        HighQualityAudio(),
-                                    ),
-                                    stream_type=StreamType().local_stream,
-                                )
+                                await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH))
                                 add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                                 await suhu.delete()
                                 buttons = stream_markup(user_id)
@@ -270,14 +254,7 @@ async def play(c: Client, m: Message):
                     else:
                         try:
                             await suhu.edit("🔄 **يتم التشغيل...**")
-                            await call_py.join_group_call(
-                                chat_id,
-                                AudioPiped(
-                                    ytlink,
-                                    HighQualityAudio(),
-                                ),
-                                stream_type=StreamType().local_stream,
-                            )
+                            await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH))
                             add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                             await suhu.delete()
                             requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
