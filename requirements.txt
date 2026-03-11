@@ -1,5 +1,5 @@
 tgcrypto
-pyrogram==2.0.106
+pyrofork
 py-tgcalls==2.2.11
 youtube-search-python
 yt-dlp
