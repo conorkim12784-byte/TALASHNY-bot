@@ -3,23 +3,26 @@ import asyncio
 from driver.queues import QUEUE, clear_queue, get_queue, pop_an_item
 from driver.veez import bot, call_py
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pytgcalls.types import Update, StreamEnded, MediaStream, AudioQuality, VideoQuality
+from pytgcalls.types import Update, ChatUpdate, StreamEnded, MediaStream, AudioQuality, VideoQuality
+from config import UPDATES_CHANNEL, BOT_USERNAME
 
+_channel_url = f"https://t.me/{UPDATES_CHANNEL}" if UPDATES_CHANNEL else "https://t.me/"
+_bot_username = BOT_USERNAME or "WorldMusicly_Bot"
 
 keyboard = InlineKeyboardMarkup(
     [
-        [
-            InlineKeyboardButton(text="الـقـائـمـه", callback_data="cbmenu"),
-            InlineKeyboardButton("الـتـحـديـثـات", url="https://t.me/FY_TF"),
-        ],
-        [
-            InlineKeyboardButton(
-                "اضـف الـبـوت لـمـجـمـوعـتـك",
-                url="https://t.me/G_FireBot?startgroup=true",
-            )
-        ],
-    ]
-)
+            [
+                InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data="cbmenu"),
+                InlineKeyboardButton("• الـتـحـديـثـات♪", url=_channel_url),
+            ],
+            [
+                InlineKeyboardButton(
+                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
+                        url=f"https://t.me/{_bot_username}?startgroup=true"
+                )
+            ],
+        ]
+    )
 
 
 async def skip_current_song(chat_id):
@@ -39,29 +42,24 @@ async def skip_current_song(chat_id):
                 if type == "Audio":
                     await call_py.play(
                         chat_id,
-                        MediaStream(
-                            url,
-                            audio_parameters=AudioQuality.HIGH,
-                        ),
+                        MediaStream(url, AudioQuality.HIGH),
                     )
                 elif type == "Video":
                     if Q == 720:
                         vq = VideoQuality.HD_720p
                     elif Q == 480:
                         vq = VideoQuality.SD_480p
-                    else:
+                    elif Q == 360:
                         vq = VideoQuality.SD_360p
+                    else:
+                        vq = VideoQuality.HD_720p
                     await call_py.play(
                         chat_id,
-                        MediaStream(
-                            url,
-                            audio_parameters=AudioQuality.HIGH,
-                            video_parameters=vq,
-                        ),
+                        MediaStream(url, AudioQuality.HIGH, vq)
                     )
                 pop_an_item(chat_id)
                 return [songname, link, type]
-            except Exception:
+            except:
                 await call_py.leave_call(chat_id)
                 clear_queue(chat_id)
                 return 2
@@ -85,35 +83,37 @@ async def skip_item(chat_id, h):
 
 
 @call_py.on_update()
-async def kicked_handler(_, update: Update):
-    from pytgcalls.types import ChatUpdate
-    if not isinstance(update, ChatUpdate):
-        return
+async def stream_update_handler(client: PyTgCalls, update: Update):
     chat_id = update.chat_id
-    if chat_id in QUEUE:
-        clear_queue(chat_id)
 
-
-@call_py.on_update()
-async def stream_end_handler(_, update: Update):
-    if not isinstance(update, StreamEnded):
+    # Handle kicked / closed / left
+    if isinstance(update, ChatUpdate):
+        if update.status in (
+            ChatUpdate.Status.KICKED,
+            ChatUpdate.Status.CLOSED_VOICE_CHAT,
+            ChatUpdate.Status.LEFT_GROUP,
+        ):
+            if chat_id in QUEUE:
+                clear_queue(chat_id)
         return
-    chat_id = update.chat_id
-    op = await skip_current_song(chat_id)
-    if op == 1:
-        pass
-    elif op == 2:
-        await bot.send_message(
-            chat_id,
-            "❌ حدث خطأ\n\n» **جاري مسح** __القائمة__ والخروج من المكالمة.",
-        )
-    else:
-        await bot.send_message(
-            chat_id,
-            f"💡 **تم التخطي الئ المسار التالي**\n\n🗂 **الاسم:** [{op[0]}]({op[1]}) | `{op[2]}`\n💭 **المجموعه:** `{chat_id}`",
-            disable_web_page_preview=True,
-            reply_markup=keyboard,
-        )
+
+    # Handle stream ended
+    if isinstance(update, StreamEnded):
+        op = await skip_current_song(chat_id)
+        if op == 1:
+            pass
+        elif op == 2:
+            await bot.send_message(
+                chat_id,
+                "❌ an error occurred\n\n» **Clearing** __Queues__ and leaving video chat.",
+            )
+        elif op != 0:
+            await bot.send_message(
+                chat_id,
+                f"💡 **تم التخطي الئ المسار التالي**\n\n🗂 **الاسم:** [{op[0]}]({op[1]}) | `{op[2]}`\n💭 **المجموعه:** `{chat_id}`",
+                disable_web_page_preview=True,
+                reply_markup=keyboard,
+            )
 
 
 async def bash(cmd):

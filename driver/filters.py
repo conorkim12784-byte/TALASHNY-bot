@@ -1,16 +1,13 @@
 from pyrogram import filters
-from pyrogram.types import Message
 from typing import List, Union
 from config import COMMAND_PREFIXES
 
 COMMAND_YYYBD = None
 
-# pyrofork removed filters.edited - patch it back globally
-edited = filters.create(lambda _, __, m: bool(m.edit_date) if isinstance(m, Message) else False)
-filters.edited = edited  # patch pyrogram.filters so all files can use filters.edited
-
-other_filters = filters.group & ~edited & ~filters.via_bot & ~filters.forwarded
-other_filters2 = filters.private & ~edited & ~filters.via_bot & ~filters.forwarded
+other_filters = filters.group & ~filters.edited & ~filters.via_bot & ~filters.forwarded
+other_filters2 = (
+    filters.private & ~filters.edited & ~filters.via_bot & ~filters.forwarded
+)
 
 
 def command(commands: Union[str, List[str]]):
