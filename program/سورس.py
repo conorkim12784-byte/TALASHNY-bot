@@ -20,7 +20,7 @@ from config import (
 )
 from program import __version__
 from driver.veez import user
-from driver.filters import command, other_filters
+from driver.filters import command2, other_filters
 from driver.decorators import sudo_users_only
 from driver.database.dbchat import add_served_chat, is_served_chat
 from driver.database.dbpunish import is_gbanned_user
@@ -58,50 +58,7 @@ async def _human_time_duration(seconds):
     return ", ".join(parts)
 
 
-@Client.on_message(command("start") & filters.private)
-async def start_(client: Client, message: Message):
-    await message.delete()
-    await message.reply_photo(
-        photo=f"{BOT_PHOTO}",
-        caption=f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention()} !
-مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
-يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
- +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات
- البوت يشتغل بالاوامر عربي وانجليزي
- لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
-
-
-  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/WORLD_MUSIC_F)
-━━━━━━━━━━━━━━━━━━**""",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "ضيـف البـوت لمجمـوعتـك ✅",
-                        url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
-                    )
-                ],
-                [InlineKeyboardButton("", callback_data="cbhowtouse")],
-                [
-                     InlineKeyboardButton(
-                        "الاوامر", url=f"https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
-                    InlineKeyboardButton("❤️ المطور", url=f"https://t.me/{OWNER_NAME}"),
-                ],
-                [
-                    InlineKeyboardButton(
-                        "👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"
-                    ),
-                    InlineKeyboardButton(
-                        "📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"
-                    ),
-                ],
-            ]
-        ),
-    )
-
-
-@Client.on_message(command(["source"]) & filters.group)
+@Client.on_message(command2(["مبرمج_السورس","مبرمج السورس","السورس","سورس"]) & filters.group)
 async def start(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -116,7 +73,7 @@ async def start(client: Client, message: Message):
      )
   )
 
-@Client.on_message(command(["developer","dev"]) & filters.group)
+@Client.on_message(command2(["المطور","مطور"]) & filters.group)
 async def help(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -134,15 +91,7 @@ async def help(client: Client, message: Message):
      )
   )
 
-@Client.on_message(command(["لب التوكن", f"لب_التوكن", "scolze"]) & filters.private)
-@sudo_users_only
-async def shadow(c: Client, message: Message):
-    start = time()
-    m_reply = await message.reply_text("انتظر من فضلك...")
-    BOT_TOKEN = time() - start
-    await m_reply.edit_text(f"**تم جلب التوكن**\n`{BOT_TOKEN}`")
-
-@Client.on_message(command(["ping"]))
+@Client.on_message(command2(["بينج","بنج","البنج"]))
 async def ping_pong(client: Client, message: Message):
     await message.delete()
     start = time()
@@ -150,7 +99,7 @@ async def ping_pong(client: Client, message: Message):
     delta_ping = time() - start
     await m_reply.edit_text("🏓 `PONG!!`\n" f"⚡️ `{delta_ping * 1000:.3f} ms`")
 
-@Client.on_message(command(["uptime", f"uptime@{BOT_USERNAME}"]))
+@Client.on_message(command2(["مده التشغيل","مده_التشغيل","فتره التشغيل","فتره_التشغيل"]))
 async def get_uptime(client: Client, message: Message):
     await message.delete()
     current_time = datetime.utcnow()
@@ -161,7 +110,7 @@ async def get_uptime(client: Client, message: Message):
         f"• **uptime:** `{uptime}`\n"
         f"• **start time:** `{START_TIME_ISO}`"
     )
-    
+
 @Client.on_chat_join_request()
 async def approve_join_chat(c: Client, m: ChatJoinRequest):
     if not m.from_user:

@@ -52,7 +52,7 @@ def updater():
     changelog, tl_chnglog = gen_chlog(repo, f"HEAD..upstream/{ac_br}")
     return bool(changelog)
 
-@Client.on_message(command2(["تحديث"]) & ~filters.edited)
+@Client.on_message(command2(["تحديث"]))
 @sudo_users_only
 async def update_repo(_, message: Message):
     await message.delete()
@@ -66,7 +66,7 @@ async def update_repo(_, message: Message):
         return
     await msg.edit(f"bot is **up-to-date** ✅", disable_web_page_preview=True)
 
-@Client.on_message(command2(["ريستارت","اعاده تشغيل"]) & ~filters.edited)
+@Client.on_message(command2(["ريستارت","اعاده تشغيل"]))
 @sudo_users_only
 async def restart_bot(_, message: Message):
     await message.delete()

@@ -3,17 +3,15 @@
 import re
 import uuid
 import socket
+
 import psutil
 import platform
 from config import BOT_USERNAME
-from driver.filters import command
+from driver.filters import command2, other_filters
 from pyrogram import Client, filters
 from driver.decorators import sudo_users_only, humanbytes
 
-
-# FETCH SYSINFO
-
-@Client.on_message(command(["sysinfo", f"sysinfo@{BOT_USERNAME}"]))
+@Client.on_message(command2(["سيرفر","معلومات السيرفر","بيانات السيرفر"]))
 @sudo_users_only
 async def give_sysinfo(client, message):
     await message.delete()
@@ -52,4 +50,3 @@ async def give_sysinfo(client, message):
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┛
     """
     await message.reply(somsg)
-    

@@ -20,10 +20,8 @@ from pyrogram.types import Message
 from driver.filters import command2, other_filters
 from youtube_search import YoutubeSearch
 from yt_dlp import YoutubeDL
-
 from config import BOT_USERNAME as bn
 from driver.decorators import humanbytes
-from driver.filters import command, other_filters
 
 
 ydl_opts = {
@@ -35,15 +33,14 @@ ydl_opts = {
     'quite': True
 }
 
-
-@Client.on_message(command(["song"]))
+@Client.on_message(command2(["تحميل","تحميل_موسيقي"]))
 def song(_, message):
     query = " ".join(message.command[1:])
     m = message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {"format": "bestaudio[ext=m4a]"}
     try:
         results = YoutubeSearch(query, max_results=1).to_dict()
-        link = f"https://youtube.com{results[0]['url_suffix']}"
+        link = f"https://youtube.com{results[0][ url_suffix ]}"
         title = results[0]["title"][:40]
         thumbnail = results[0]["thumbnails"][0]
         thumb_name = f"{title}.jpg"
@@ -85,9 +82,9 @@ def song(_, message):
         os.remove(thumb_name)
     except Exception as e:
         print(e)
-        
+
 @Client.on_message(
-    command(["vsong","vsong@{bn}","video"])
+    command2(["تحميل_فيديو","تحميل فيديو"])
 )
 async def vsong(client, message):
     await message.delete()
@@ -102,7 +99,7 @@ async def vsong(client, message):
     query = " ".join(message.command[1:])
     try:
         results = YoutubeSearch(query, max_results=1).to_dict()
-        link = f"https://youtube.com{results[0]['url_suffix']}"
+        link = f"https://youtube.com{results[0][ url_suffix ]}"
         title = results[0]["title"][:40]
         thumbnail = results[0]["thumbnails"][0]
         thumb_name = f"{title}.jpg"
@@ -135,8 +132,9 @@ async def vsong(client, message):
     except Exception as e:
         print(e)
 
-@Client.on_message(command(["lyric"]))
+@Client.on_message(command2(["بحث"]))
 async def lyrics(_, message):
+    await message.delete()
     try:
         if len(message.command) < 2:
             await message.reply_text("» **قم باارسال اسم المقطع**")
@@ -146,8 +144,7 @@ async def lyrics(_, message):
         resp = requests.get(
             f"https://api-tede.herokuapp.com/api/lirik?l={query}"
         ).json()
-        result = f"{resp['data']}"
+        result = f"{resp[ data ]}"
         await rep.edit(result)
     except Exception:
         await rep.edit("❌ **لم يتم العثور على نتائج كلمات غنائية**\n\n» **يرجى إعطاء اسم أغنية صالح**")
-       

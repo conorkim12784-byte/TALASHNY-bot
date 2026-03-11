@@ -11,7 +11,7 @@ from driver.filters import command2, other_filters
 from config import BOT_USERNAME as bn
 
 
-@Client.on_message(command(["اذاعه"]) & ~filters.edited)
+@Client.on_message(command(["اذاعه"]))
 @sudo_users_only
 async def broadcast(c: Client, message: Message):
     if not message.reply_to_message:
@@ -54,7 +54,7 @@ async def broadcast(c: Client, message: Message):
     await message.reply_text(f"✅ تمت الاذاعه إلى {sent} جروب في البوت.")
 
 
-@Client.on_message(command(["ذت","اذت","اذع"]) & ~filters.edited)
+@Client.on_message(command(["ذت","اذت","اذع"]))
 @sudo_users_only
 async def broadcast_pin(c: Client, message: Message):
     if not message.reply_to_message:
