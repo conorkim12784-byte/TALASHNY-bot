@@ -89,7 +89,7 @@ async def play_ar2(c: Client, m: Message):
                 ctitle = await CHAT_TITLE(gcname)
                 image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
                 await suhu.edit("**يـتـم الـتـشـغـيـل...**")
-                await call_py.play(chat_id, MediaStream(dl, audio_parameters=AudioQuality.HIGH))
+                await call_py.play(chat_id, MediaStream(dl, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                 await suhu.delete()
                 buttons = stream_markup(user_id)
@@ -124,7 +124,7 @@ async def play_ar2(c: Client, m: Message):
             else:
                 try:
                     await suhu.edit("**يـتـم الـتـشـغـيـل...**")
-                    await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH))
+                    await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                     add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                     await suhu.delete()
                     buttons = stream_markup(user_id)
