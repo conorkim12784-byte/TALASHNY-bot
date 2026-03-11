@@ -1,4 +1,3 @@
-# helper - shared async ytsearch used by all music modules
 import json
 import asyncio
 from driver.utils import bash
@@ -48,12 +47,19 @@ async def ytsearch(query: str):
 
 
 async def ytdl_audio(link: str):
-    out, err = await bash(f'yt-dlp -g -f "bestaudio" {link}')
-    if out: return 1, out.split("\n")[0].strip()
+    # نجرب فورمات مختلفة لو فيه مشكلة
+    for fmt in ["bestaudio/best", "bestaudio", "best", "worstaudio"]:
+        out, err = await bash(f'yt-dlp -g -f "{fmt}" --no-warnings "{link}"')
+        out = out.strip().split("\n")[0].strip() if out else ""
+        if out and out.startswith("http"):
+            return 1, out
     return 0, err
 
 
 async def ytdl_video(link: str):
-    out, err = await bash(f'yt-dlp -g -f "best[height<=?720][width<=?1280]" {link}')
-    if out: return 1, out.split("\n")[0].strip()
+    for fmt in ["best[height<=720]/best", "best[height<=480]/best", "best"]:
+        out, err = await bash(f'yt-dlp -g -f "{fmt}" --no-warnings "{link}"')
+        out = out.strip().split("\n")[0].strip() if out else ""
+        if out and out.startswith("http"):
+            return 1, out
     return 0, err

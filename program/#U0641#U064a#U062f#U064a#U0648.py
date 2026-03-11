@@ -17,41 +17,43 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
-from youtubesearchpython import VideosSearch
+import json, subprocess
 
 
 def ytsearch(query: str):
     try:
-        search = VideosSearch(query, limit=1).result()
-        data = search["result"][0]
-        songname = data["title"]
-        url = data["link"]
-        duration = data["duration"]
-        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
+        result = subprocess.run(
+            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download",
+             "--no-warnings", "--ignore-errors"],
+            capture_output=True, text=True, timeout=60
+        )
+        if not result.stdout.strip():
+            print(f"yt-dlp error: {result.stderr[:200]}")
+            return result.stderr[:200] if result.stderr else "no output"
+        data = json.loads(result.stdout.strip().split("\n")[0])
+        songname = data.get("title", "Unknown")
+        url = data.get("webpage_url", "")
+        duration_secs = data.get("duration", 0)
+        mins, secs = divmod(int(duration_secs), 60)
+        duration = f"{mins}:{secs:02d}"
+        thumbnail = data.get("thumbnail", "")
         return [songname, url, duration, thumbnail]
     except Exception as e:
         print(e)
-        return 0
+        return str(e)
 
 
 async def ytdl(link):
-    proc = await asyncio.create_subprocess_exec(
-        "yt-dlp",
-        "-g",
-        "-f",
-        "best[height<=?720][width<=?1280]",
-        f"{link}",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return 1, stdout.decode().split("\n")[0]
-    else:
-        return 0, stderr.decode()
+    for fmt in ["best[height<=720]/best", "best[height<=480]/best", "best"]:
+        from driver.utils import bash as _bash
+        out, err = await _bash(f'yt-dlp -g -f "{fmt}" --no-warnings "{link}"')
+        out = out.strip().split("\n")[0].strip() if out else ""
+        if out and out.startswith("http"):
+            return 1, out
+    return 0, err
 
 
-@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو"]) & other_filters)
+@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","vplay","vp"]) & other_filters)
 async def vplay(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
