@@ -1,6 +1,6 @@
 from cache.admins import admins
 from driver.veez import call_py, bot
-from pyrogram import Client, enums, filters
+from pyrogram import Client, filters
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.queues import QUEUE, clear_queue
@@ -27,7 +27,7 @@ async def update_admin(client, message):
     await message.delete()
     global admins
     new_admins = []
-    new_ads = await client.get_chat_members(message.chat.id, filter=enums.ChatMembersFilter.ADMINISTRATORS)
+    new_ads = await client.get_chat_members(message.chat.id, filter="administrators")
     for u in new_ads:
         new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
@@ -62,7 +62,7 @@ async def skip(c: Client, m: Message):
                 chat_id,
                 photo=image,
                 reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"⏭ **تم التخطي الئ المسار التالي**\n\n🏷 **الاسم:** [{op[0]}]({op[1]})\n💭 **المجموعة:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {m.from_user.mention}",
+                caption=f"⏭ **تم التخطي الئ المسار التالي**\n\n🏷 **الاسم:** [{op[0]}]({op[1]})\n💭 **المجموعة:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {m.from_user.mention()}",
             )
     else:
         skip = m.text.split(None, 1)[1]
@@ -91,7 +91,7 @@ async def stop(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await m.reply("✅ **تم ايقاف التشغيل**")
         except Exception as e:
@@ -217,7 +217,7 @@ async def cbstop(_, query: CallbackQuery):
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await query.edit_message_text("✅ **تم ايقاف التشغيل**", reply_markup=close_mark)
         except Exception as e:
@@ -281,3 +281,4 @@ async def change_volume(client, m: Message):
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
         await m.reply("❌ **قائمة التشغيل فارغه**")
+        

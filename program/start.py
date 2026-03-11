@@ -64,7 +64,7 @@ async def start_(client: Client, message: Message):
     await message.reply_photo(
         photo=f"{BOT_PHOTO}",
         caption=f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention} !
+اهـلا يـبـنـي.؟ {message.from_user.mention()} !
 مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
 يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
  +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات

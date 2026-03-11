@@ -91,7 +91,7 @@ async def stop(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await m.reply("✅ **تم ايقاف التشغيل**")
         except Exception as e:
@@ -109,7 +109,7 @@ async def stop(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await m.reply("حاضر هسكت اهو🥲")
         except Exception as e:

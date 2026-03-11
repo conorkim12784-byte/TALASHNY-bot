@@ -17,7 +17,7 @@ async def broadcast(c: Client, message: Message):
     if not message.reply_to_message:
         pass
     else:
-        x = message.reply_to_message.id
+        x = message.reply_to_message.message_id
         y = message.chat.id
         sent = 0
         chats = []
@@ -60,7 +60,7 @@ async def broadcast_pin(c: Client, message: Message):
     if not message.reply_to_message:
         pass
     else:
-        x = message.reply_to_message.id
+        x = message.reply_to_message.message_id
         y = message.chat.id
         sent = 0
         pin = 0

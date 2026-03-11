@@ -20,7 +20,7 @@ async def cbstart(_, query: CallbackQuery):
     await query.answer("الصفحه الرئيسيه")
     await query.edit_message_text(
         f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention} !
+اهـلا يـبـنـي.؟ {message.from_user.mention()} !
 مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
 يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
  +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات

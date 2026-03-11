@@ -13,17 +13,10 @@ from driver.filters import command, other_filters
 from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
-from pyrogram import Client, enums
+from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
-from pytgcalls import StreamType
-from pytgcalls.types.input_stream import AudioVideoPiped
-from pytgcalls.types.input_stream.quality import (
-    HighQualityAudio,
-    HighQualityVideo,
-    LowQualityVideo,
-    MediumQualityVideo,
-)
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 from youtubesearchpython import VideosSearch
 
 
@@ -73,7 +66,7 @@ async def vplay(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != enums.ChatMemberStatus.ADMINISTRATOR:
+    if a.status != "administrator":
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
@@ -94,7 +87,7 @@ async def vplay(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot) 
-        if b.status == enums.ChatMemberStatus.BANNED:
+        if b.status == "kicked":
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):
@@ -166,22 +159,8 @@ async def vplay(c: Client, m: Message):
                 userid = m.from_user.id
                 thumbnail = f"{IMG_5}"
                 image = await thumb(thumbnail, title, userid, ctitle)
-                if Q == 720:
-                    amaze = HighQualityVideo()
-                elif Q == 480:
-                    amaze = MediumQualityVideo()
-                elif Q == 360:
-                    amaze = LowQualityVideo()
                 await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                await call_py.join_group_call(
-                    chat_id,
-                    AudioVideoPiped(
-                        dl,
-                        HighQualityAudio(),
-                        amaze,
-                    ),
-                    stream_type=StreamType().local_stream,
-                )
+                await call_py.play(chat_id, MediaStream(dl, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p))
                 add_to_queue(chat_id, songname, dl, link, "Video", Q)
                 await loser.delete()
                 requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
@@ -201,7 +180,6 @@ async def vplay(c: Client, m: Message):
                 query = m.text.split(None, 1)[1]
                 search = ytsearch(query)
                 Q = 720
-                amaze = HighQualityVideo()
                 if search == 0:
                     await loser.edit("❌ **لم يتم العثور على نتائج**")
                 else:
@@ -233,15 +211,7 @@ async def vplay(c: Client, m: Message):
                         else:
                             try:
                                 await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                                await call_py.join_group_call(
-                                    chat_id,
-                                    AudioVideoPiped(
-                                        ytlink,
-                                        HighQualityAudio(),
-                                        amaze,
-                                    ),
-                                    stream_type=StreamType().local_stream,
-                                )
+                                await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p))
                                 add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
                                 await loser.delete()
                                 requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
@@ -265,7 +235,6 @@ async def vplay(c: Client, m: Message):
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             Q = 720
-            amaze = HighQualityVideo()
             if search == 0:
                 await loser.edit("❌ **لم يتم العثور على نتائج**")
             else:
@@ -297,15 +266,7 @@ async def vplay(c: Client, m: Message):
                     else:
                         try:
                             await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                            await call_py.join_group_call(
-                                chat_id,
-                                AudioVideoPiped(
-                                    ytlink,
-                                    HighQualityAudio(),
-                                    amaze,
-                                ),
-                                stream_type=StreamType().local_stream,
-                            )
+                            await call_py.play(chat_id, MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p))
                             add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
                             await loser.delete()
                             requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
@@ -334,7 +295,7 @@ async def vstream(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != enums.ChatMemberStatus.ADMINISTRATOR:
+    if a.status != "administrator":
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
@@ -355,7 +316,7 @@ async def vstream(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot)
-        if b.status == enums.ChatMemberStatus.BANNED:
+        if b.status == "kicked":
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):
@@ -422,23 +383,9 @@ async def vstream(c: Client, m: Message):
                     caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** {requester}",
                 )
             else:
-                if Q == 720:
-                    amaze = HighQualityVideo()
-                elif Q == 480:
-                    amaze = MediumQualityVideo()
-                elif Q == 360:
-                    amaze = LowQualityVideo()
                 try:
                     await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                    await call_py.join_group_call(
-                        chat_id,
-                        AudioVideoPiped(
-                            livelink,
-                            HighQualityAudio(),
-                            amaze,
-                        ),
-                        stream_type=StreamType().live_stream,
-                    )
+                    await call_py.play(chat_id, MediaStream(livelink, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p))
                     add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
                     await loser.delete()
                     requester = (

@@ -142,7 +142,7 @@ async def lyrics(_, message):
         query = message.text.split(None, 1)[1]
         rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
         resp = requests.get(
-            f"https://api-tede.herokuapp.com/api/lirik?l={query}"
+            f"https://lyrist.vercel.app/api/{query}"
         ).json()
         result = f"{resp[ data ]}"
         await rep.edit(result)
