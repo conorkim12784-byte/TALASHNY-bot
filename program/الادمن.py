@@ -37,7 +37,7 @@ async def update_admin(client, message):
         "✅تم إعادة تحميل البوت ** بشكل صحيح! **  \n✅ ** تم تحديث قائمة المسؤولين ** **! ** "
     )
 
-@Client.on_message(command2(["تخطي"]) & other_filters)
+@Client.on_message(command2(["تخطي","skip"]) & other_filters)
 @authorized_users_only
 async def skip(c: Client, m: Message):
     await m.delete()
@@ -84,7 +84,7 @@ async def skip(c: Client, m: Message):
             await m.reply(OP)
 
 @Client.on_message(
-    command2(["انهاء"])
+    command2(["انهاء","stop","end"])
     & other_filters
 )
 @authorized_users_only
@@ -120,7 +120,7 @@ async def stop(client, m: Message):
         await m.reply("مفيش حاجه شغاله عشان اسكت")
 
 @Client.on_message(
-    command2(["ايقاف","ايقاف_مؤقت","توقف"]) & other_filters
+    command2(["ايقاف","ايقاف_مؤقت","توقف","pause"]) & other_filters
 )
 @authorized_users_only
 async def pause(client, m: Message):
@@ -138,7 +138,7 @@ async def pause(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 @Client.on_message(
-    command2(["كمل","استكمال","استكمل"]) & other_filters
+    command2(["كمل","استكمال","استكمل","resume"]) & other_filters
 )
 @authorized_users_only
 async def resume(client, m: Message):
@@ -157,7 +157,7 @@ async def resume(client, m: Message):
 
 
 @Client.on_message(
-    command2(["ميوت"]) & other_filters
+    command2(["ميوت","mute"]) & other_filters
 )
 @authorized_users_only
 async def mute(client, m: Message):
@@ -175,7 +175,7 @@ async def mute(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 @Client.on_message(
-    command2(["فك_ميوت","حذف_الميوت","حذف الميوت","فك ميوت","ازاله ميوت","ازاله_ميوت"]) & other_filters
+    command2(["فك_ميوت","حذف_الميوت","فك ميوت","ازاله ميوت","unmute"]) & other_filters
 )
 @authorized_users_only
 async def unmute(client, m: Message):

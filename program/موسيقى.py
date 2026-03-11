@@ -45,7 +45,7 @@ async def ytdl(link: str):
     return 0, stderr
 
 
-@Client.on_message(command2(["تشغيل","شغل"]) & other_filters)
+@Client.on_message(command2(["تشغيل","شغل","play","p"]) & other_filters)
 async def play(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -70,12 +70,12 @@ async def play(c: Client, m: Message):
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
         return
-    if not a.can_delete_messages:
+    if not (a.privileges and a.privileges.can_delete_messages):
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __حذف الرسائل__"
         )
         return
-    if not a.can_invite_users:
+    if not (a.privileges and a.privileges.can_invite_users):
         await m.reply_text("ليس لدي صلاحية:" + "\n\n» ❌ __اضافة المستخدمين__")
         return
     try:

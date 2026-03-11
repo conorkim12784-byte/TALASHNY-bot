@@ -5,7 +5,6 @@
 # pyrogram stuff
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
-from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import InlineKeyboardMarkup, Message
 # pytgcalls stuff
 from pytgcalls.types import MediaStream, AudioQuality
@@ -46,7 +45,7 @@ async def ytdl(link: str):
     return 0, stderr
 
 
-@Client.on_message(command2(["تشغيل","شغل"]) & other_filters)
+@Client.on_message(command2(["تشغيل","شغل","play","p"]) & other_filters)
 async def play(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -61,28 +60,28 @@ async def play(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != ChatMemberStatus.ADMINISTRATOR:
+    if a.status.value not in ("administrator", "creator"):
         await m.reply_text(
             f"💡 لاستخدامي ، يجب أن أكون ** مشرف ** مع ** الصلاحيات التالية **:\n\n» ❌ __حذف الرسائل__\n» ❌ __دعوة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n** يتم تحديث البيانات ** تلقائيًا بعد أن تقوم بترقيتي **"
         )
         return
-    if not a.can_manage_video_chats:
+    if not (a.privileges and a.privileges.can_manage_video_chats):
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
         return
-    if not a.can_delete_messages:
+    if not (a.privileges and a.privileges.can_delete_messages):
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __حذف الرسائل__"
         )
         return
-    if not a.can_invite_users:
+    if not (a.privileges and a.privileges.can_invite_users):
         await m.reply_text("ليس لدي صلاحية:" + "\n\n» ❌ __اضافة المستخدمين__")
         return
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot)
-        if b.status == ChatMemberStatus.BANNED:
+        if b.status.value == "banned":
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):

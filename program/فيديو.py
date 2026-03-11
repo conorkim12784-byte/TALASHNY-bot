@@ -51,7 +51,7 @@ async def ytdl(link):
         return 0, stderr.decode()
 
 
-@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو"]) & other_filters)
+@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","vplay","vp"]) & other_filters)
 async def vplay(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
