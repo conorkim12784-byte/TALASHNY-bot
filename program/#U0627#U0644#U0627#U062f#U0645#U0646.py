@@ -91,7 +91,7 @@ async def stop(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await m.reply("✅ **تم ايقاف التشغيل**")
         except Exception as e:
@@ -109,7 +109,7 @@ async def stop(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.leave_group_call(chat_id)
+            await call_py.leave_call(chat_id)
             clear_queue(chat_id)
             await m.reply("حاضر هسكت اهو🥲")
         except Exception as e:
@@ -126,7 +126,7 @@ async def pause(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.pause_stream(chat_id)
+            await call_py.pause(chat_id)
             await m.reply(
                 "⏸ **تم ايقاف المسار موقتآ**\n\n• **لٲستئناف البث استخدم**\n» /resume الامر."
             )
@@ -144,7 +144,7 @@ async def resume(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.resume_stream(chat_id)
+            await call_py.resume(chat_id)
             await m.reply(
                 "▶️ **تم استئناف المسار**\n\n• **لايقاف البث موقتآ استخدم**\n» /pause الامر"
             )
@@ -163,7 +163,7 @@ async def mute(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.mute_stream(chat_id)
+            await call_py.mute(chat_id)
             await m.reply(
                 "🔇 **تم كتم الصوت**\n\n• **لرفع الكتم استخدم**\n» /unmute الامر" 
             )
@@ -181,7 +181,7 @@ async def unmute(client, m: Message):
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
-            await call_py.unmute_stream(chat_id)
+            await call_py.unmute(chat_id)
             await m.reply(
                 "🔊 **تم رفع الكتم**\n\n• **لكتم الصوت استخدم**\n» /mute الامر"
             )

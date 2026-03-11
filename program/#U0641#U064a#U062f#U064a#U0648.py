@@ -16,14 +16,7 @@ from driver.veez import call_py, user
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
-from pytgcalls import StreamType
-from pytgcalls.types.input_stream import AudioVideoPiped
-from pytgcalls.types.input_stream.quality import (
-    HighQualityAudio,
-    HighQualityVideo,
-    LowQualityVideo,
-    MediumQualityVideo,
-)
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 from youtubesearchpython import VideosSearch
 
 
@@ -167,20 +160,15 @@ async def vplay(c: Client, m: Message):
                 thumbnail = f"{IMG_5}"
                 image = await thumb(thumbnail, title, userid, ctitle)
                 if Q == 720:
-                    amaze = HighQualityVideo()
+                    amaze = VideoQuality.HD_720p
                 elif Q == 480:
-                    amaze = MediumQualityVideo()
+                    amaze = VideoQuality.SD_480p
                 elif Q == 360:
-                    amaze = LowQualityVideo()
+                    amaze = VideoQuality.SD_360p
                 await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                await call_py.join_group_call(
+                await call_py.play(
                     chat_id,
-                    AudioVideoPiped(
-                        dl,
-                        HighQualityAudio(),
-                        amaze,
-                    ),
-                    stream_type=StreamType().local_stream,
+                    MediaStream(dl, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
                 )
                 add_to_queue(chat_id, songname, dl, link, "Video", Q)
                 await loser.delete()
@@ -201,7 +189,7 @@ async def vplay(c: Client, m: Message):
                 query = m.text.split(None, 1)[1]
                 search = ytsearch(query)
                 Q = 720
-                amaze = HighQualityVideo()
+                amaze = VideoQuality.HD_720p
                 if search == 0:
                     await loser.edit("❌ **لم يتم العثور على نتائج**")
                 else:
@@ -233,14 +221,9 @@ async def vplay(c: Client, m: Message):
                         else:
                             try:
                                 await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                                await call_py.join_group_call(
+                                await call_py.play(
                                     chat_id,
-                                    AudioVideoPiped(
-                                        ytlink,
-                                        HighQualityAudio(),
-                                        amaze,
-                                    ),
-                                    stream_type=StreamType().local_stream,
+                                    MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
                                 )
                                 add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
                                 await loser.delete()
@@ -265,7 +248,7 @@ async def vplay(c: Client, m: Message):
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             Q = 720
-            amaze = HighQualityVideo()
+            amaze = VideoQuality.HD_720p
             if search == 0:
                 await loser.edit("❌ **لم يتم العثور على نتائج**")
             else:
@@ -297,14 +280,9 @@ async def vplay(c: Client, m: Message):
                     else:
                         try:
                             await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                            await call_py.join_group_call(
+                            await call_py.play(
                                 chat_id,
-                                AudioVideoPiped(
-                                    ytlink,
-                                    HighQualityAudio(),
-                                    amaze,
-                                ),
-                                stream_type=StreamType().local_stream,
+                                MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
                             )
                             add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
                             await loser.delete()
@@ -423,21 +401,16 @@ async def vstream(c: Client, m: Message):
                 )
             else:
                 if Q == 720:
-                    amaze = HighQualityVideo()
+                    amaze = VideoQuality.HD_720p
                 elif Q == 480:
-                    amaze = MediumQualityVideo()
+                    amaze = VideoQuality.SD_480p
                 elif Q == 360:
-                    amaze = LowQualityVideo()
+                    amaze = VideoQuality.SD_360p
                 try:
                     await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                    await call_py.join_group_call(
+                    await call_py.play(
                         chat_id,
-                        AudioVideoPiped(
-                            livelink,
-                            HighQualityAudio(),
-                            amaze,
-                        ),
-                        stream_type=StreamType().live_stream,
+                        MediaStream(livelink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
                     )
                     add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
                     await loser.delete()
