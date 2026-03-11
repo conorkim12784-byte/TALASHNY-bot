@@ -59,41 +59,51 @@ async def _human_time_duration(seconds):
 
 @Client.on_message(command("start") & filters.private & ~filters.edited)
 async def start_(client: Client, message: Message):
-    await message.delete()
-    await message.reply_photo(
-        photo=f"https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption=f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention()} !
-مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
-يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
- +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات
- البوت يشتغل بالاوامر عربي وانجليزي
- لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    # جلب أسماء المطورين
+    dev_ids = [1923931101, 5340100457, 1491415522]
+    dev_buttons = []
+    for dev_id in dev_ids:
+        try:
+            dev_user = await client.get_users(dev_id)
+            dev_name = dev_user.first_name
+        except Exception:
+            dev_name = str(dev_id)
+        dev_buttons.append(InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}"))
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+        caption=f"""**━━━━━━━━━━━━━━━━━━━━**
+👋 **أهلاً {message.from_user.mention()} !**
 
-  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/FY_TF)
-━━━━━━━━━━━━━━━━━━**""",
+🎵 أنا بوت **TALASHNY** للموسيقى
+أقوم بتشغيل الأغاني في المكالمات الصوتية بجودة عالية وبدون انقطاع
+
+✦ يدعم الأوامر بالعربي والإنجليزي
+✦ أضفني للمجموعة وارفعني أدمن
+✦ اكتب `/انضم` لدعوة الحساب المساعد
+
+**━━━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "ضيـف البـوت لمجمـوعتـك ✅",
-                        url=f"https://t.me/G_FireBot?startgroup=true"
+                        "➕ ضيـف البـوت لمجمـوعتـك ✅",
+                        url="https://t.me/G_FireBot?startgroup=true"
                     )
                 ],
-                [InlineKeyboardButton("", callback_data="cbhowtouse")],
+                [InlineKeyboardButton("📋 كيفية الاستخدام", callback_data="cbhowtouse")],
                 [
-                     InlineKeyboardButton(
-                        "الاوامر", url=f"https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
+                    InlineKeyboardButton("📜 الاوامر", url="https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
                     InlineKeyboardButton("❤️ المطور", url=f"https://t.me/{OWNER_NAME}"),
                 ],
                 [
-                    InlineKeyboardButton(
-                        "👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"
-                    ),
-                    InlineKeyboardButton(
-                        "📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"
-                    ),
+                    InlineKeyboardButton("👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"),
+                    InlineKeyboardButton("📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
                 ],
+                dev_buttons,
             ]
         ),
     )
@@ -101,7 +111,10 @@ async def start_(client: Client, message: Message):
 
 @Client.on_message(command(["source"]) & filters.group & ~filters.edited)
 async def source_cmd(client: Client, message: Message):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     # جلب أسماء المطورين من تيليجرام
     dev_ids = [1923931101, 5340100457, 1491415522]
     buttons = []
@@ -113,21 +126,29 @@ async def source_cmd(client: Client, message: Message):
             dev_name = str(dev_id)
         buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("♡ اضف البوت لمجموعتك ♡", url="https://t.me/G_FireBot?startgroup=true")])
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption=f"""🎵 **بوت تلاشني للموسيقى**
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+        caption="""✦ ━━━━━━━━━━━━━━━━━ ✦
+🎵  **T A L A S H N Y**  🎵
+  𝙈 𝙐 𝙎 𝙄 𝘾  𝘽 𝙊 𝙏
 
-👨‍💻 **المطورين:**
-هؤلاء هم من قاموا ببناء وتطوير البوت، تواصل معهم عبر الأزرار أدناه.
+✦ ━━━━━━━━━━━━━━━━━ ✦
 
-📣 **القناة الرسمية:** [اضغط هنا](https://t.me/FY_TF)""",
+🛠 **Built & Developed by:**
+The team behind this bot — reach out via the buttons below.
+
+📣 **Official Channel:** [Click Here](https://t.me/FY_TF)
+✦ ━━━━━━━━━━━━━━━━━ ✦""",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 
 @Client.on_message(command(["developer", "dev"]) & filters.group & ~filters.edited)
 async def help(client: Client, message: Message):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     dev_ids = [1923931101, 5340100457, 1491415522]
     buttons = []
     for dev_id in dev_ids:
@@ -156,7 +177,10 @@ async def shadow(c: Client, message: Message):
 
 @Client.on_message(command(["ping"]) & ~filters.edited)
 async def ping_pong(client: Client, message: Message):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     start = time()
     m_reply = await message.reply_text("pinging...")
     delta_ping = time() - start
@@ -165,7 +189,10 @@ async def ping_pong(client: Client, message: Message):
 
 @Client.on_message(command([f"uptime@{BOT_USERNAME}", "uptime"]) & ~filters.edited)
 async def get_uptime(client: Client, message: Message):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     current_time = datetime.utcnow()
     uptime_sec = (current_time - START_TIME).total_seconds()
     uptime = await _human_time_duration(int(uptime_sec))
