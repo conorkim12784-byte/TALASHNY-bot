@@ -1,5 +1,6 @@
 import asyncio
 from pytgcalls import idle
+import driver.filters  # must be imported first to patch pyrogram.filters.edited
 from driver.veez import call_py, bot, user
 
 
