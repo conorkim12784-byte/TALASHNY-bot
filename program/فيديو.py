@@ -1,3 +1,4 @@
+from pyrogram.enums import ChatMemberStatus
 # Copyright (C) 2021 By Veez Music-Project
 # Commit Start Date 20/10/2021
 # Finished On 28/10/2021
@@ -66,7 +67,7 @@ async def vplay(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status != ChatMemberStatus.ADMINISTRATOR:
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
@@ -295,7 +296,7 @@ async def vstream(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status != ChatMemberStatus.ADMINISTRATOR:
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )

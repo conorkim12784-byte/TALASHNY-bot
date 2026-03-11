@@ -1,3 +1,4 @@
+from pyrogram.enums import ChatMemberStatus
 # Copyright (C) 2021 By Veez Music-Project
 
 from pyrogram import Client
@@ -53,7 +54,7 @@ async def play(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status != ChatMemberStatus.ADMINISTRATOR:
         await m.reply_text(
             "💡 لاستخدامي ، يجب أن أكون ** مشرف ** مع ** الصلاحيات التالية **:\n\n» ❌ __حذف الرسائل__\n» ❌ __دعوة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n** يتم تحديث البيانات ** تلقائيًا بعد أن تقوم بترقيتي **"
         )
