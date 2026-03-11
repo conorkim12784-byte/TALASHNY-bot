@@ -24,12 +24,15 @@ from pyrogram.types import (
 @Client.on_message(command(["reload"]) & other_filters)
 @authorized_users_only
 async def update_admin(client, message):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     global admins
     new_admins = []
-    new_ads = await client.get_chat_members(message.chat.id, filter="administrators")
-    for u in new_ads:
-        new_admins.append(u.user.id)
+    async for u in client.get_chat_members(message.chat.id, filter="administrators"):
+        if u.user:
+            new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
     await message.reply_text(
         "✅تم إعادة تحميل البوت ** بشكل صحيح! **  \n✅ ** تم تحديث قائمة المسؤولين ** **! ** "
@@ -38,7 +41,10 @@ async def update_admin(client, message):
 @Client.on_message(command(["skip"]) & other_filters)
 @authorized_users_only
 async def skip(c: Client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     user_id = m.from_user.id
     chat_id = m.chat.id
     if len(m.command) < 2:
@@ -87,7 +93,10 @@ async def skip(c: Client, m: Message):
 )
 @authorized_users_only
 async def stop(client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -104,7 +113,10 @@ async def stop(client, m: Message):
 )
 @authorized_users_only
 async def pause(client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -122,7 +134,10 @@ async def pause(client, m: Message):
 )
 @authorized_users_only
 async def resume(client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -140,7 +155,10 @@ async def resume(client, m: Message):
 )
 @authorized_users_only
 async def mute(client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -158,7 +176,10 @@ async def mute(client, m: Message):
 )
 @authorized_users_only
 async def unmute(client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -174,7 +195,7 @@ async def unmute(client, m: Message):
 @Client.on_callback_query(filters.regex("cbpause"))
 async def cbpause(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -193,7 +214,7 @@ async def cbpause(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbresume"))
 async def cbresume(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -212,7 +233,7 @@ async def cbresume(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbstop"))
 async def cbstop(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -229,7 +250,7 @@ async def cbstop(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbmute"))
 async def cbmute(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -248,7 +269,7 @@ async def cbmute(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbunmute"))
 async def cbunmute(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:

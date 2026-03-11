@@ -24,12 +24,18 @@ from pyrogram.types import (
 @Client.on_message(command2(["اعاده","تحديث_الادمن","حدث_الادمن"]) & other_filters)
 @authorized_users_only
 async def update_admin(client, message):
-    await message.delete()
+    try:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     global admins
     new_admins = []
-    new_ads = await client.get_chat_members(message.chat.id, filter="administrators")
-    for u in new_ads:
-        new_admins.append(u.user.id)
+    async for u in client.get_chat_members(message.chat.id, filter="administrators"):
+        if u.user:
+            new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
     await message.reply_text(
         "✅تم إعادة تحميل البوت ** بشكل صحيح! **  \n✅ ** تم تحديث قائمة المسؤولين ** **! ** "
@@ -38,7 +44,13 @@ async def update_admin(client, message):
 @Client.on_message(command2(["تخطي"]) & other_filters)
 @authorized_users_only
 async def skip(c: Client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     user_id = m.from_user.id
     chat_id = m.chat.id
     if len(m.command) < 2:
@@ -87,7 +99,13 @@ async def skip(c: Client, m: Message):
 )
 @authorized_users_only
 async def stop(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -105,7 +123,13 @@ async def stop(client, m: Message):
 )
 @authorized_users_only
 async def stop(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -122,7 +146,13 @@ async def stop(client, m: Message):
 )
 @authorized_users_only
 async def pause(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -140,7 +170,13 @@ async def pause(client, m: Message):
 )
 @authorized_users_only
 async def resume(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -159,7 +195,13 @@ async def resume(client, m: Message):
 )
 @authorized_users_only
 async def mute(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
@@ -177,7 +219,13 @@ async def mute(client, m: Message):
 )
 @authorized_users_only
 async def unmute(client, m: Message):
-    await m.delete()
+    try:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:
