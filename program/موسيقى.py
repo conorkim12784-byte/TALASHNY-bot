@@ -19,17 +19,24 @@ from driver.veez import call_py, user
 from driver.utils import bash
 from config import BOT_USERNAME, IMG_5
 # youtube-dl stuff
-from youtubesearchpython import VideosSearch
+import json, subprocess
 
 
 def ytsearch(query: str):
     try:
-        search = VideosSearch(query, limit=1).result()
-        data = search["result"][0]
-        songname = data["title"]
-        url = data["link"]
-        duration = data["duration"]
-        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
+        result = subprocess.run(
+            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download"],
+            capture_output=True, text=True, timeout=20
+        )
+        if not result.stdout:
+            return 0
+        data = json.loads(result.stdout.strip().split("\n")[0])
+        songname = data.get("title", "Unknown")
+        url = data.get("webpage_url", "")
+        duration_secs = data.get("duration", 0)
+        mins, secs = divmod(int(duration_secs), 60)
+        duration = f"{mins}:{secs:02d}"
+        thumbnail = data.get("thumbnail", "")
         return [songname, url, duration, thumbnail]
     except Exception as e:
         print(e)
