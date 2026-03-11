@@ -1,7 +1,7 @@
 tgcrypto
 pyrofork
 py-tgcalls==2.2.11
-youtube-search-python
+youtube-search
 yt-dlp
 speedtest-cli
 python-dotenv
