@@ -1,7 +1,7 @@
 # Copyright (C) 2021 By Veez Music-Project
 
-import json
 import asyncio
+import json
 
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
@@ -18,39 +18,50 @@ from config import BOT_USERNAME, IMG_5
 
 
 async def ytsearch(query: str):
+    """بحث يوتيوب باستخدام yt-dlp بشكل async حقيقي"""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "yt-dlp", f"ytsearch1:{query}",
-            "--dump-json", "--no-playlist", "--no-download",
-            "--no-warnings", "--ignore-errors",
+            "yt-dlp",
+            f"ytsearch1:{query}",
+            "--dump-json",
+            "--no-playlist",
+            "--no-download",
+            "--no-warnings",
+            "--ignore-errors",
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return "timeout - yt-dlp took too long"
+
         stdout = stdout.decode("utf-8", errors="ignore").strip()
         stderr = stderr.decode("utf-8", errors="ignore").strip()
+
         if not stdout:
-            return stderr[:200] if stderr else "no output"
+            return stderr[:300] if stderr else "no results found"
+
         data = json.loads(stdout.split("\n")[0])
         songname = data.get("title", "Unknown")
         url = data.get("webpage_url", "")
-        duration_secs = data.get("duration", 0)
+        duration_secs = data.get("duration", 0) or 0
         mins, secs = divmod(int(duration_secs), 60)
         duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "")
+        thumbnail = data.get("thumbnail", "") or IMG_5
         return [songname, url, duration, thumbnail]
-    except asyncio.TimeoutError:
-        return "timeout"
+
     except Exception as e:
         return str(e)
 
 
 async def ytdl(link: str):
     stdout, stderr = await bash(
-        f'yt-dlp -g -f "best[height<=?720][width<=?1280]" {link}'
+        f'yt-dlp -g -f "bestaudio" --no-playlist "{link}"'
     )
     if stdout:
-        return 1, stdout
+        return 1, stdout.strip().split("\n")[0]
     return 0, stderr
 
 
@@ -60,29 +71,34 @@ async def play(c: Client, m: Message):
     replied = m.reply_to_message
     chat_id = m.chat.id
     user_id = m.from_user.id
+
     if m.sender_chat:
         return await m.reply_text(
-            "you're an __Anonymous__ user !\n\n» revert back to your real user account to use this bot."
+            "انـت مـسـتـخـدم مـجـهـول الـهـويـة!\n\nارجـع لـحـسـابـك الـحـقـيـقـي لـاسـتـخـدام الـبـوت."
         )
+
     try:
         aing = await c.get_me()
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
+
     a = await c.get_chat_member(chat_id, aing.id)
     if a.status.value not in ("administrator", "creator"):
         await m.reply_text(
-            "لاستخدامي يجب ان اكون **مشرف** مع **الصلاحيات التالية**:\n\n» __حذف الرسائل__\n» __دعوة المستخدمين__\n» __ادارة المكالمات المرئية__"
+            "لـاسـتـخـدامـي يـجـب ان اكـون **مـشـرف** مـع **الـصـلـاحـيـات الـتـالـيـة**:\n\n"
+            "» __حـذف الـرسـائـل__\n» __دعـوة الـمـسـتـخـدمـيـن__\n» __ادارة الـمـكـالـمـات الـمـرئـيـة__"
         )
         return
     if not a.privileges.can_manage_video_chats:
-        await m.reply_text("ليس لدي صلاحية:\n\n» __ادارة المكالمات المرئية__")
+        await m.reply_text("لـيـس لـدي صـلـاحـيـة:\n\n» __ادارة الـمـكـالـمـات الـمـرئـيـة__")
         return
     if not a.privileges.can_delete_messages:
-        await m.reply_text("ليس لدي صلاحية:\n\n» __حذف الرسائل__")
+        await m.reply_text("لـيـس لـدي صـلـاحـيـة:\n\n» __حـذف الـرسـائـل__")
         return
     if not a.privileges.can_invite_users:
-        await m.reply_text("ليس لدي صلاحية:\n\n» __اضافة المستخدمين__")
+        await m.reply_text("لـيـس لـدي صـلـاحـيـة:\n\n» __اضـافـة الـمـسـتـخـدمـيـن__")
         return
+
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot)
@@ -101,10 +117,11 @@ async def play(c: Client, m: Message):
         except UserAlreadyParticipant:
             pass
         except Exception as e:
-            return await m.reply_text(f"**فشل المساعد في الانضمام**\n\n**السبب**: `{e}`")
+            return await m.reply_text(f"**فـشـل الـمـسـاعـد فـي الـانـضـمـام**\n\n**السبب**: `{e}`")
 
+    # تشغيل ملف صوتي مرفق
     if replied and (replied.audio or replied.voice):
-        suhu = await replied.reply("**جاري تنزيل الصوت...**")
+        suhu = await replied.reply("**جـاري تـنـزيـل الـصـوت...**")
         dl = await replied.download()
         link = replied.link
         try:
@@ -128,14 +145,20 @@ async def play(c: Client, m: Message):
             await m.reply_photo(
                 photo=image,
                 reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"**تمت اضافة المقطع الى قائمة الانتظار »** `{pos}`\n\n**الاسم:** [{songname}]({link})\n**المجموعه:** `{chat_id}`\n**المده:** `{duration}`\n**طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                caption=(
+                    f"**تـمـت اضـافـة الـمـقـطـع الـى قـائـمـة الـانـتـظـار »** `{pos}`\n\n"
+                    f"**الـاسـم:** [{songname}]({link})\n"
+                    f"**الـمـجـمـوعـه:** `{chat_id}`\n"
+                    f"**الـمـده:** `{duration}`\n"
+                    f"**طـلـب بـواسـطـة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})"
+                ),
             )
         else:
             try:
                 gcname = m.chat.title
                 ctitle = await CHAT_TITLE(gcname)
                 image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
-                await suhu.edit("**يتم التشغيل...**")
+                await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                 await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                 await suhu.delete()
@@ -143,28 +166,39 @@ async def play(c: Client, m: Message):
                 await m.reply_photo(
                     photo=image,
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"**الاسم:** [{songname}]({link})\n**المجموعه:** `{chat_id}`\n**المده:** `{duration}`\n**طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                    caption=(
+                        f"**الـاسـم:** [{songname}]({link})\n"
+                        f"**الـمـجـمـوعـه:** `{chat_id}`\n"
+                        f"**الـمـده:** `{duration}`\n"
+                        f"**طـلـب بـواسـطـة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})"
+                    ),
                 )
             except Exception as e:
                 await suhu.delete()
-                await m.reply_text(f"خطا:\n\n» {e}")
+                await m.reply_text(f"خـطـا:\n\n» {e}")
+
+    # بحث يوتيوب
     else:
         if len(m.command) < 2:
-            await m.reply("» عليك الرد على **ملف صوتي** او **اكتب شي للبحث**")
+            await m.reply("» عـلـيـك الـرد عـلـى **مـلـف صـوتـي** او **اكـتـب شـي لـلـبـحـث**")
         else:
-            suhu = await c.send_message(chat_id, "**جاري البحث...**")
+            suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
             query = m.text.split(None, 1)[1]
+
             search = await ytsearch(query)
+
             if not isinstance(search, list):
-                await suhu.edit(f"**لم يتم العثور على نتائج**\n\n`{search}`")
+                await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
                 return
+
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
             image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
             veez, ytlink = await ytdl(url)
+
             if veez == 0:
-                await suhu.edit(f"تم اكتشاف مشاكل في yt-dlp\n\n» `{ytlink}`")
+                await suhu.edit(f"تـم اكـتـشـاف مـشـاكـل فـي yt-dlp\n\n» `{ytlink}`")
             elif chat_id in QUEUE:
                 pos = add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                 await suhu.delete()
@@ -172,11 +206,17 @@ async def play(c: Client, m: Message):
                 await m.reply_photo(
                     photo=image,
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"**تمت اضافة المقطع الى قائمة الانتظار »** `{pos}`\n\n**الاسم:** [{songname}]({url})\n**المجموعه:** `{chat_id}`\n**المده:** `{duration}`\n**طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                    caption=(
+                        f"**تـمـت اضـافـة الـمـقـطـع الـى قـائـمـة الـانـتـظـار »** `{pos}`\n\n"
+                        f"**الـاسـم:** [{songname}]({url})\n"
+                        f"**الـمـجـمـوعـه:** `{chat_id}`\n"
+                        f"**الـمـده:** `{duration}`\n"
+                        f"**طـلـب بـواسـطـة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})"
+                    ),
                 )
             else:
                 try:
-                    await suhu.edit("**يتم التشغيل...**")
+                    await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                     await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH))
                     add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                     await suhu.delete()
@@ -184,8 +224,14 @@ async def play(c: Client, m: Message):
                     await m.reply_photo(
                         photo=image,
                         reply_markup=InlineKeyboardMarkup(buttons),
-                        caption=f"**تم تشغيل الموسيقى.**\n\n**الاسم:** [{songname}]({url})\n**المجموعه:** `{chat_id}`\n**المده:** `{duration}`\n**طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                        caption=(
+                            f"**تـم تـشـغـيـل الـمـوسـيـقـى.**\n\n"
+                            f"**الـاسـم:** [{songname}]({url})\n"
+                            f"**الـمـجـمـوعـه:** `{chat_id}`\n"
+                            f"**الـمـده:** `{duration}`\n"
+                            f"**طـلـب بـواسـطـة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})"
+                        ),
                     )
                 except Exception as ep:
                     await suhu.delete()
-                    await m.reply_text(f"خطا: `{ep}`")
+                    await m.reply_text(f"خـطـا: `{ep}`")

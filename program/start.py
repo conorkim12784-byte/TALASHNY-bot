@@ -63,38 +63,33 @@ async def start_(client: Client, message: Message):
     await message.reply_photo(
         photo=f"{BOT_PHOTO}",
         caption=f"""**━━━━━━━━━━━━
-اهلا يبني {message.from_user.mention()} !
-مرحبا بك انا بوت اقوم بتشغيل الاغاني في المكالمه الصوتية.
-يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
- + اضفني الى مجموعتك وارفعني رول بشكل مع كامل الصلاحيات
- البوت يشتغل بالاوامر عربي وانجليزي
- لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
+اهـلـا يـبـنـي {message.from_user.mention()} !
+مـرحـبـا بـك انا بـوت اقـوم بـتـشـغـيـل الـاغـانـي فـي الـمـكـالـمـه الـصـوتـيـه.
+يـمـكـنـنـي الـتـشـغـيـل بـصـوت رائـع وبـدون اي مـشـاكـل او تـقـطـيـع فـي الـاغـنـيـه
+ + اضـفـنـي الـى مـجـمـوعـتـك وارفـعـنـي رول بـشـكـل مـع كـامـل الـصـلـاحـيـات
+ الـبـوت يـشـتـغـل بـالـاوامـر عـربـي وانـجـلـيـزي
+ لـانـضـمـام الـحـسـاب الـمـسـاعـد لـتـشـغـيـل الـبـوت اكـتـب انضم
 
 
-  لمعرفة استخدامي بشكل صحيح اضغط علي زر الاوامر. DEV [TALASHNY](https://t.me/FY_TF)
+  لـمـعـرفـة اسـتـخـدامـي بـشـكـل صـحـيـح اضـغـط عـلـي زر الـاوامـر. DEV [TALASHNY](https://t.me/FY_TF)
 
 ━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "ضيف البوت لمجموعتك",
+                        "ضـيـف الـبـوت لـمـجـمـوعـتـك",
                         url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
                     )
                 ],
                 [InlineKeyboardButton("", callback_data="cbhowtouse")],
                 [
-                    InlineKeyboardButton(
-                        "الاوامر", url=f"https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
-                    InlineKeyboardButton("المطور", url=f"https://t.me/{OWNER_NAME}"),
+                    InlineKeyboardButton("الـاوامـر", url=f"https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
+                    InlineKeyboardButton("الـمـطـور", url=f"https://t.me/{OWNER_NAME}"),
                 ],
                 [
-                    InlineKeyboardButton(
-                        "جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"
-                    ),
-                    InlineKeyboardButton(
-                        "قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"
-                    ),
+                    InlineKeyboardButton("جـروب الـدعـم", url=f"https://t.me/{GROUP_SUPPORT}"),
+                    InlineKeyboardButton("قـنـاة الـبـوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
                 ],
             ]
         ),
@@ -106,11 +101,14 @@ async def source_cmd(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
         photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="PROGRAMMER [DEVELOPER](https://t.me/FY_TF)\nTO COMMUNICATE TOGETHER\nFOLLOW THE BUTTONS LOWER",
+        caption="**TALASHNY**\nتـواصـل مـعـنـا عـبـر الـازرار بـالـاسـفـل",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("اضف البوت الى مجموعتك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true"),
+                    InlineKeyboardButton("TALASHNY", url="https://t.me/FY_TF"),
+                ],
+                [
+                    InlineKeyboardButton("اضـف الـبـوت الـى مـجـمـوعـتـك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true"),
                 ]
             ]
         )
@@ -122,14 +120,14 @@ async def dev_cmd(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
         photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="مش محتاجين نكتب كلام كتير خش ع اول زرار وانت هتعرف",
+        caption="مـش مـحـتـاجـيـن نـكـتـب كـلـام كـتـيـر خـش ع اول زرار وانـت هـتـعـرف",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("DEVELOPER", url="https://t.me/FY_TF"),
+                    InlineKeyboardButton("TALASHNY", url="https://t.me/FY_TF"),
                 ],
                 [
-                    InlineKeyboardButton("ضيف البوت لمجموعتك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true"),
+                    InlineKeyboardButton("ضـيـف الـبـوت لـمـجـمـوعـتـك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true"),
                 ]
             ]
         )
@@ -190,22 +188,22 @@ async def new_chat(c: Client, m: Message):
     for member in m.new_chat_members:
         if member.id == bot_id:
             return await m.reply(
-                "**شكرا لاضافتي الى المجموعة !**\n\n"
-                "قم بترقيتي كمسؤول عن المجموعة لكي اتمكن من العمل بشكل صحيح\n"
-                "ولا تنسى كتابة `/انضم` لدعوة الحساب المساعد\n"
-                "قم بكتابة `/تحديث` لتحديث قائمة المشرفين",
+                "**شـكـرا لـاضـافـتـي الـى الـمـجـمـوعـة !**\n\n"
+                "قـم بـتـرقـيـتـي كـمـسـؤـول عـن الـمـجـمـوعـة لـكـي اتـمـكـن مـن الـعـمـل بـشـكـل صـحـيـح\n"
+                "ولا تـنـسـى كـتـابـة `/انضم` لـدعـوة الـحـسـاب الـمـسـاعـد\n"
+                "قـم بـكـتـابـة `/تحديث` لـتـحـديـث قـائـمـة الـمـشـرفـيـن",
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
-                            InlineKeyboardButton("قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
-                            InlineKeyboardButton("جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}")
+                            InlineKeyboardButton("قـنـاة الـبـوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
+                            InlineKeyboardButton("جـروب الـدعـم", url=f"https://t.me/{GROUP_SUPPORT}")
                         ],
                         [
                             InlineKeyboardButton(ALIVE_NAME, url=f"https://t.me/{ass_uname}"),
                         ],
                         [
                             InlineKeyboardButton(
-                                "اضف البوت لمجموعتك",
+                                "اضـف الـبـوت لـمـجـمـوعـتـك",
                                 url=f'https://t.me/{BOT_USERNAME}?startgroup=true'),
                         ],
                     ]
