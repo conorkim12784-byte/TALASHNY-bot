@@ -83,6 +83,9 @@ async def ubot_leave(c: Client, m: Message):
     chat_id = m.chat.id
     left_member = m.left_chat_member
     if left_member.id == bot_id:
-        await user.leave_chat(chat_id)
+        try:
+            await user.leave_chat(chat_id)
+        except Exception:
+            pass
 #    elif left_member.id == ass_id:
 #        await c.leave_chat(chat_id)
