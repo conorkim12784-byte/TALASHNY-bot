@@ -30,7 +30,7 @@ async def edit_or_reply(msg: Message, **kwargs):
     await func(**{k: v for k, v in kwargs.items() if k in spec})
 
 
-@Client.on_message(command2(["مغادره البوت"]) & ~filters.edited)
+@Client.on_message(command2(["مغادره البوت"]))
 @sudo_users_only
 async def bot_leave_group(_, message):
     if len(message.command) != 2:

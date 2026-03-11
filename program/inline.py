@@ -1,48 +1,66 @@
-from pyrogram import Client, errors
+""" inline section button """
+
 from pyrogram.types import (
-    InlineQuery,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
+  CallbackQuery,
+  InlineKeyboardButton,
+  InlineKeyboardMarkup,
+  Message,
 )
-from youtubesearchpython import VideosSearch
+from config import UPDATES_CHANNEL, BOT_USERNAME
 
 
-@Client.on_inline_query()
-async def inline(client: Client, query: InlineQuery):
-    answers = []
-    search_query = query.query.lower().strip().rstrip()
+def stream_markup(user_id):
+  channel_url = f"https://t.me/{UPDATES_CHANNEL}" if UPDATES_CHANNEL else "https://t.me/"
+  bot_username = BOT_USERNAME or "WorldMusicly_Bot"
+  buttons = [
+    [
+      InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data=f'cbmenu | {user_id}'),
+      InlineKeyboardButton(text="• الـتـحـديـثـات♪", url=channel_url),
+    ],
+    [
+    InlineKeyboardButton(
+                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
+                        url=f'https://t.me/{bot_username}?startgroup=true'),
+    ],
+  ]
+  return buttons
 
-    if search_query == "":
-        await client.answer_inline_query(
-            query.id,
-            results=answers,
-            switch_pm_text=" يمكنك البحث مباشرة من اليوتيوب",
-            switch_pm_parameter="help",
-            cache_time=0,
-        )
-    else:
-        search = VideosSearch(search_query, limit=50)
 
-        for result in search.result()["result"]:
-            answers.append(
-                InlineQueryResultArticle(
-                    title=result["title"],
-                    description="{}, {} views.".format(
-                        result["duration"], result["viewCount"]["short"]
-                    ),
-                    input_message_content=InputTextMessageContent(
-                        "🔗 https://www.youtube.com/watch?v={}".format(result["id"])
-                    ),
-                    thumb_url=result["thumbnails"][0]["url"],
-                )
-            )
+def menu_markup(user_id):
+  buttons = [
+    [
+      InlineKeyboardButton(text="⏹", callback_data=f'cbstop | {user_id}'),
+      InlineKeyboardButton(text="⏸", callback_data=f'cbpause | {user_id}'),
+      InlineKeyboardButton(text="▶️", callback_data=f'cbresume | {user_id}'),
+    ],
+    [
+      InlineKeyboardButton(text="🔇", callback_data=f'cbmute | {user_id}'),
+      InlineKeyboardButton(text="🔊", callback_data=f'cbunmute | {user_id}'),
+    ],
+    [
+      InlineKeyboardButton(text="🗑 اغلاق", callback_data='cls'),
+    ]
+  ]
+  return buttons
 
-        try:
-            await query.answer(results=answers, cache_time=0)
-        except errors.QueryIdInvalid:
-            await query.answer(
-                results=answers,
-                cache_time=0,
-                switch_pm_text="خطاء:انتهت مهلة البحث",
-                switch_pm_parameter="",
-            )
+
+close_mark = InlineKeyboardMarkup(
+  [
+    [
+      InlineKeyboardButton(
+        "🔙 رجوع", callback_data="cbmenu"
+      )
+    ]
+  ]
+)
+
+
+back_mark = InlineKeyboardMarkup(
+  [
+    [
+      InlineKeyboardButton(
+        "🔙 رجوع", callback_data="cbmenu"
+      )
+    ]
+  ]
+)

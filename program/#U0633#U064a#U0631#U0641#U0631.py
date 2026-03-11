@@ -11,7 +11,7 @@ from driver.filters import command2, other_filters
 from pyrogram import Client, filters
 from driver.decorators import sudo_users_only, humanbytes
 
-@Client.on_message(command2(["سيرفر","معلومات السيرفر","بيانات السيرفر"]) & ~filters.edited)
+@Client.on_message(command2(["سيرفر","معلومات السيرفر","بيانات السيرفر"]))
 @sudo_users_only
 async def give_sysinfo(client, message):
     await message.delete()

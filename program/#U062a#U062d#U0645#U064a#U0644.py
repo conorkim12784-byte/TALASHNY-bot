@@ -33,7 +33,7 @@ ydl_opts = {
     'quite': True
 }
 
-@Client.on_message(command2(["تحميل","تحميل_موسيقي"]) & ~filters.edited)
+@Client.on_message(command2(["تحميل","تحميل_موسيقي"]))
 def song(_, message):
     query = " ".join(message.command[1:])
     m = message.reply("🔎 جاري البحث انتظر قليلآ...")
@@ -84,7 +84,7 @@ def song(_, message):
         print(e)
 
 @Client.on_message(
-    command2(["تحميل_فيديو","تحميل فيديو"]) & ~filters.edited
+    command2(["تحميل_فيديو","تحميل فيديو"])
 )
 async def vsong(client, message):
     await message.delete()

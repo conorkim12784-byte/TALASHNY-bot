@@ -1,6 +1,8 @@
 from cache.admins import admins
 from driver.veez import call_py, bot
-from pyrogram import Client, filters
+from pyrogram import Client
+from pyrogram.enums import ChatMembersFilter
+from pyrogram import filters
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.queues import QUEUE, clear_queue
@@ -27,8 +29,8 @@ async def update_admin(client, message):
     await message.delete()
     global admins
     new_admins = []
-    new_ads = await client.get_chat_members(message.chat.id, filter="administrators")
-    for u in new_ads:
+    new_ads = client.get_chat_members(message.chat.id, filter=ChatMembersFilter.ADMINISTRATORS)
+    async for u in new_ads:
         new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
     await message.reply_text(

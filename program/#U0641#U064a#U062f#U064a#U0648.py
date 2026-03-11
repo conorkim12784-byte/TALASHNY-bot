@@ -66,12 +66,12 @@ async def vplay(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status.value not in ("administrator", "creator"):
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
         return
-    if not a.can_manage_voice_chats:
+    if not (a.privileges and a.privileges.can_manage_video_chats):
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
@@ -87,7 +87,7 @@ async def vplay(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot) 
-        if b.status == "kicked":
+        if b.status.value == "banned":
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):
@@ -312,12 +312,12 @@ async def vstream(c: Client, m: Message):
     except Exception as e:
         return await m.reply_text(f"error:\n\n{e}")
     a = await c.get_chat_member(chat_id, aing.id)
-    if a.status != "administrator":
+    if a.status.value not in ("administrator", "creator"):
         await m.reply_text(
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
         return
-    if not a.can_manage_voice_chats:
+    if not (a.privileges and a.privileges.can_manage_video_chats):
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
@@ -333,7 +333,7 @@ async def vstream(c: Client, m: Message):
     try:
         ubot = (await user.get_me()).id
         b = await c.get_chat_member(chat_id, ubot)
-        if b.status == "kicked":
+        if b.status.value == "banned":
             await c.unban_chat_member(chat_id, ubot)
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):

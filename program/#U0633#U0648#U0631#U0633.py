@@ -58,7 +58,7 @@ async def _human_time_duration(seconds):
     return ", ".join(parts)
 
 
-@Client.on_message(command2(["مبرمج_السورس","مبرمج السورس","السورس","سورس"]) & filters.group & ~filters.edited)
+@Client.on_message(command2(["مبرمج_السورس","مبرمج السورس","السورس","سورس"]) & filters.group)
 async def start(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -73,7 +73,7 @@ async def start(client: Client, message: Message):
      )
   )
 
-@Client.on_message(command2(["المطور","مطور"]) & filters.group & ~filters.edited)
+@Client.on_message(command2(["المطور","مطور"]) & filters.group)
 async def help(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -91,7 +91,7 @@ async def help(client: Client, message: Message):
      )
   )
 
-@Client.on_message(command2(["بينج","بنج","البنج"]) & ~filters.edited)
+@Client.on_message(command2(["بينج","بنج","البنج"]))
 async def ping_pong(client: Client, message: Message):
     await message.delete()
     start = time()
@@ -99,7 +99,7 @@ async def ping_pong(client: Client, message: Message):
     delta_ping = time() - start
     await m_reply.edit_text("🏓 `PONG!!`\n" f"⚡️ `{delta_ping * 1000:.3f} ms`")
 
-@Client.on_message(command2(["مده التشغيل","مده_التشغيل","فتره التشغيل","فتره_التشغيل"]) & ~filters.edited)
+@Client.on_message(command2(["مده التشغيل","مده_التشغيل","فتره التشغيل","فتره_التشغيل"]))
 async def get_uptime(client: Client, message: Message):
     await message.delete()
     current_time = datetime.utcnow()
@@ -173,4 +173,3 @@ async def chat_watcher_func(_, message: Message):
         await message.reply_text(
             f"👮🏼 (> {suspect} <)\n\n**Gbanned** user detected, that user has been gbanned by sudo user and was blocked from this Chat !\n\n🚫 **Reason:** potential spammer and abuser."
         )
-
