@@ -70,11 +70,11 @@ async def source_cmd(client: Client, message: Message):
     buttons = []
     for dev_id in dev_ids:
         try:
-            dev_user = await client.get_users(dev_id)
-            dev_name = dev_user.first_name
+            dev_user = (await client.get_users(dev_id))
+            dev_name = dev_user.first_name or str(dev_id)
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+        buttons.append([InlineKeyboardButton(dev_name, url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("اضـف الـبـوت لـمـجـمـوعـتـك", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
@@ -108,11 +108,11 @@ async def help(client: Client, message: Message):
     buttons = []
     for dev_id in dev_ids:
         try:
-            dev_user = await client.get_users(dev_id)
-            dev_name = dev_user.first_name
+            dev_user = (await client.get_users(dev_id))
+            dev_name = dev_user.first_name or str(dev_id)
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+        buttons.append([InlineKeyboardButton(dev_name, url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("اضـف الـبـوت لـمـجـمـوعـتـك", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_animation(
         animation=f"{DEV_PHOTO}",

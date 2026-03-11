@@ -68,11 +68,15 @@ async def start_(client: Client, message: Message):
     dev_buttons = []
     for dev_id in dev_ids:
         try:
-            dev_user = await client.get_users(dev_id)
-            dev_name = dev_user.first_name
+            dev_user = (await client.get_users(dev_id))
+            dev_name = dev_user.first_name or str(dev_id)
         except Exception:
-            dev_name = str(dev_id)
-        dev_buttons.append(InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}"))
+            try:
+                dev_user = (await user.get_users(dev_id))
+                dev_name = dev_user.first_name or str(dev_id)
+            except Exception:
+                dev_name = str(dev_id)
+        dev_buttons.append(InlineKeyboardButton(dev_name, url=f"tg://user?id={dev_id}"))
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption=f"""**━━━━━━━━━━━━━━━━━━━━**
@@ -122,11 +126,15 @@ async def source_cmd(client: Client, message: Message):
     buttons = []
     for dev_id in dev_ids:
         try:
-            dev_user = await client.get_users(dev_id)
-            dev_name = dev_user.first_name
+            dev_user = (await client.get_users(dev_id))
+            dev_name = dev_user.first_name or str(dev_id)
         except Exception:
-            dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+            try:
+                dev_user = (await user.get_users(dev_id))
+                dev_name = dev_user.first_name or str(dev_id)
+            except Exception:
+                dev_name = str(dev_id)
+        buttons.append([InlineKeyboardButton(dev_name, url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("♡ اضف البوت لمجموعتك ♡", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
@@ -157,11 +165,15 @@ async def help(client: Client, message: Message):
     buttons = []
     for dev_id in dev_ids:
         try:
-            dev_user = await client.get_users(dev_id)
-            dev_name = dev_user.first_name
+            dev_user = (await client.get_users(dev_id))
+            dev_name = dev_user.first_name or str(dev_id)
         except Exception:
-            dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+            try:
+                dev_user = (await user.get_users(dev_id))
+                dev_name = dev_user.first_name or str(dev_id)
+            except Exception:
+                dev_name = str(dev_id)
+        buttons.append([InlineKeyboardButton(dev_name, url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_animation(
         animation=f"{DEV_PHOTO}",
