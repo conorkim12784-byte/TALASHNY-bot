@@ -1,5 +1,0 @@
-[phases.setup]
-nixPkgs = ["python310", "ffmpeg", "ntp", "ntpdate"]
-
-[start]
-cmd = "ntpdate -u time.google.com; ntpdate -u time.cloudflare.com; python main.py"
