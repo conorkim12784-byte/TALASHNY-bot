@@ -3,6 +3,7 @@ import asyncio
 from driver.queues import QUEUE, clear_queue, get_queue, pop_an_item
 from driver.veez import bot, call_py
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pytgcalls import PyTgCalls
 from pytgcalls.types import Update, ChatUpdate, StreamEnded, MediaStream, AudioQuality, VideoQuality
 from config import UPDATES_CHANNEL, BOT_USERNAME
 
