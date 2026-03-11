@@ -1,6 +1,6 @@
 tgcrypto
 py-tgcalls==2.2.11
-pyrogram==1.4.16
+pyrogram==2.0.106
 youtube-search-python
 yt-dlp
 lyricsgenius

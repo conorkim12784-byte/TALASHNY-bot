@@ -10,12 +10,18 @@ async def start_bot():
     await call_py.start()
     print("[INFO]: PY-TGCALLS CLIENT STARTED !!")
     if GROUP_SUPPORT:
-        await user.join_chat(GROUP_SUPPORT)
+        try:
+            await user.join_chat(GROUP_SUPPORT)
+        except Exception as e:
+            print(f"[WARN]: Could not join GROUP_SUPPORT: {e}")
     if UPDATES_CHANNEL:
-        await user.join_chat(UPDATES_CHANNEL)
+        try:
+            await user.join_chat(UPDATES_CHANNEL)
+        except Exception as e:
+            print(f"[WARN]: Could not join UPDATES_CHANNEL: {e}")
     await idle()
     print("[INFO]: STOPPING BOT & USERBOT")
     await bot.stop()
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(start_bot())
+
+asyncio.run(start_bot())
