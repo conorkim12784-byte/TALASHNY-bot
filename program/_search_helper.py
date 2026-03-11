@@ -1,38 +1,7 @@
 import asyncio
 
-try:
-    from youtubesearchpython import VideosSearch
-    _USE_VSP = True
-except ImportError:
-    _USE_VSP = False
-
-try:
-    from youtube_search import YoutubeSearch
-    _USE_YS = True
-except ImportError:
-    _USE_YS = False
-
-# إعدادات yt_dlp تتخطى حماية يوتيوب
-_YDL_OPTS_AUDIO = {
-    "format": "bestaudio/best",
-    "quiet": True,
-    "no_warnings": True,
-    "noplaylist": True,
-    "skip_download": True,
-    "extract_flat": False,
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["android", "web"],
-            "player_skip": ["webpage", "js"],
-        }
-    },
-    "http_headers": {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36",
-    },
-}
-
-_YDL_OPTS_VIDEO = {
-    "format": "best[height<=720]/best",
+# yt_dlp بس - بدون youtube_search أو youtubesearchpython
+YDL_BASE = {
     "quiet": True,
     "no_warnings": True,
     "noplaylist": True,
@@ -44,93 +13,74 @@ _YDL_OPTS_VIDEO = {
         }
     },
     "http_headers": {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36",
+        "User-Agent": "com.google.android.youtube/17.36.4 (Linux; U; Android 11) gzip",
     },
 }
 
 
-async def ytsearch(query: str):
-    loop = asyncio.get_event_loop()
-    try:
-        if _USE_VSP:
-            def _s():
-                r = VideosSearch(query, limit=1).result()
-                if not r or not r.get("result"):
-                    return None
-                v = r["result"][0]
-                th = v.get("thumbnails", [{}])
-                return [
-                    v.get("title", "Unknown"),
-                    v.get("link", ""),
-                    v.get("duration", "0:00") or "0:00",
-                    th[0].get("url", "") if th else ""
-                ]
-            res = await loop.run_in_executor(None, _s)
-            return res if res else "no results"
-
-        elif _USE_YS:
-            def _s2():
-                r = YoutubeSearch(query, max_results=1).to_dict()
-                if not r:
-                    return None
-                v = r[0]
-                return [
-                    v.get("title", "Unknown"),
-                    "https://www.youtube.com" + v.get("url_suffix", ""),
-                    v.get("duration", "0:00"),
-                    (v.get("thumbnails") or [""])[0]
-                ]
-            res = await loop.run_in_executor(None, _s2)
-            return res if res else "no results"
-
-        else:
-            import yt_dlp
-            def _s3():
-                opts = {"quiet": True, "no_warnings": True, "extract_flat": True, "noplaylist": True}
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-                    if not info or not info.get("entries"):
-                        return None
-                    v = info["entries"][0]
-                    dur = v.get("duration", 0) or 0
-                    m, s = divmod(int(dur), 60)
-                    return [
-                        v.get("title", "Unknown"),
-                        f"https://www.youtube.com/watch?v={v.get('id','')}",
-                        f"{m}:{s:02d}",
-                        v.get("thumbnail", "")
-                    ]
-            res = await loop.run_in_executor(None, _s3)
-            return res if res else "no results"
-
-    except Exception as e:
-        return str(e)
-
-
-def _get_direct_url(link: str, opts: dict):
-    """بيجيب الرابط المباشر من يوتيوب بدون bot detection"""
+def _search_sync(query: str):
     import yt_dlp
-    # جرب android client الأول عشان أقل حماية
-    for client in [["android"], ["android", "web"], ["web"]]:
+    opts = dict(YDL_BASE)
+    opts["extract_flat"] = True
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+        if not info or not info.get("entries"):
+            return None
+        v = info["entries"][0]
+        dur = v.get("duration", 0) or 0
+        m, s = divmod(int(dur), 60)
+        vid_id = v.get("id", "")
+        return [
+            v.get("title", "Unknown"),
+            f"https://www.youtube.com/watch?v={vid_id}",
+            f"{m}:{s:02d}",
+            v.get("thumbnail", "") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+        ]
+
+
+def _get_url_sync(link: str, is_video: bool = False):
+    import yt_dlp
+    fmt = "best[height<=720]/best" if is_video else "bestaudio/best"
+    for client in [["android"], ["android_vr"], ["web"]]:
         try:
-            o = dict(opts)
-            o["extractor_args"] = {"youtube": {"player_client": client}}
-            with yt_dlp.YoutubeDL(o) as ydl:
+            opts = dict(YDL_BASE)
+            opts["format"] = fmt
+            opts["extractor_args"] = {
+                "youtube": {
+                    "player_client": client,
+                    "player_skip": ["webpage", "js"],
+                }
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(link, download=False)
                 if not info:
                     continue
-                url = info.get("url") or (info.get("formats") or [{}])[-1].get("url", "")
-                if url and url.startswith("http"):
-                    return url
+                # جيب أول URL شغال
+                if info.get("url"):
+                    return info["url"]
+                fmts = info.get("formats", [])
+                for f in reversed(fmts):
+                    u = f.get("url", "")
+                    if u.startswith("http"):
+                        return u
         except Exception:
             continue
     return None
 
 
+async def ytsearch(query: str):
+    loop = asyncio.get_event_loop()
+    try:
+        res = await loop.run_in_executor(None, _search_sync, query)
+        return res if res else "لم يتم العثور على نتائج"
+    except Exception as e:
+        return str(e)
+
+
 async def ytdl_audio(link: str):
     loop = asyncio.get_event_loop()
     try:
-        url = await loop.run_in_executor(None, _get_direct_url, link, _YDL_OPTS_AUDIO)
+        url = await loop.run_in_executor(None, _get_url_sync, link, False)
         if url:
             return 1, url
         return 0, "فشل في جلب رابط الصوت"
@@ -141,7 +91,7 @@ async def ytdl_audio(link: str):
 async def ytdl_video(link: str):
     loop = asyncio.get_event_loop()
     try:
-        url = await loop.run_in_executor(None, _get_direct_url, link, _YDL_OPTS_VIDEO)
+        url = await loop.run_in_executor(None, _get_url_sync, link, True)
         if url:
             return 1, url
         return 0, "فشل في جلب رابط الفيديو"
