@@ -35,7 +35,6 @@ __micro__ = 1
 
 __python_version__ = f"{version_info[0]}.{version_info[1]}.{version_info[2]}"
 
-
 START_TIME = datetime.utcnow()
 START_TIME_ISO = START_TIME.replace(microsecond=0).isoformat()
 TIME_DURATION_UNITS = (
@@ -62,7 +61,7 @@ async def _human_time_duration(seconds):
 async def start_(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
-        photo=f"{BOT_PHOTO}",
+        photo=f"https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption=f"""**━━━━━━━━━━━━
 اهـلا يـبـنـي.؟ {message.from_user.mention()} !
 مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
@@ -71,15 +70,14 @@ async def start_(client: Client, message: Message):
  البوت يشتغل بالاوامر عربي وانجليزي
  لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
 
-
-  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/WORLD_MUSIC_F)
+  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/FY_TF)
 ━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
                         "ضيـف البـوت لمجمـوعتـك ✅",
-                        url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
+                        url=f"https://t.me/G_FireBot?startgroup=true"
                     )
                 ],
                 [InlineKeyboardButton("", callback_data="cbhowtouse")],
@@ -102,37 +100,50 @@ async def start_(client: Client, message: Message):
 
 
 @Client.on_message(command(["source"]) & filters.group & ~filters.edited)
-async def start(client: Client, message: Message):
+async def source_cmd(client: Client, message: Message):
     await message.delete()
+    # جلب أسماء المطورين من تيليجرام
+    dev_ids = [1923931101, 5340100457, 1491415522]
+    buttons = []
+    for dev_id in dev_ids:
+        try:
+            dev_user = await client.get_users(dev_id)
+            dev_name = dev_user.first_name
+        except Exception:
+            dev_name = str(dev_id)
+        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
+    buttons.append([InlineKeyboardButton("♡ اضف البوت لمجموعتك ♡", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_photo(
-        photo=f"https://telegra.ph/file/a6c96cdbd066ca2388d06.jpg",
-        caption=f"""ᴘʀᴏɢʀᴀᴍᴍᴇʀ [𝘿𝙀𝙑𝙀𝙇𝙊𝙋𝙀𝙍 ☤ ](https://t.me/WORLD_MUSIC_F) 𖡼\nᴛᴏ ᴄᴏᴍᴍụɴɪᴄᴀᴛᴇ ᴛᴏɢᴇᴛʜᴇʀ 𖡼\nғᴏʟʟᴏᴡ ᴛʜᴇ ʙụᴛᴛᴏɴѕ ʟᴏᴡᴇʀ 𖡼""",
-        reply_markup=InlineKeyboardMarkup(
-         [
-            [
-                InlineKeyboardButton("♡اضف البوت الى مجموعتك♡", url=f"https://t.me/WorldMusicly_Bot?startgroup=true"),
-            ]
-         ]
-     )
-  )
+        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+        caption=f"""🎵 **بوت تلاشني للموسيقى**
 
-@Client.on_message(command(["developer","dev"]) & filters.group & ~filters.edited)
+👨‍💻 **المطورين:**
+هؤلاء هم من قاموا ببناء وتطوير البوت، تواصل معهم عبر الأزرار أدناه.
+
+📣 **القناة الرسمية:** [اضغط هنا](https://t.me/FY_TF)""",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+
+@Client.on_message(command(["developer", "dev"]) & filters.group & ~filters.edited)
 async def help(client: Client, message: Message):
     await message.delete()
+    dev_ids = [1923931101, 5340100457, 1491415522]
+    buttons = []
+    for dev_id in dev_ids:
+        try:
+            dev_user = await client.get_users(dev_id)
+            dev_name = dev_user.first_name
+        except Exception:
+            dev_name = str(dev_id)
+        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
+    buttons.append([InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_photo(
         photo=f"{DEV_PHOTO}",
         caption=f"""◍ مش محتاجين نكتب كلام كتير خش ع اول زرار وانت هتعرف""",
-        reply_markup=InlineKeyboardMarkup(
-         [
-            [
-                InlineKeyboardButton("• 𝘿𝙀𝙑𝙀𝙇𝙊𝙋𝙀𝙍 ☤ ", url=f"https://t.me/WORLD_MUSIC_F"),
-            ],
-            [
-                InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅", url=f"https://t.me/{BOT_USERNAME}?startgroup=true"),
-            ]
-         ]
-     )
-  )
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
 
 @Client.on_message(command(["لب التوكن", f"لب_التوكن", "scolze"]) & filters.private & ~filters.edited)
 @sudo_users_only
@@ -142,6 +153,7 @@ async def shadow(c: Client, message: Message):
     BOT_TOKEN = time() - start
     await m_reply.edit_text(f"**تم جلب التوكن**\n`{BOT_TOKEN}`")
 
+
 @Client.on_message(command(["ping"]) & ~filters.edited)
 async def ping_pong(client: Client, message: Message):
     await message.delete()
@@ -150,7 +162,8 @@ async def ping_pong(client: Client, message: Message):
     delta_ping = time() - start
     await m_reply.edit_text("🏓 `PONG!!`\n" f"⚡️ `{delta_ping * 1000:.3f} ms`")
 
-@Client.on_message(command(["uptime", f"uptime@{BOT_USERNAME}"]) & ~filters.edited)
+
+@Client.on_message(command([f"uptime@{BOT_USERNAME}", "uptime"]) & ~filters.edited)
 async def get_uptime(client: Client, message: Message):
     await message.delete()
     current_time = datetime.utcnow()
@@ -161,7 +174,8 @@ async def get_uptime(client: Client, message: Message):
         f"• **uptime:** `{uptime}`\n"
         f"• **start time:** `{START_TIME_ISO}`"
     )
-    
+
+
 @Client.on_chat_join_request()
 async def approve_join_chat(c: Client, m: ChatJoinRequest):
     if not m.from_user:
@@ -194,13 +208,12 @@ async def new_chat(c: Client, m: Message):
                             InlineKeyboardButton("💭 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}")
                         ],
                         [
-                            InlineKeyboardButton(
-                        ALIVE_NAME, url=f"https://t.me/{ass_uname}"),
+                            InlineKeyboardButton(ALIVE_NAME, url=f"https://t.me/{ass_uname}"),
                         ],
                         [
                             InlineKeyboardButton(
-                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
-                        url=f'https://t.me/WorldMusicly_Bot?startgroup=true'),
+                                "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
+                                url="https://t.me/G_FireBot?startgroup=true"),
                         ],
                     ]
                 )
@@ -208,6 +221,7 @@ async def new_chat(c: Client, m: Message):
 
 
 chat_watcher_group = 5
+
 
 @Client.on_message(group=chat_watcher_group)
 async def chat_watcher_func(_, message: Message):
@@ -224,4 +238,3 @@ async def chat_watcher_func(_, message: Message):
         await message.reply_text(
             f"👮🏼 (> {suspect} <)\n\n**Gbanned** user detected, that user has been gbanned by sudo user and was blocked from this Chat !\n\n🚫 **Reason:** potential spammer and abuser."
         )
-
