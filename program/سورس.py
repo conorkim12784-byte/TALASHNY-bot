@@ -59,7 +59,13 @@ async def _human_time_duration(seconds):
 
 @Client.on_message(command2(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"]) & filters.group & ~filters.edited)
 async def source_cmd(client: Client, message: Message):
-    await message.delete()
+    try:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     dev_ids = [1923931101, 5340100457, 1491415522]
     buttons = []
     for dev_id in dev_ids:
@@ -68,23 +74,36 @@ async def source_cmd(client: Client, message: Message):
             dev_name = dev_user.first_name
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
-    buttons.append([InlineKeyboardButton("♡ اضف البوت لمجموعتك ♡", url="https://t.me/G_FireBot?startgroup=true")])
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption=f"""🎵 **بوت تلاشني للموسيقى**
+        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+    buttons.append([InlineKeyboardButton("اضـف الـبـوت لـمـجـمـوعـتـك", url="https://t.me/G_FireBot?startgroup=true")])
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+        caption="""━━━━━━━━━━━━━━━━━━━━
+T·A·L·A·S·H·N·Y
+M·U·S·I·C  B·O·T
+━━━━━━━━━━━━━━━━━━━━
 
-👨‍💻 **المطورين:**
-هؤلاء هم من قاموا ببناء وتطوير البوت، تواصل معهم عبر الأزرار أدناه.
+B·U·I·L·T  &  D·E·V·E·L·O·P·E·D  B·Y
+T·H·E  T·A·L·A·S·H·N·Y  T·E·A·M
 
-📣 **القناة الرسمية:** [اضغط هنا](https://t.me/FY_TF)""",
+R·E·A·C·H  O·U·T  V·I·A  T·H·E  B·U·T·T·O·N·S  B·E·L·O·W
+
+O·F·F·I·C·I·A·L  C·H·A·N·N·E·L
+[C·L·I·C·K  H·E·R·E](https://t.me/FY_TF)
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 
 @Client.on_message(command2(["المطور", "مطور"]) & filters.group & ~filters.edited)
 async def help(client: Client, message: Message):
-    await message.delete()
+    try:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     dev_ids = [1923931101, 5340100457, 1491415522]
     buttons = []
     for dev_id in dev_ids:
@@ -93,18 +112,31 @@ async def help(client: Client, message: Message):
             dev_name = dev_user.first_name
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
-    buttons.append([InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅", url="https://t.me/G_FireBot?startgroup=true")])
-    await message.reply_photo(
-        photo=f"{DEV_PHOTO}",
-        caption=f"""◍ مش محتاجين نكتب كلام كتير خش ع اول زرار وانت هتعرف""",
+        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
+    buttons.append([InlineKeyboardButton("اضـف الـبـوت لـمـجـمـوعـتـك", url="https://t.me/G_FireBot?startgroup=true")])
+    await message.reply_animation(
+        animation=f"{DEV_PHOTO}",
+        caption="""━━━━━━━━━━━━━━━━━━━━
+T·A·L·A·S·H·N·Y  —  M·U·S·I·C  B·O·T
+━━━━━━━━━━━━━━━━━━━━
+
+F·R·O·N·T·E·N·D  D·E·V·E·L·O·P·E·R·S
+T·A·P  T·H·E  B·U·T·T·O·N·S  B·E·L·O·W
+
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 
 @Client.on_message(command2(["بينج", "بنج", "البنج"]) & ~filters.edited)
 async def ping_pong(client: Client, message: Message):
-    await message.delete()
+    try:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     start = time()
     m_reply = await message.reply_text("pinging...")
     delta_ping = time() - start
@@ -113,7 +145,13 @@ async def ping_pong(client: Client, message: Message):
 
 @Client.on_message(command2(["مده التشغيل", "مده_التشغيل", "فتره التشغيل", "فتره_التشغيل"]) & ~filters.edited)
 async def get_uptime(client: Client, message: Message):
-    await message.delete()
+    try:
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
     current_time = datetime.utcnow()
     uptime_sec = (current_time - START_TIME).total_seconds()
     uptime = await _human_time_duration(int(uptime_sec))

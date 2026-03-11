@@ -18,63 +18,65 @@ from config import (
 @Client.on_callback_query(filters.regex("cbstart"))
 async def cbstart(_, query: CallbackQuery):
     await query.answer("الصفحه الرئيسيه")
-    await query.edit_message_text(
-        f"""**━━━━━━━━━━━━
-اهـلا يـبـنـي.؟ {message.from_user.mention()} !
-مـرحبآ بـك انــا بــوت اقـوم بــتـشـغـيـل الاغــانــي فـي الـمـڪـالـمـه الـصـوتـية .🤔❤؟
-يمكنني التشغيل بصوت رائع وبدون اي مشاكل او تقطيع في الاغنيه
- +اضفني الى مجموعتك وارفعني رول بشڪل مع ڪامل الصلاحيات
- البوت يشتغل بالاوامر عربي وانجليزي
- لانضمام الحساب المساعد لتشغيل البوت اكتب انضم
+    await query.edit_message_caption(
+        caption=f"""━━━━━━━━━━━━━━━━━━━━
+T·A·L·A·S·H·N·Y  —  بـوت الـمـوسـيـقـى
+━━━━━━━━━━━━━━━━━━━━
 
+اهـلا  {query.from_user.mention()} !
 
-  لمعرفة استخدامي بشڪل صحيح اضغط علي زر الاوامر. 🤔𝑫𝑬𝑽 [𝑾𝑶𝑹𝑳𝑫 𝑴𝑼𝑺𝑰𝑪 💗ˣ](t.me/WORLD_MUSIC_F)
-━━━━━━━━━━━━━━━━━━**""",
+انـا بـوت تـلاشـنـي للـمـوسـيـقـى
+اشـغّـل الاغـانـي فـي الـمـكـالـمـات الـصـوتـيـة
+بـجـودة عـالـيـة وبـدون انـقـطـاع
+
+يـدعـم الاوامـر بـالـعـربـي والانـجـلـيـزي
+اضـفـنـي للـمـجـمـوعـة وارفـعـنـي ادمـن
+اكـتـب /انـضـم لـدعـوة الـحـسـاب الـمـسـاعـد
+
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(
             [
+                [InlineKeyboardButton(
+                    "اضـف الـبـوت لـمـجـمـوعـتـك",
+                    url=f"https://t.me/G_FireBot?startgroup=true")],
                 [
-                InlineKeyboardButton(
-                        "ضيـف البـوت لمجمـوعتـك ✅",
-                        url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
-                [
-                     InlineKeyboardButton(
-                        "الاوامر", url=f"https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
-                    InlineKeyboardButton("❤️ المطور", url=f"https://t.me/{OWNER_NAME}"),
+                    InlineKeyboardButton("الاوامر", url="https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
+                    InlineKeyboardButton("المطور", url=f"https://t.me/{OWNER_NAME}"),
                 ],
                 [
-                    InlineKeyboardButton(
-                        "👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"
-                    ),
-                    InlineKeyboardButton(
-                        "📣 قناة البوت", url=f"https://t.me/Ch_World_Music"
-                    ),
+                    InlineKeyboardButton("جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"),
+                    InlineKeyboardButton("قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
                 ],
+                [InlineKeyboardButton("كيفية الاستخدام", callback_data="cbhowtouse")],
             ]
         ),
-        disable_web_page_preview=True,
     )
 
 
 @Client.on_callback_query(filters.regex("cbhowtouse"))
 async def cbguides(_, query: CallbackQuery):
     await query.answer("طريقة الاستخدام")
-    await query.edit_message_text(
-        f""" الدليل الأساسي لاستخدام هذا البوت:
+    await query.edit_message_caption(
+        caption=f"""━━━━━━━━━━━━━━━━━━━━
+كـيـفـيـة  الاسـتـخـدام
+━━━━━━━━━━━━━━━━━━━━
 
- 1 ↤ أولاً ، أضفني إلى مجموعتك
- 2 ↤ بعد ذلك ، قم بترقيتي كمشرف ومنح جميع الصلاحيات باستثناء الوضع الخفي
- 3 ↤ بعد ترقيتي ، اكتب /reload مجموعة لتحديث بيانات المشرفين
- 4 ↤ أضف @{ASSISTANT_NAME} إلى مجموعتك أو اكتب /userbotjoin لدعوة حساب المساعد
- 5 ↤ قم بتشغيل المكالمة  أولاً قبل البدء في تشغيل الفيديو / الموسيقى
- 6 ↤ في بعض الأحيان ، يمكن أن تساعدك إعادة تحميل البوت باستخدام الأمر /reload في إصلاح بعض المشكلات
- 📌 إذا لم ينضم البوت إلى المكالمة ، فتأكد من تشغيل المكالمة  بالفعل ، أو اكتب /userbotleave ثم اكتب /userbotjoin مرة أخرى
+١  —  اضـفـنـي الـى مـجـمـوعـتـك
+٢  —  ارفـعـنـي ادمـن مـع كـامـل الـصـلاحـيـات
+٣  —  اكـتـب /reload لـتـحـديـث بـيـانـات الـمـشـرفـيـن
+٤  —  اكـتـب /انـضـم لـدعـوة الـحـسـاب الـمـسـاعـد
+٥  —  شـغّـل الـمـكـالـمـة اولا ثـم ابـدا الـتـشـغـيـل
+٦  —  اسـتـخـدم /reload اذا واجـهـت اي مـشـكـلـة
 
- 💡 إذا كانت لديك أسئلة  حول هذا البوت ، فيمكنك إخبارنا منن خلال قروب الدعم الخاصة بي هنا ↤ @{GROUP_SUPPORT}
+اذا لـم يـنـضـم الـبـوت الـى الـمـكـالـمـة
+اكـتـب /userbotleave ثـم /userbotjoin
 
-⚡ قناة البوت @{UPDATES_CHANNEL}
-""",
+لـلـدعـم والاسـتـفـسـار  —  @{GROUP_SUPPORT}
+قـنـاة الـبـوت  —  @{UPDATES_CHANNEL}
+
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🔙 رجوع", callback_data="cbstart")]]
+            [[InlineKeyboardButton("رجوع", callback_data="cbstart")]]
         ),
     )
 
@@ -170,7 +172,7 @@ async def cbsudo(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbmenu"))
 async def cbmenu(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     user_id = query.message.from_user.id
@@ -188,6 +190,6 @@ async def cbmenu(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cls"))
 async def close(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_video_chats:
+    if not getattr(a, "can_manage_video_chats", getattr(a, "can_manage_voice_chats", True)):
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     await query.message.delete()

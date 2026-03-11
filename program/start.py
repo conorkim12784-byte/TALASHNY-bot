@@ -72,36 +72,38 @@ async def start_(client: Client, message: Message):
             dev_name = dev_user.first_name
         except Exception:
             dev_name = str(dev_id)
-        dev_buttons.append(InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}"))
+        dev_buttons.append(InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}"))
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption=f"""**━━━━━━━━━━━━━━━━━━━━**
-👋 **أهلاً {message.from_user.mention()} !**
+اهـلا  {message.from_user.mention()} !
 
-🎵 أنا بوت **TALASHNY** للموسيقى
-أقوم بتشغيل الأغاني في المكالمات الصوتية بجودة عالية وبدون انقطاع
+T·A·L·A·S·H·N·Y  —  بـوت الـمـوسـيـقـى
 
-✦ يدعم الأوامر بالعربي والإنجليزي
-✦ أضفني للمجموعة وارفعني أدمن
-✦ اكتب `/انضم` لدعوة الحساب المساعد
+اشـغّـل الاغـانـي فـي الـمـكـالـمـات الـصـوتـيـة
+بـجـودة عـالـيـة وبـدون انـقـطـاع
+
+يـدعـم الاوامـر بـالـعـربـي والانـجـلـيـزي
+اضـفـنـي لـلـمـجـمـوعـة وارفـعـنـي ادمـن
+اكـتـب /انـضـم لـدعـوة الـحـسـاب الـمـسـاعـد
 
 **━━━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "➕ ضيـف البـوت لمجمـوعتـك ✅",
+                        "اضـف الـبـوت لـمـجـمـوعـتـك",
                         url="https://t.me/G_FireBot?startgroup=true"
                     )
                 ],
-                [InlineKeyboardButton("📋 كيفية الاستخدام", callback_data="cbhowtouse")],
+                [InlineKeyboardButton("كـيـفـيـة الاسـتـخـدام", callback_data="cbhowtouse")],
                 [
-                    InlineKeyboardButton("📜 الاوامر", url="https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
-                    InlineKeyboardButton("❤️ المطور", url=f"https://t.me/{OWNER_NAME}"),
+                    InlineKeyboardButton("الاوامـر", url="https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
+                    InlineKeyboardButton("الـمـطـور", url=f"https://t.me/{OWNER_NAME}"),
                 ],
                 [
-                    InlineKeyboardButton("👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"),
-                    InlineKeyboardButton("📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
+                    InlineKeyboardButton("جـروب الـدعـم", url=f"https://t.me/{GROUP_SUPPORT}"),
+                    InlineKeyboardButton("قـنـاة الـبـوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
                 ],
                 dev_buttons,
             ]
@@ -124,21 +126,23 @@ async def source_cmd(client: Client, message: Message):
             dev_name = dev_user.first_name
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
+        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("♡ اضف البوت لمجموعتك ♡", url="https://t.me/G_FireBot?startgroup=true")])
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="""✦ ━━━━━━━━━━━━━━━━━ ✦
-🎵  **T A L A S H N Y**  🎵
-  𝙈 𝙐 𝙎 𝙄 𝘾  𝘽 𝙊 𝙏
+        caption="""━━━━━━━━━━━━━━━━━━━━
+T·A·L·A·S·H·N·Y
+M·U·S·I·C  B·O·T
+━━━━━━━━━━━━━━━━━━━━
 
-✦ ━━━━━━━━━━━━━━━━━ ✦
+B·U·I·L·T  &  D·E·V·E·L·O·P·E·D  B·Y
+T·H·E  T·A·L·A·S·H·N·Y  T·E·A·M
 
-🛠 **Built & Developed by:**
-The team behind this bot — reach out via the buttons below.
+R·E·A·C·H  O·U·T  V·I·A  T·H·E  B·U·T·T·O·N·S  B·E·L·O·W
 
-📣 **Official Channel:** [Click Here](https://t.me/FY_TF)
-✦ ━━━━━━━━━━━━━━━━━ ✦""",
+O·F·F·I·C·I·A·L  C·H·A·N·N·E·L
+[C·L·I·C·K  H·E·R·E](https://t.me/FY_TF)
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -157,11 +161,18 @@ async def help(client: Client, message: Message):
             dev_name = dev_user.first_name
         except Exception:
             dev_name = str(dev_id)
-        buttons.append([InlineKeyboardButton(f"👨‍💻 {dev_name}", url=f"tg://user?id={dev_id}")])
+        buttons.append([InlineKeyboardButton(f"{dev_name}", url=f"tg://user?id={dev_id}")])
     buttons.append([InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅", url="https://t.me/G_FireBot?startgroup=true")])
-    await message.reply_photo(
-        photo=f"{DEV_PHOTO}",
-        caption=f"""◍ مش محتاجين نكتب كلام كتير خش ع اول زرار وانت هتعرف""",
+    await message.reply_animation(
+        animation=f"{DEV_PHOTO}",
+        caption="""━━━━━━━━━━━━━━━━━━━━
+T·A·L·A·S·H·N·Y  —  M·U·S·I·C  B·O·T
+━━━━━━━━━━━━━━━━━━━━
+
+F·R·O·N·T·E·N·D  D·E·V·E·L·O·P·E·R·S
+T·A·P  T·H·E  B·U·T·T·O·N·S  B·E·L·O·W
+
+━━━━━━━━━━━━━━━━━━━━""",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -231,7 +242,7 @@ async def new_chat(c: Client, m: Message):
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
-                            InlineKeyboardButton("📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
+                            InlineKeyboardButton("قـنـاة الـبـوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
                             InlineKeyboardButton("💭 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}")
                         ],
                         [
