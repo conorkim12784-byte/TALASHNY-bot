@@ -1,3 +1,4 @@
+import asyncio
 # Copyright (C) 2021 By Veez Music-Project
 # Commit Start Date 20/10/2021
 # Finished On 28/10/2021
@@ -22,26 +23,24 @@ from config import BOT_USERNAME, IMG_5
 import json, subprocess
 
 
-def ytsearch(query: str):
+async def ytsearch(query: str):
+    loop = asyncio.get_event_loop()
     try:
-        result = subprocess.run(
-            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download",
-             "--no-warnings", "--ignore-errors"],
-            capture_output=True, text=True, timeout=60
-        )
-        if not result.stdout.strip():
-            print(f"yt-dlp error: {result.stderr[:200]}")
-            return result.stderr[:200] if result.stderr else "no output"
-        data = json.loads(result.stdout.strip().split("\n")[0])
-        songname = data.get("title", "Unknown")
-        url = data.get("webpage_url", "")
-        duration_secs = data.get("duration", 0)
-        mins, secs = divmod(int(duration_secs), 60)
-        duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "")
-        return [songname, url, duration, thumbnail]
+        from youtube_search import YoutubeSearch
+        def _do_search():
+            results = YoutubeSearch(query, max_results=1).to_dict()
+            if not results:
+                return None
+            r = results[0]
+            return [
+                r.get("title", "Unknown"),
+                "https://www.youtube.com" + r.get("url_suffix", ""),
+                r.get("duration", "0:00"),
+                (r.get("thumbnails") or [""])[0]
+            ]
+        res = await loop.run_in_executor(None, _do_search)
+        return res if res else "no results"
     except Exception as e:
-        print(e)
         return str(e)
 
 
@@ -180,7 +179,7 @@ async def play(c: Client, m: Message):
             else:
                 suhu = await c.send_message(chat_id, "🔎 **جاري البحث...**")
                 query = m.text.split(None, 1)[1]
-                search = ytsearch(query)
+                search = await ytsearch(query)
                 if search == 0 or isinstance(search, str):
                     err = search if isinstance(search, str) else ""
                     await suhu.edit(f"❌ **لم يتم العثور على نتائج**\n\n`{err}`")
@@ -240,7 +239,7 @@ async def play(c: Client, m: Message):
         else:
             suhu = await c.send_message(chat_id, "🔎 **جاري البحث...**")
             query = m.text.split(None, 1)[1]
-            search = ytsearch(query)
+            search = await ytsearch(query)
             if search == 0:
                 await suhu.edit("❌ **لم يتم العثور على نتائج**")
             else:
