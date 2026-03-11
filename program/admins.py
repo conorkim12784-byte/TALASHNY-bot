@@ -1,7 +1,8 @@
 from cache.admins import admins
 from driver.veez import call_py, bot
 from pyrogram import Client
-from pyrogram.enums import ChatMembersFilter, filters
+from pyrogram.enums import ChatMembersFilter
+from pyrogram import filters
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.queues import QUEUE, clear_queue
