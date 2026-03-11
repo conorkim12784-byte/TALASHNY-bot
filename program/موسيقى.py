@@ -25,11 +25,13 @@ import json, subprocess
 def ytsearch(query: str):
     try:
         result = subprocess.run(
-            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download"],
-            capture_output=True, text=True, timeout=20
+            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download",
+             "--no-warnings", "--ignore-errors"],
+            capture_output=True, text=True, timeout=60
         )
-        if not result.stdout:
-            return 0
+        if not result.stdout.strip():
+            print(f"yt-dlp error: {result.stderr[:200]}")
+            return result.stderr[:200] if result.stderr else "no output"
         data = json.loads(result.stdout.strip().split("\n")[0])
         songname = data.get("title", "Unknown")
         url = data.get("webpage_url", "")
@@ -40,7 +42,7 @@ def ytsearch(query: str):
         return [songname, url, duration, thumbnail]
     except Exception as e:
         print(e)
-        return 0
+        return str(e)
 
 
 async def ytdl(link: str):
@@ -179,8 +181,9 @@ async def play(c: Client, m: Message):
                 suhu = await c.send_message(chat_id, "🔎 **جاري البحث...**")
                 query = m.text.split(None, 1)[1]
                 search = ytsearch(query)
-                if search == 0:
-                    await suhu.edit("❌ **لم يتم العثور على نتائج**")
+                if search == 0 or isinstance(search, str):
+                    err = search if isinstance(search, str) else ""
+                    await suhu.edit(f"❌ **لم يتم العثور على نتائج**\n\n`{err}`")
                 else:
                     songname = search[0]
                     title = search[0]
