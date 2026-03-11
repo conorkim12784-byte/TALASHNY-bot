@@ -1,6 +1,15 @@
 import asyncio
-import os
-from urllib.parse import unquote
+import aiohttp
+from urllib.parse import unquote, quote_plus
+
+# سيرفرات Piped مفتوحة - بيتجاوز bot detection يوتيوب تماماً
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.tokhmi.xyz",
+    "https://pipedapi.moomoo.me",
+    "https://piped-api.garudalinux.org",
+    "https://api.piped.yt",
+]
 
 
 def _fix_thumbnail(url: str, vid_id: str = "") -> str:
@@ -13,166 +22,111 @@ def _fix_thumbnail(url: str, vid_id: str = "") -> str:
     return url
 
 
-def _make_opts(extra: dict = {}) -> dict:
-    """إعدادات yt_dlp الأساسية مع cookies لو موجودة"""
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "ignoreerrors": True,
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 Chrome/112.0.0.0 Mobile Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-    }
-    # لو في cookies.txt على السيرفر استخدمها
-    for path in ["/app/cookies.txt", "cookies.txt", "/root/cookies.txt"]:
-        if os.path.exists(path):
-            opts["cookiefile"] = path
-            break
-    opts.update(extra)
-    return opts
-
-
-# الـ clients بالترتيب من الأقل bot-detection للأكتر
-_CLIENTS = [
-    ["android_vr"],
-    ["android_creator"],
-    ["android"],
-    ["ios"],
-    ["mweb"],
-]
-
-
-def _search_sync(query: str):
-    import yt_dlp
-    for client in _CLIENTS:
+async def _piped_search(query: str) -> list | None:
+    """بحث عبر Piped API"""
+    for instance in PIPED_INSTANCES:
         try:
-            opts = _make_opts({
-                "extract_flat": True,
-                "extractor_args": {"youtube": {"player_client": client}},
-            })
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-                if not info or not info.get("entries"):
-                    continue
-                v = info["entries"][0]
-                vid_id = v.get("id", "")
-                if not vid_id:
-                    continue
-                dur = v.get("duration", 0) or 0
-                m, s = divmod(int(dur), 60)
-                return [
-                    v.get("title", "Unknown"),
-                    f"https://www.youtube.com/watch?v={vid_id}",
-                    f"{m}:{s:02d}",
-                    _fix_thumbnail(v.get("thumbnail", ""), vid_id)
-                ]
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                url = f"{instance}/search?q={quote_plus(query)}&filter=videos"
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        continue
+                    data = await resp.json()
+                    items = data.get("items", [])
+                    if not items:
+                        continue
+                    v = items[0]
+                    vid_id = v.get("url", "").replace("/watch?v=", "").split("&")[0]
+                    dur = v.get("duration", 0) or 0
+                    m, s = divmod(int(dur), 60)
+                    thumb = v.get("thumbnail", "") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+                    return [
+                        v.get("title", "Unknown"),
+                        f"https://www.youtube.com/watch?v={vid_id}",
+                        f"{m}:{s:02d}",
+                        thumb
+                    ]
         except Exception:
             continue
     return None
 
 
-def _get_audio_url_sync(link: str) -> str | None:
-    """جيب رابط صوت فقط — بدون فيديو"""
-    import yt_dlp
-    # فورمات الصوت فقط بالترتيب
-    audio_formats = [
-        "140",          # m4a audio 128k - الأكتر توافقاً
-        "251",          # webm audio opus
-        "250",          # webm audio opus low
-        "249",          # webm audio opus lowest
-        "bestaudio[ext=m4a]",
-        "bestaudio[ext=webm]",
-        "bestaudio",
-    ]
-    for client in _CLIENTS:
-        for fmt in audio_formats:
-            try:
-                opts = _make_opts({
-                    "format": fmt,
-                    "extractor_args": {
-                        "youtube": {
-                            "player_client": client,
-                            "player_skip": ["webpage", "js"],
-                        }
-                    },
-                })
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(link, download=False)
-                    if not info:
-                        continue
-                    url = info.get("url", "")
-                    if url and url.startswith("http"):
-                        return url
-                    # تحقق من formats
-                    for f in reversed(info.get("formats", [])):
-                        # صوت فقط بدون فيديو
-                        if f.get("vcodec", "none") == "none" and f.get("acodec", "none") != "none":
-                            u = f.get("url", "")
-                            if u.startswith("http"):
-                                return u
-            except Exception:
-                continue
-    return None
-
-
-def _get_video_url_sync(link: str) -> str | None:
-    """جيب رابط فيديو"""
-    import yt_dlp
-    for client in _CLIENTS:
+async def _piped_stream(vid_id: str, audio_only: bool = True) -> str | None:
+    """جيب رابط البث من Piped"""
+    for instance in PIPED_INSTANCES:
         try:
-            opts = _make_opts({
-                "format": "best[height<=720]/best",
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": client,
-                        "player_skip": ["webpage", "js"],
-                    }
-                },
-            })
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(link, download=False)
-                if not info:
-                    continue
-                url = info.get("url", "")
-                if url and url.startswith("http"):
-                    return url
-                for f in reversed(info.get("formats", [])):
-                    u = f.get("url", "")
-                    if u.startswith("http"):
-                        return u
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+                async with session.get(f"{instance}/streams/{vid_id}") as resp:
+                    if resp.status != 200:
+                        continue
+                    data = await resp.json()
+                    if audio_only:
+                        streams = data.get("audioStreams", [])
+                        # رتب من الأعلى جودة للأقل
+                        streams = sorted(streams, key=lambda x: x.get("bitrate", 0), reverse=True)
+                        for s in streams:
+                            url = s.get("url", "")
+                            if url.startswith("http"):
+                                return url
+                    else:
+                        streams = data.get("videoStreams", [])
+                        # اختار 720p أو الأقل
+                        for quality in [720, 480, 360]:
+                            for s in streams:
+                                if s.get("quality", "") == f"{quality}p":
+                                    url = s.get("url", "")
+                                    if url.startswith("http"):
+                                        return url
+                        # لو مش لقى quality معينة خد الأول
+                        if streams:
+                            return streams[0].get("url", "")
         except Exception:
             continue
     return None
 
 
 async def ytsearch(query: str):
-    loop = asyncio.get_event_loop()
     try:
-        res = await loop.run_in_executor(None, _search_sync, query)
+        res = await _piped_search(query)
         return res if res else "لم يتم العثور على نتائج"
     except Exception as e:
         return str(e)
 
 
 async def ytdl_audio(link: str):
-    loop = asyncio.get_event_loop()
     try:
-        url = await loop.run_in_executor(None, _get_audio_url_sync, link)
+        # استخرج video ID
+        vid_id = ""
+        if "watch?v=" in link:
+            vid_id = link.split("watch?v=")[1].split("&")[0]
+        elif "youtu.be/" in link:
+            vid_id = link.split("youtu.be/")[1].split("?")[0]
+
+        if not vid_id:
+            return 0, "رابط غير صحيح"
+
+        url = await _piped_stream(vid_id, audio_only=True)
         if url:
             return 1, url
-        return 0, "فشل في جلب رابط الصوت - جرب لاحقاً"
+        return 0, "فشل في جلب رابط الصوت"
     except Exception as e:
         return 0, str(e)
 
 
 async def ytdl_video(link: str):
-    loop = asyncio.get_event_loop()
     try:
-        url = await loop.run_in_executor(None, _get_video_url_sync, link)
+        vid_id = ""
+        if "watch?v=" in link:
+            vid_id = link.split("watch?v=")[1].split("&")[0]
+        elif "youtu.be/" in link:
+            vid_id = link.split("youtu.be/")[1].split("?")[0]
+
+        if not vid_id:
+            return 0, "رابط غير صحيح"
+
+        url = await _piped_stream(vid_id, audio_only=False)
         if url:
             return 1, url
-        return 0, "فشل في جلب رابط الفيديو - جرب لاحقاً"
+        return 0, "فشل في جلب رابط الفيديو"
     except Exception as e:
         return 0, str(e)
