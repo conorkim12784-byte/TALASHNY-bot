@@ -1,11 +1,9 @@
 tgcrypto
-py-tgcalls==0.9.7
 pyrogram==2.0.106
+py-tgcalls==2.2.11
 youtube-search-python
 yt-dlp
-lyricsgenius
 speedtest-cli
-youtube-search
 python-dotenv
 dnspython
 gitpython
@@ -15,5 +13,4 @@ requests
 pillow
 motor
 psutil
-future
 wget
