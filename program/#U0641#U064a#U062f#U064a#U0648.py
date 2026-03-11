@@ -5,6 +5,7 @@
 import re
 import asyncio
 
+from program._search_helper import ytsearch, ytdl_video as ytdl
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
@@ -17,38 +18,8 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
-import json, subprocess
 
 
-async def ytsearch(query: str):
-    loop = asyncio.get_event_loop()
-    try:
-        from youtube_search import YoutubeSearch
-        def _do_search():
-            results = YoutubeSearch(query, max_results=1).to_dict()
-            if not results:
-                return None
-            r = results[0]
-            return [
-                r.get("title", "Unknown"),
-                "https://www.youtube.com" + r.get("url_suffix", ""),
-                r.get("duration", "0:00"),
-                (r.get("thumbnails") or [""])[0]
-            ]
-        res = await loop.run_in_executor(None, _do_search)
-        return res if res else "no results"
-    except Exception as e:
-        return str(e)
-
-
-async def ytdl(link):
-    for fmt in ["best[height<=720]/best", "best[height<=480]/best", "best"]:
-        from driver.utils import bash as _bash
-        out, err = await _bash(f'yt-dlp -g -f "{fmt}" --no-warnings "{link}"')
-        out = out.strip().split("\n")[0].strip() if out else ""
-        if out and out.startswith("http"):
-            return 1, out
-    return 0, err
 
 
 @Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","vplay","vp"]) & other_filters)

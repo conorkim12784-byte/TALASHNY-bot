@@ -17,40 +17,11 @@ from driver.filters import command, other_filters
 from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
-from driver.utils import bash
+from program._search_helper import ytsearch, ytdl_audio as ytdl
 from config import BOT_USERNAME, IMG_5
 # youtube-dl stuff
-import json, subprocess
 
 
-async def ytsearch(query: str):
-    loop = asyncio.get_event_loop()
-    try:
-        from youtube_search import YoutubeSearch
-        def _do_search():
-            results = YoutubeSearch(query, max_results=1).to_dict()
-            if not results:
-                return None
-            r = results[0]
-            return [
-                r.get("title", "Unknown"),
-                "https://www.youtube.com" + r.get("url_suffix", ""),
-                r.get("duration", "0:00"),
-                (r.get("thumbnails") or [""])[0]
-            ]
-        res = await loop.run_in_executor(None, _do_search)
-        return res if res else "no results"
-    except Exception as e:
-        return str(e)
-
-
-async def ytdl(link: str):
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" --no-warnings "{link}"'
-    )
-    if stdout:
-        return 1, stdout
-    return 0, stderr
 
 
 @Client.on_message(command2(["تشغيل","شغل","play","p"]) & other_filters)

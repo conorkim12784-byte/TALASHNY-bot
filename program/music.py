@@ -1,7 +1,6 @@
 # Copyright (C) 2021 By Veez Music-Project
 
 import asyncio
-import json
 
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
@@ -13,56 +12,10 @@ from driver.design.chatname import CHAT_TITLE
 from driver.filters import command, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
-from driver.utils import bash
+from program._search_helper import ytsearch, ytdl_audio as ytdl
 from config import BOT_USERNAME, IMG_5
 
 
-async def ytsearch(query: str):
-    """بحث يوتيوب باستخدام yt-dlp بشكل async حقيقي"""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "yt-dlp",
-            f"ytsearch1:{query}",
-            "--dump-json",
-            "--no-playlist",
-            "--no-download",
-            "--no-warnings",
-            "--ignore-errors",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
-        except asyncio.TimeoutError:
-            proc.kill()
-            return "timeout - yt-dlp took too long"
-
-        stdout = stdout.decode("utf-8", errors="ignore").strip()
-        stderr = stderr.decode("utf-8", errors="ignore").strip()
-
-        if not stdout:
-            return stderr[:300] if stderr else "no results found"
-
-        data = json.loads(stdout.split("\n")[0])
-        songname = data.get("title", "Unknown")
-        url = data.get("webpage_url", "")
-        duration_secs = data.get("duration", 0) or 0
-        mins, secs = divmod(int(duration_secs), 60)
-        duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "") or IMG_5
-        return [songname, url, duration, thumbnail]
-
-    except Exception as e:
-        return str(e)
-
-
-async def ytdl(link: str):
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio" --no-playlist "{link}"'
-    )
-    if stdout:
-        return 1, stdout.strip().split("\n")[0]
-    return 0, stderr
 
 
 @Client.on_message(command(["mplay", "play"]) & other_filters)
