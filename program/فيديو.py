@@ -60,7 +60,7 @@ async def ytdl(link):
         return 0, stderr.decode()
 
 
-@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","فيد","فيديو","vplay","vp"]) & other_filters)
+@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","vplay","vp"]) & other_filters)
 async def vplay(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -116,12 +116,12 @@ async def vplay(c: Client, m: Message):
             pass
         except Exception as e:
             return await m.reply_text(
-                f"𝗔𝗦𝗦𝗜𝗦𝗧𝗔𝗡𝗧 𝗙𝗔𝗜𝗟𝗘𝗗 𝗧𝗢 𝗝𝗢𝗜𝗡\n\n**السبب**: `{e}`"
+                f"❌ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`"
             )
 
     if replied:
         if replied.video or replied.document:
-            loser = await replied.reply("𝗗𝗢𝗪𝗡𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+            loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
             dl = await replied.download()
             link = replied.link
             if len(m.command) < 2:
@@ -159,7 +159,7 @@ async def vplay(c: Client, m: Message):
                 await m.reply_photo(
                     photo=image,
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n💡 **الحالة:** `شغال`\n𝗕𝗬 : {requester}",
+                    caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {requester}",
                 )
             else:
                 gcname = m.chat.title
@@ -174,7 +174,7 @@ async def vplay(c: Client, m: Message):
                     amaze = VideoQuality.SD_480p
                 elif Q == 360:
                     amaze = VideoQuality.SD_360p
-                await loser.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
                 await call_py.play(
                     chat_id,
                     MediaStream(dl, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
@@ -186,7 +186,7 @@ async def vplay(c: Client, m: Message):
                 await m.reply_photo(
                     photo=image,
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"𝗡𝗢𝗪 𝗣𝗟𝗔𝗬𝗜𝗡𝗚\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : {requester}",
+                    caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** {requester}",
                 )
         else:
             if len(m.command) < 2:
@@ -200,7 +200,7 @@ async def vplay(c: Client, m: Message):
                 Q = 720
                 amaze = VideoQuality.HD_720p
                 if search == 0:
-                    await loser.edit("𝗡𝗢 𝗥𝗘𝗦𝗨𝗟𝗧𝗦 𝗙𝗢𝗨𝗡𝗗")
+                    await loser.edit("❌ **لم يتم العثور على نتائج**")
                 else:
                     songname = search[0]
                     title = search[0]
@@ -225,11 +225,11 @@ async def vplay(c: Client, m: Message):
                             await m.reply_photo(
                                 photo=image,
                                 reply_markup=InlineKeyboardMarkup(buttons),
-                                caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n💡 **الحالة:** `شغال`\n𝗕𝗬 : {requester}",
+                                caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {requester}",
                             )
                         else:
                             try:
-                                await loser.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                                await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
                                 await call_py.play(
                                     chat_id,
                                     MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
@@ -241,11 +241,11 @@ async def vplay(c: Client, m: Message):
                                 await m.reply_photo(
                                     photo=image,
                                     reply_markup=InlineKeyboardMarkup(buttons),
-                                    caption=f"𝗡𝗢𝗪 𝗣𝗟𝗔𝗬𝗜𝗡𝗚\n\n𝗡𝗔𝗠𝗘 : [{songname}]({link})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : {requester}",
+                                    caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** {requester}",
                                 )
                             except Exception as ep:
                                 await loser.delete()
-                                await m.reply_text(f"𝗘𝗥𝗥𝗢𝗥 : `{ep}`")
+                                await m.reply_text(f"🚫 خطأ: `{ep}`")
 
     else:
         if len(m.command) < 2:
@@ -259,7 +259,7 @@ async def vplay(c: Client, m: Message):
             Q = 720
             amaze = VideoQuality.HD_720p
             if search == 0:
-                await loser.edit("𝗡𝗢 𝗥𝗘𝗦𝗨𝗟𝗧𝗦 𝗙𝗢𝗨𝗡𝗗")
+                await loser.edit("❌ **لم يتم العثور على نتائج**")
             else:
                 songname = search[0]
                 title = search[0]
@@ -284,11 +284,11 @@ async def vplay(c: Client, m: Message):
                         await m.reply_photo(
                             photo=image,
                             reply_markup=InlineKeyboardMarkup(buttons),
-                            caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n💡 **الحالة:** `شغال`\n𝗕𝗬 : {requester}",
+                            caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {requester}",
                         )
                     else:
                         try:
-                            await loser.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                            await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
                             await call_py.play(
                                 chat_id,
                                 MediaStream(ytlink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
@@ -300,11 +300,11 @@ async def vplay(c: Client, m: Message):
                             await m.reply_photo(
                                 photo=image,
                                 reply_markup=InlineKeyboardMarkup(buttons),
-                                caption=f"𝗡𝗢𝗪 𝗣𝗟𝗔𝗬𝗜𝗡𝗚\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : {requester}",
+                                caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** {requester}",
                             )
                         except Exception as ep:
                             await loser.delete()
-                            await m.reply_text(f"𝗘𝗥𝗥𝗢𝗥 : `{ep}`")
+                            await m.reply_text(f"🚫 خطأ: `{ep}`")
 
 
 @Client.on_message(command(["vstream", f"ستريم"]) & other_filters)
@@ -362,7 +362,7 @@ async def vstream(c: Client, m: Message):
             pass
         except Exception as e:
             return await m.reply_text(
-                f"𝗔𝗦𝗦𝗜𝗦𝗧𝗔𝗡𝗧 𝗙𝗔𝗜𝗟𝗘𝗗 𝗧𝗢 𝗝𝗢𝗜𝗡\n\n**السبب**: `{e}`"
+                f"❌ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`"
             )
 
     if len(m.command) < 2:
@@ -371,7 +371,7 @@ async def vstream(c: Client, m: Message):
         if len(m.command) == 2:
             link = m.text.split(None, 1)[1]
             Q = 720
-            loser = await c.send_message(chat_id, "𝗣𝗥𝗢𝗖𝗘𝗦𝗦𝗜𝗡𝗚 ...")
+            loser = await c.send_message(chat_id, "🔄 **تتم المعالجة انتظر قليلآ...**")
         elif len(m.command) == 3:
             op = m.text.split(None, 1)[1]
             link = op.split(None, 1)[0]
@@ -383,7 +383,7 @@ async def vstream(c: Client, m: Message):
                 await m.reply(
                     "» __فقط 720, 480, 360 مسموح__ \n💡 **الان يشتغل الفيديو في 720p**"
                 )
-            loser = await c.send_message(chat_id, "𝗣𝗥𝗢𝗖𝗘𝗦𝗦𝗜𝗡𝗚 ...")
+            loser = await c.send_message(chat_id, "🔄 **تتم المعالجة انتظر قليلآ...**")
         else:
             await m.reply("**/vstream {link} {720/480/360}**")
 
@@ -406,7 +406,7 @@ async def vstream(c: Client, m: Message):
                 await m.reply_photo(
                     photo=f"{IMG_1}",
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗕𝗬 : {requester}",
+                    caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** {requester}",
                 )
             else:
                 if Q == 720:
@@ -416,7 +416,7 @@ async def vstream(c: Client, m: Message):
                 elif Q == 360:
                     amaze = VideoQuality.SD_360p
                 try:
-                    await loser.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                    await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
                     await call_py.play(
                         chat_id,
                         MediaStream(livelink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
@@ -430,8 +430,8 @@ async def vstream(c: Client, m: Message):
                     await m.reply_photo(
                         photo=f"{IMG_2}",
                         reply_markup=InlineKeyboardMarkup(buttons),
-                        caption=f"💡 **[فيديو مباشر]({link}) بدء التشغيل**\n\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n💡 **الحالة:** `شغال`\n𝗕𝗬 : {requester}",
+                        caption=f"💡 **[فيديو مباشر]({link}) بدء التشغيل**\n\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {requester}",
                     )
                 except Exception as ep:
                     await loser.delete()
-                    await m.reply_text(f"𝗘𝗥𝗥𝗢𝗥 : `{ep}`")
+                    await m.reply_text(f"🚫 خطأ: `{ep}`")

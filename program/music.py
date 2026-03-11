@@ -94,10 +94,10 @@ async def play(c: Client, m: Message):
         except UserAlreadyParticipant:
             pass
         except Exception as e:
-            return await m.reply_text(f"𝗔𝗦𝗦𝗜𝗦𝗧𝗔𝗡𝗧 𝗙𝗔𝗜𝗟𝗘𝗗 𝗧𝗢 𝗝𝗢𝗜𝗡\n\n**السبب**: `{e}`")
+            return await m.reply_text(f"❌ **فشل المساعد في الانضمام**\n\n**السبب**: `{e}`")
 
     if replied and (replied.audio or replied.voice):
-        suhu = await replied.reply("𝗗𝗢𝗪𝗡𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+        suhu = await replied.reply("📥 **جاري تنزيل الصوت...**")
         dl = await replied.download()
         link = replied.link
         try:
@@ -121,14 +121,14 @@ async def play(c: Client, m: Message):
             await m.reply_photo(
                 photo=image,
                 reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗡𝗔𝗠𝗘 : [{songname}]({link})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                caption=f"💡 **تمت إضافة المقطع إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
             )
         else:
             try:
                 gcname = m.chat.title
                 ctitle = await CHAT_TITLE(gcname)
                 image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
-                await suhu.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                await suhu.edit("🔄 **يتم التشغيل...**")
                 await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                 await suhu.delete()
@@ -136,20 +136,20 @@ async def play(c: Client, m: Message):
                 await m.reply_photo(
                     photo=image,
                     reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"𝗡𝗔𝗠𝗘 : [{songname}]({link})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                    caption=f"🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
                 )
             except Exception as e:
                 await suhu.delete()
-                await m.reply_text(f"𝗘𝗥𝗥𝗢𝗥 :\n\n» {e}")
+                await m.reply_text(f"🚫 خطأ:\n\n» {e}")
     else:
         if len(m.command) < 2:
             await m.reply("» عليك الرد على **ملف صوتي** أو **أكتب شي للبحث**")
         else:
-            suhu = await c.send_message(chat_id, "𝗦𝗘𝗔𝗥𝗖𝗛𝗜𝗡𝗚 ...")
+            suhu = await c.send_message(chat_id, "🔎 **جاري البحث...**")
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             if search == 0:
-                await suhu.edit("𝗡𝗢 𝗥𝗘𝗦𝗨𝗟𝗧𝗦 𝗙𝗢𝗨𝗡𝗗")
+                await suhu.edit("❌ **لم يتم العثور على نتائج**")
             else:
                 songname, url, duration, thumbnail = search
                 gcname = m.chat.title
@@ -165,11 +165,11 @@ async def play(c: Client, m: Message):
                     await m.reply_photo(
                         photo=image,
                         reply_markup=InlineKeyboardMarkup(buttons),
-                        caption=f"𝗔𝗗𝗗𝗘𝗗 𝗧𝗢 𝗤𝗨𝗘𝗨𝗘 » `{pos}`\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                        caption=f"💡 **تمت إضافة المقطع إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
                     )
                 else:
                     try:
-                        await suhu.edit("𝗟𝗢𝗔𝗗𝗜𝗡𝗚 ...")
+                        await suhu.edit("🔄 **يتم التشغيل...**")
                         await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH))
                         add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                         await suhu.delete()
@@ -177,8 +177,8 @@ async def play(c: Client, m: Message):
                         await m.reply_photo(
                             photo=image,
                             reply_markup=InlineKeyboardMarkup(buttons),
-                            caption=f"𝗡𝗢𝗪 𝗣𝗟𝗔𝗬𝗜𝗡𝗚\n\n𝗡𝗔𝗠𝗘 : [{songname}]({url})\n𝗚𝗥𝗢𝗨𝗣 : `{chat_id}`\n𝗧𝗜𝗠𝗘 : `{duration}`\n𝗕𝗬 : [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
+                            caption=f"💡 **تم تشغيل الموسيقى.**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
                         )
                     except Exception as ep:
                         await suhu.delete()
-                        await m.reply_text(f"𝗘𝗥𝗥𝗢𝗥 : `{ep}`")
+                        await m.reply_text(f"🚫 خطأ: `{ep}`")
