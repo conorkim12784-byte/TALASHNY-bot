@@ -1,5 +1,4 @@
 from typing import List
-from pyrogram import enums
 from pyrogram.types import Chat
 from cache.admins import get as gett, set
 
@@ -9,7 +8,7 @@ async def get_administrators(chat: Chat) -> List[int]:
     if get:
         return get
     else:
-        administrators = await chat.get_members(filter=enums.ChatMembersFilter.ADMINISTRATORS)
+        administrators = await chat.get_members(filter="administrators")
         to_set = []
 
         for administrator in administrators:
