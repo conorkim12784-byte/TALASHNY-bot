@@ -21,7 +21,8 @@ async def start_bot():
             print(f"[WARN]: Could not join UPDATES_CHANNEL: {e}")
     await idle()
     print("[INFO]: STOPPING BOT & USERBOT")
-    await call_py.stop()
+    await bot.stop()
 
 
-asyncio.run(start_bot())
+loop = asyncio.get_event_loop()
+loop.run_until_complete(start_bot())
