@@ -174,7 +174,7 @@ async def unmute(client, m: Message):
 @Client.on_callback_query(filters.regex("cbpause"))
 async def cbpause(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -193,7 +193,7 @@ async def cbpause(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbresume"))
 async def cbresume(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -212,7 +212,7 @@ async def cbresume(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbstop"))
 async def cbstop(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -229,7 +229,7 @@ async def cbstop(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbmute"))
 async def cbmute(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:
@@ -248,7 +248,7 @@ async def cbmute(_, query: CallbackQuery):
 @Client.on_callback_query(filters.regex("cbunmute"))
 async def cbunmute(_, query: CallbackQuery):
     a = await _.get_chat_member(query.message.chat.id, query.from_user.id)
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         return await query.answer("💡 المسؤول الوحيد الذي لديه إذن إدارة الدردشات الصوتية يمكنه النقر على هذا الزر !", show_alert=True)
     chat_id = query.message.chat.id
     if chat_id in QUEUE:

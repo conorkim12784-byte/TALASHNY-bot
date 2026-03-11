@@ -59,7 +59,7 @@ async def play(c: Client, m: Message):
             "💡 لاستخدامي ، يجب أن أكون ** مشرف ** مع ** الصلاحيات التالية **:\n\n» ❌ __حذف الرسائل__\n» ❌ __دعوة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n** يتم تحديث البيانات ** تلقائيًا بعد أن تقوم بترقيتي **"
         )
         return
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         await m.reply_text("ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__")
         return
     if not a.can_delete_messages:

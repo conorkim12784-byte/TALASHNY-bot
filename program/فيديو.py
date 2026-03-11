@@ -72,7 +72,7 @@ async def vplay(c: Client, m: Message):
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
         return
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
@@ -301,7 +301,7 @@ async def vstream(c: Client, m: Message):
             f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
         )
         return
-    if not a.can_manage_voice_chats:
+    if not a.can_manage_video_chats:
         await m.reply_text(
             "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
         )
