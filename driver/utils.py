@@ -9,13 +9,13 @@ from pytgcalls.types import Update, StreamEnded, MediaStream, AudioQuality, Vide
 keyboard = InlineKeyboardMarkup(
     [
         [
-            InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data="cbmenu"),
-            InlineKeyboardButton("• الـتـحـديـثـات♪", url="https://t.me/Ch_World_Music"),
+            InlineKeyboardButton(text="الـقـائـمـه", callback_data="cbmenu"),
+            InlineKeyboardButton("الـتـحـديـثـات", url="https://t.me/FY_TF"),
         ],
         [
             InlineKeyboardButton(
-                "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
-                url="https://t.me/WorldMusicly_Bot?startgroup=true",
+                "اضـف الـبـوت لـمـجـمـوعـتـك",
+                url="https://t.me/G_FireBot?startgroup=true",
             )
         ],
     ]
