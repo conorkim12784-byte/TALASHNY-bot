@@ -172,7 +172,7 @@ async def approve_join_chat(c: Client, m: ChatJoinRequest):
     try:
         await c.approve_chat_join_request(m.chat.id, m.from_user.id)
     except FloodWait as e:
-        await asyncio.sleep(e.x + 2)
+        await asyncio.sleep(e.value + 2)
         await c.approve_chat_join_request(m.chat.id, m.from_user.id)
 
 

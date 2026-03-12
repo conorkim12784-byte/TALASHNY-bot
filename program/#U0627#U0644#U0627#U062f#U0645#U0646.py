@@ -175,7 +175,7 @@ async def mute(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 @Client.on_message(
-    command2(["فك_ميوت","حذف_الميوت","حذف الميوت","فك ميوت","ازاله ميوت","ازاله_ميوت"]) & other_filters
+    command2(["فك_ميوت","حذف_الميوت","فك ميوت","ازاله ميوت"]) & other_filters
 )
 @authorized_users_only
 async def unmute(client, m: Message):

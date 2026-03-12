@@ -5,7 +5,6 @@
 import re
 import asyncio
 
-from program._search_helper import ytsearch, ytdl_video as ytdl
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
@@ -18,11 +17,50 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
+import json, subprocess
 
 
+def ytsearch(query: str):
+    try:
+        result = subprocess.run(
+            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download",
+             "--no-warnings", "--ignore-errors"],
+            capture_output=True, text=True, timeout=60
+        )
+        if not result.stdout.strip():
+            print(f"yt-dlp error: {result.stderr[:200]}")
+            return result.stderr[:200] if result.stderr else "no output"
+        data = json.loads(result.stdout.strip().split("\n")[0])
+        songname = data.get("title", "Unknown")
+        url = data.get("webpage_url", "")
+        duration_secs = data.get("duration", 0)
+        mins, secs = divmod(int(duration_secs), 60)
+        duration = f"{mins}:{secs:02d}"
+        thumbnail = data.get("thumbnail", "")
+        return [songname, url, duration, thumbnail]
+    except Exception as e:
+        print(e)
+        return str(e)
 
 
-@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","vplay","vp"]) & other_filters)
+async def ytdl(link):
+    proc = await asyncio.create_subprocess_exec(
+        "yt-dlp",
+        "-g",
+        "-f",
+        "best[height<=?720][width<=?1280]",
+        f"{link}",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return 1, stdout.decode().split("\n")[0]
+    else:
+        return 0, stderr.decode()
+
+
+@Client.on_message(command2(["تشغيل_فيديو","تشغيل فيديو","شغل فيديو","شغل_فيديو","فيد","فيديو"]) & other_filters)
 async def vplay(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -158,7 +196,7 @@ async def vplay(c: Client, m: Message):
             else:
                 loser = await c.send_message(chat_id, "🔎 **جاري البحث انتظر قليلآ...**")
                 query = m.text.split(None, 1)[1]
-                search = await ytsearch(query)
+                search = ytsearch(query)
                 Q = 720
                 amaze = VideoQuality.HD_720p
                 if search == 0:
@@ -217,7 +255,7 @@ async def vplay(c: Client, m: Message):
         else:
             loser = await c.send_message(chat_id, "🔎 **جاري البحث انتظر قليلآ...**")
             query = m.text.split(None, 1)[1]
-            search = await ytsearch(query)
+            search = ytsearch(query)
             Q = 720
             amaze = VideoQuality.HD_720p
             if search == 0:
@@ -269,131 +307,3 @@ async def vplay(c: Client, m: Message):
                             await m.reply_text(f"🚫 خطأ: `{ep}`")
 
 
-@Client.on_message(command(["vstream", f"ستريم"]) & other_filters)
-async def vstream(c: Client, m: Message):
-    await m.delete()
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    if m.sender_chat:
-        return await m.reply_text(
-            "you're an __Anonymous__ user !\n\n» revert back to your real user account to use this bot."
-        )
-    try:
-        aing = await c.get_me()
-    except Exception as e:
-        return await m.reply_text(f"error:\n\n{e}")
-    a = await c.get_chat_member(chat_id, aing.id)
-    if a.status.value not in ("administrator", "creator"):
-        await m.reply_text(
-            f"💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__\n\n **يتم تحديث البوت تلقائي** "
-        )
-        return
-    if not (a.privileges and a.privileges.can_manage_video_chats):
-        await m.reply_text(
-            "ليس لدي صلاحية:" + "\n\n» ❌ __ادارة المكالمات المرئية__"
-        )
-        return
-    if not a.can_delete_messages:
-        await m.reply_text(
-            "ليس لدي صلاحية:" + "\n\n» ❌ __حذف الرسائل__"
-        )
-        return
-    if not a.can_invite_users:
-        await m.reply_text("ليس لدي صلاحية:" + "\n\n» ❌ __اضافة مستخدمين__")
-        return
-    try:
-        ubot = (await user.get_me()).id
-        b = await c.get_chat_member(chat_id, ubot)
-        if b.status.value == "banned":
-            await c.unban_chat_member(chat_id, ubot)
-            invitelink = await c.export_chat_invite_link(chat_id)
-            if invitelink.startswith("https://t.me/+"):
-                invitelink = invitelink.replace(
-                    "https://t.me/+", "https://t.me/joinchat/"
-                )
-            await user.join_chat(invitelink)
-    except UserNotParticipant:
-        try:
-            invitelink = await c.export_chat_invite_link(chat_id)
-            if invitelink.startswith("https://t.me/+"):
-                invitelink = invitelink.replace(
-                    "https://t.me/+", "https://t.me/joinchat/"
-                )
-            await user.join_chat(invitelink)
-        except UserAlreadyParticipant:
-            pass
-        except Exception as e:
-            return await m.reply_text(
-                f"❌ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`"
-            )
-
-    if len(m.command) < 2:
-        await m.reply("» اعطني رابط مباشر للتشغيل")
-    else:
-        if len(m.command) == 2:
-            link = m.text.split(None, 1)[1]
-            Q = 720
-            loser = await c.send_message(chat_id, "🔄 **تتم المعالجة انتظر قليلآ...**")
-        elif len(m.command) == 3:
-            op = m.text.split(None, 1)[1]
-            link = op.split(None, 1)[0]
-            quality = op.split(None, 1)[1]
-            if quality == "720" or "480" or "360":
-                Q = int(quality)
-            else:
-                Q = 720
-                await m.reply(
-                    "» __فقط 720, 480, 360 مسموح__ \n💡 **الان يشتغل الفيديو في 720p**"
-                )
-            loser = await c.send_message(chat_id, "🔄 **تتم المعالجة انتظر قليلآ...**")
-        else:
-            await m.reply("**/vstream {link} {720/480/360}**")
-
-        regex = r"^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+"
-        match = re.match(regex, link)
-        if match:
-            veez, livelink = await ytdl(link)
-        else:
-            livelink = link
-            veez = 1
-
-        if veez == 0:
-            await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{livelink}`")
-        else:
-            if chat_id in QUEUE:
-                pos = add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
-                await loser.delete()
-                requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
-                buttons = stream_markup(user_id)
-                await m.reply_photo(
-                    photo=f"{IMG_1}",
-                    reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** {requester}",
-                )
-            else:
-                if Q == 720:
-                    amaze = VideoQuality.HD_720p
-                elif Q == 480:
-                    amaze = VideoQuality.SD_480p
-                elif Q == 360:
-                    amaze = VideoQuality.SD_360p
-                try:
-                    await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                    await call_py.play(
-                        chat_id,
-                        MediaStream(livelink, audio_parameters=AudioQuality.HIGH, video_parameters=amaze),
-                    )
-                    add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
-                    await loser.delete()
-                    requester = (
-                        f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
-                    )
-                    buttons = stream_markup(user_id)
-                    await m.reply_photo(
-                        photo=f"{IMG_2}",
-                        reply_markup=InlineKeyboardMarkup(buttons),
-                        caption=f"💡 **[فيديو مباشر]({link}) بدء التشغيل**\n\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {requester}",
-                    )
-                except Exception as ep:
-                    await loser.delete()
-                    await m.reply_text(f"🚫 خطأ: `{ep}`")
