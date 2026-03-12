@@ -4,7 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from driver.decorators import sudo_users_only
 from driver.database.dbchat import get_served_chats
-from driver.filters import command2, other_filters
+from driver.filters import command, command2, other_filters
 from config import BOT_USERNAME as bn
 
 
