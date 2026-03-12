@@ -14,27 +14,16 @@ from config import SUDO_USERS
 from driver.filters import other_filters
 from driver.queues import QUEUE
 
-# ═══════════════════════════════════════
-# 🔧 إعدادات وثوابت
-# ═══════════════════════════════════════
-
 DEV_IDS = [1923931101, 5340100457]
 
-# تخزين عدد الحظرات لكل مشرف في كل جروب
-ban_count = {}  # {chat_id: {user_id: count}}
-
-# تخزين المكتومين في كل جروب
-muted_users = {}  # {chat_id: {user_id: True}}
-
-# تخزين المديرين في البوت
-bot_managers = {}  # {chat_id: {user_id: True}}
-
-# تخزين اللي طلبوا الأغاني
-song_requester = {}  # {chat_id: {"name": ..., "requester": ...}}
+# تخزين عدد الحظرات لكل مشرف
+ban_count = {}       # {chat_id: {user_id: count}}
+muted_users = {}     # {chat_id: {user_id: True}}
+bot_managers = {}    # {chat_id: {user_id: True}}
+song_requester = {}  # {chat_id: {"mention": ...}}
 
 GIF_URL = "https://i.postimg.cc/wxV3PspQ/1756574872401.gif"
 
-# ردود عشوائية للأيديين (فيها مبرمجي)
 DEV_REPLIES = [
     "نورت الدنيا يا مبرمجي 🌟",
     "أهلاً بمبرمجي البوت 👨‍💻",
@@ -45,7 +34,6 @@ DEV_REPLIES = [
     "يسلم إيدك يا مبرمجي على الشغل الجميل 💪",
 ]
 
-# ردود عشوائية للأعضاء العاديين
 NORMAL_REPLIES = [
     "أهلاً بيك يا فندم 😊",
     "نورت الجروب 🌟",
@@ -56,7 +44,6 @@ NORMAL_REPLIES = [
     "إيه اللي تأمر بيه؟ 🎵",
 ]
 
-# ردود على البوتات
 BOT_REPLIES = [
     "آلة تكلم آلة 🤖",
     "بوت بيسلم على بوت، عالم غريب 😂",
@@ -66,9 +53,9 @@ BOT_REPLIES = [
 ]
 
 
-# ═══════════════════════════════════════
-# 🔍 دوال مساعدة
-# ═══════════════════════════════════════
+# ══════════════════════════
+# دوال مساعدة
+# ══════════════════════════
 
 def is_dev(user_id):
     return user_id in DEV_IDS
@@ -80,7 +67,6 @@ def is_muted(chat_id, user_id):
     return muted_users.get(chat_id, {}).get(user_id, False)
 
 async def get_member_rank(client, chat_id, user_id):
-    """يرجع رتبة المستخدم"""
     if is_dev(user_id):
         return "مبرمج"
     try:
@@ -91,143 +77,116 @@ async def get_member_rank(client, chat_id, user_id):
             return "مدير"
         if member.status == ChatMemberStatus.ADMINISTRATOR:
             return "مشرف"
-        if member.status == ChatMemberStatus.MEMBER:
-            return "عضو"
-        if member.user.is_bot:
+        if getattr(member.user, 'is_bot', False):
             return "بوت"
+        return "عضو"
     except:
-        pass
-    return "عضو"
+        return "عضو"
 
 async def can_mute(client, chat_id, muter_id, target_id):
-    """يتحقق إذا المستخدم يقدر يكتم الهدف"""
-    if is_dev(muter_id) and not is_dev(target_id):
+    if is_dev(target_id):
+        return False
+    if is_dev(muter_id):
         return True
     try:
         muter = await client.get_chat_member(chat_id, muter_id)
-        target = await client.get_chat_member(chat_id, target_id)
         muter_rank = await get_member_rank(client, chat_id, muter_id)
         target_rank = await get_member_rank(client, chat_id, target_id)
-        # المالك يكتم المديرين والمشرفين والأعضاء بس مش الأيديين
         if muter.status == ChatMemberStatus.OWNER:
-            if is_dev(target_id):
-                return False
-            if target_rank in ["مدير", "مشرف", "عضو"]:
-                return True
-        # المدير يكتم الأعضاء بس
+            return target_rank in ["مدير", "مشرف", "عضو"]
         if muter_rank == "مدير":
-            if target_rank == "عضو":
-                return True
-            return False
+            return target_rank == "عضو"
     except:
         pass
     return False
 
 
-# ═══════════════════════════════════════
-# 🚀 أول ما البوت يدخل جروب
-# ═══════════════════════════════════════
+# ══════════════════════════
+# أول ما البوت يدخل جروب
+# ══════════════════════════
 
 @Client.on_message(filters.new_chat_members & filters.group)
 async def on_bot_join(client: Client, message: Message):
-    me = await client.get_me()
-    for member in message.new_chat_members:
-        if member.id == me.id:
-            chat_id = message.chat.id
-            try:
-                # رفع المالك مالك في البوت
-                chat = await client.get_chat(chat_id)
-                if chat.permissions:
-                    pass
-                # رفع المشرفين مديرين في البوت
+    try:
+        me = await client.get_me()
+        for member in message.new_chat_members:
+            if member.id == me.id:
+                chat_id = message.chat.id
+                if bot_managers.get(chat_id) is None:
+                    bot_managers[chat_id] = {}
                 async for m in client.get_chat_members(chat_id):
-                    if m.status == ChatMemberStatus.ADMINISTRATOR:
-                        if bot_managers.get(chat_id) is None:
-                            bot_managers[chat_id] = {}
+                    if m.status == ChatMemberStatus.ADMINISTRATOR and not m.user.is_bot:
                         bot_managers[chat_id][m.user.id] = True
                 await message.reply(
                     "**✨ أهلاً بكم!**\n\n"
                     "🎵 أنا بوت الموسيقى، جاهز للخدمة!\n"
                     "📋 اكتب /الاوامر لتشاهد كل الأوامر المتاحة"
                 )
-            except Exception as e:
-                pass
-
-
-# ═══════════════════════════════════════
-# 🛡️ منع التصفية - مراقبة الحظرات
-# ═══════════════════════════════════════
-
-@Client.on_message(filters.group & filters.service)
-async def anti_flood_ban(client: Client, message: Message):
-    try:
-        if not message.new_chat_members and not hasattr(message, 'left_chat_member'):
-            return
     except:
         pass
 
 
+# ══════════════════════════
+# منع التصفية
+# ══════════════════════════
+
 @Client.on_chat_member_updated(filters.group)
 async def track_bans(client: Client, update):
     try:
+        if not (update.new_chat_member and
+                update.new_chat_member.status == ChatMemberStatus.BANNED):
+            return
+        banner_id = update.from_user.id if update.from_user else None
+        if not banner_id or is_dev(banner_id):
+            return
         chat_id = update.chat.id
-        if update.new_chat_member and update.new_chat_member.status == ChatMemberStatus.BANNED:
-            banner_id = update.from_user.id if update.from_user else None
-            if not banner_id:
-                return
-            if is_dev(banner_id):
-                return
-            # زود العداد
-            if chat_id not in ban_count:
-                ban_count[chat_id] = {}
-            ban_count[chat_id][banner_id] = ban_count[chat_id].get(banner_id, 0) + 1
-            count = ban_count[chat_id][banner_id]
-            banned_user = update.new_chat_member.user
-            banner = update.from_user
-            # إشعار بكل حظر
-            await client.send_message(
-                chat_id,
-                f"⚠️ **إشعار حظر**\n\n"
-                f"👮 **المشرف:** {banner.mention}\n"
-                f"🚫 **حظر العضو:** {banned_user.mention}\n"
-                f"📊 **عدد الحظرات:** `{count}/45`"
-            )
-            # لو وصل 45 ينزله
-            if count >= 45:
-                try:
-                    await client.promote_chat_member(
-                        chat_id, banner_id,
-                        privileges=ChatPrivileges(
-                            can_manage_chat=False,
-                            can_delete_messages=False,
-                            can_manage_video_chats=False,
-                            can_restrict_members=False,
-                            can_promote_members=False,
-                            can_change_info=False,
-                            can_invite_users=False,
-                            can_pin_messages=False,
-                        )
+        if chat_id not in ban_count:
+            ban_count[chat_id] = {}
+        ban_count[chat_id][banner_id] = ban_count[chat_id].get(banner_id, 0) + 1
+        count = ban_count[chat_id][banner_id]
+        banned_user = update.new_chat_member.user
+        banner = update.from_user
+        await client.send_message(
+            chat_id,
+            f"⚠️ **إشعار حظر**\n\n"
+            f"👮 **المشرف:** {banner.mention}\n"
+            f"🚫 **حظر العضو:** {banned_user.mention}\n"
+            f"📊 **عدد الحظرات:** `{count}/45`"
+        )
+        if count >= 45:
+            try:
+                await client.promote_chat_member(
+                    chat_id, banner_id,
+                    privileges=ChatPrivileges(
+                        can_manage_chat=False,
+                        can_delete_messages=False,
+                        can_manage_video_chats=False,
+                        can_restrict_members=False,
+                        can_promote_members=False,
+                        can_change_info=False,
+                        can_invite_users=False,
+                        can_pin_messages=False,
                     )
-                    ban_count[chat_id][banner_id] = 0
-                    await client.send_message(
-                        chat_id,
-                        f"🚨 **تم إزالة المشرف من الإشراف!**\n\n"
-                        f"👮 **المشرف:** {banner.mention}\n"
-                        f"📊 **السبب:** تجاوز حد الحظر (45 حظر)"
-                    )
-                except Exception as e:
-                    pass
-    except Exception as e:
+                )
+                ban_count[chat_id][banner_id] = 0
+                await client.send_message(
+                    chat_id,
+                    f"🚨 **تم إزالة المشرف من الإشراف!**\n\n"
+                    f"👮 **المشرف:** {banner.mention}\n"
+                    f"📊 **السبب:** تجاوز حد الحظر (45 حظر)"
+                )
+            except:
+                pass
+    except:
         pass
 
 
-# ═══════════════════════════════════════
-# 🔇 نظام الكتم
-# ═══════════════════════════════════════
+# ══════════════════════════
+# حذف رسائل المكتومين
+# ══════════════════════════
 
-@Client.on_message(filters.group & filters.incoming)
+@Client.on_message(filters.group & filters.incoming, group=-1)
 async def delete_muted_messages(client: Client, message: Message):
-    """حذف رسائل المكتومين تلقائياً"""
     if not message.from_user:
         return
     chat_id = message.chat.id
@@ -239,7 +198,11 @@ async def delete_muted_messages(client: Client, message: Message):
             pass
 
 
-async def do_mute(client, message, target_id, target_name):
+# ══════════════════════════
+# أوامر الكتم
+# ══════════════════════════
+
+async def do_mute(client, message, target_id, target_mention):
     chat_id = message.chat.id
     muter_id = message.from_user.id
     if not await can_mute(client, chat_id, muter_id, target_id):
@@ -252,35 +215,28 @@ async def do_mute(client, message, target_id, target_name):
     ]])
     await message.reply(
         f"🔇 **تم الكتم بنجاح**\n\n"
-        f"👤 **المستخدم:** {target_name}\n"
+        f"👤 **المستخدم:** {target_mention}\n"
         f"📝 **سيتم حذف رسائله تلقائياً حتى إلغاء الكتم**",
         reply_markup=keyboard
     )
 
 
-@Client.on_message(filters.group & filters.command(["كتم", "mute_user"]) & other_filters)
-async def mute_user(client: Client, message: Message):
+@Client.on_message(filters.group & filters.command(["كتم"]) & other_filters)
+async def mute_user_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     muter_id = message.from_user.id
-    muter_rank = await get_member_rank(client, chat_id, muter_id)
-    if muter_rank not in ["مبرمج", "مالك المجموعة", "مدير"]:
+    rank = await get_member_rank(client, chat_id, muter_id)
+    if rank not in ["مبرمج", "مالك المجموعة", "مدير"]:
         return
-    target = None
-    target_name = ""
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
-        target_name = target.mention
-        await do_mute(client, message, target.id, target_name)
+        await do_mute(client, message, target.id, target.mention)
     elif len(message.command) >= 2:
         arg = message.command[1]
         try:
-            if arg.startswith("@"):
-                user = await client.get_users(arg)
-            else:
-                user = await client.get_users(int(arg))
-            target_name = user.mention
-            await do_mute(client, message, user.id, target_name)
+            user = await client.get_users(arg.lstrip("@") if arg.startswith("@") else int(arg))
+            await do_mute(client, message, user.id, user.mention)
         except:
             await message.reply("❌ **المستخدم مش موجود**")
     else:
@@ -288,12 +244,12 @@ async def mute_user(client: Client, message: Message):
 
 
 @Client.on_message(filters.group & filters.command(["الغاء_كتم", "فك_كتم"]) & other_filters)
-async def unmute_user(client: Client, message: Message):
+async def unmute_user_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
-    muter_id = message.from_user.id
-    muter_rank = await get_member_rank(client, chat_id, muter_id)
-    if muter_rank not in ["مبرمج", "مالك المجموعة", "مدير"]:
+    user_id = message.from_user.id
+    rank = await get_member_rank(client, chat_id, user_id)
+    if rank not in ["مبرمج", "مالك المجموعة", "مدير"]:
         return
     target = None
     if message.reply_to_message and message.reply_to_message.from_user:
@@ -301,10 +257,7 @@ async def unmute_user(client: Client, message: Message):
     elif len(message.command) >= 2:
         arg = message.command[1]
         try:
-            if arg.startswith("@"):
-                target = await client.get_users(arg)
-            else:
-                target = await client.get_users(int(arg))
+            target = await client.get_users(arg.lstrip("@") if arg.startswith("@") else int(arg))
         except:
             return await message.reply("❌ **المستخدم مش موجود**")
     if target:
@@ -312,13 +265,14 @@ async def unmute_user(client: Client, message: Message):
             muted_users[chat_id].pop(target.id, None)
         await message.reply(f"🔊 **تم إلغاء كتم** {target.mention}")
     else:
-        await message.reply("**الاستخدام:** /الغاء_كتم بالرد أو /الغاء_كتم @يوزر أو ID")
+        await message.reply("**الاستخدام:** /الغاء_كتم بالرد أو @يوزر أو ID")
 
 
 @Client.on_callback_query(filters.regex(r"^unmute_(\-?\d+)_(\d+)$"))
 async def cb_unmute(client: Client, query: CallbackQuery):
-    chat_id = int(query.data.split("_")[1])
-    target_id = int(query.data.split("_")[2])
+    parts = query.data.split("_")
+    chat_id = int(parts[1])
+    target_id = int(parts[2])
     user_id = query.from_user.id
     rank = await get_member_rank(client, chat_id, user_id)
     if rank not in ["مبرمج", "مالك المجموعة", "مدير"]:
@@ -328,33 +282,45 @@ async def cb_unmute(client: Client, query: CallbackQuery):
     try:
         target = await client.get_users(target_id)
         await query.message.edit_text(
-            f"🔊 **تم إلغاء الكتم**\n\n👤 **المستخدم:** {target.mention}\n✅ **بواسطة:** {query.from_user.mention}"
+            f"🔊 **تم إلغاء الكتم**\n\n"
+            f"👤 **المستخدم:** {target.mention}\n"
+            f"✅ **بواسطة:** {query.from_user.mention}"
         )
     except:
         await query.answer("✅ تم إلغاء الكتم", show_alert=True)
 
 
-# ═══════════════════════════════════════
-# 👑 أوامر الرفع والتنزيل
-# ═══════════════════════════════════════
+# ══════════════════════════
+# أوامر الرفع والتنزيل
+# ══════════════════════════
 
-@Client.on_message(filters.group & filters.regex(r"^[/!.](رفع مشرف|رفع_مشرف)") & other_filters)
-async def promote_admin(client: Client, message: Message):
+async def is_owner_or_dev(client, chat_id, user_id):
+    if is_dev(user_id):
+        return True
+    try:
+        member = await client.get_chat_member(chat_id, user_id)
+        return member.status == ChatMemberStatus.OWNER
+    except:
+        return False
+
+
+@Client.on_message(filters.group & filters.command(["رفع_مشرف", "رفع"]) & other_filters)
+async def promote_admin_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     user_id = message.from_user.id
-    # المالك والأيديين بس
-    member = await client.get_chat_member(chat_id, user_id)
-    if not is_dev(user_id) and member.status != ChatMemberStatus.OWNER:
+    if not await is_owner_or_dev(client, chat_id, user_id):
         return
-    target = None
-    title = ""
-    if message.reply_to_message and message.reply_to_message.from_user:
-        target = message.reply_to_message.from_user
-        parts = message.text.split(None, 2)
-        title = parts[2] if len(parts) > 2 else ""
-    else:
-        return await message.reply("**الاستخدام:** /رفع مشرف [لقب] بالرد على المستخدم")
+    # لو أمر رفع لازم يكون بعده "مشرف"
+    if message.command[0] == "رفع":
+        if len(message.command) < 2 or message.command[1] != "مشرف":
+            return
+    if not message.reply_to_message or not message.reply_to_message.from_user:
+        return await message.reply("**الاستخدام:** رد على المستخدم واكتب /رفع_مشرف [لقب]")
+    target = message.reply_to_message.from_user
+    title = " ".join(message.command[2:]) if len(message.command) > 2 else ""
+    if message.command[0] == "رفع":
+        title = " ".join(message.command[2:]) if len(message.command) > 2 else ""
     try:
         await client.promote_chat_member(
             chat_id, target.id,
@@ -368,7 +334,10 @@ async def promote_admin(client: Client, message: Message):
             )
         )
         if title:
-            await client.set_administrator_title(chat_id, target.id, title)
+            try:
+                await client.set_administrator_title(chat_id, target.id, title)
+            except:
+                pass
         await message.reply(
             f"✅ **تم الرفع بنجاح**\n\n"
             f"👤 **المشرف:** {target.mention}\n"
@@ -378,28 +347,24 @@ async def promote_admin(client: Client, message: Message):
         await message.reply(f"❌ **فشل الرفع:** `{e}`")
 
 
-@Client.on_message(filters.group & filters.regex(r"^[/!.](رفع مدير|رفع_مدير)") & other_filters)
-async def promote_manager(client: Client, message: Message):
+@Client.on_message(filters.group & filters.command(["رفع_مدير"]) & other_filters)
+async def promote_manager_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     user_id = message.from_user.id
-    member = await client.get_chat_member(chat_id, user_id)
-    if not is_dev(user_id) and member.status != ChatMemberStatus.OWNER:
+    if not await is_owner_or_dev(client, chat_id, user_id):
         return
     target = None
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
     elif len(message.command) >= 2:
+        arg = message.command[1]
         try:
-            arg = message.command[1]
-            if arg.startswith("@"):
-                target = await client.get_users(arg)
-            else:
-                target = await client.get_users(int(arg))
+            target = await client.get_users(arg.lstrip("@") if arg.startswith("@") else int(arg))
         except:
             return await message.reply("❌ المستخدم مش موجود")
     if not target:
-        return await message.reply("**الاستخدام:** /رفع مدير بالرد أو @يوزر أو ID")
+        return await message.reply("**الاستخدام:** /رفع_مدير بالرد أو @يوزر أو ID")
     if bot_managers.get(chat_id) is None:
         bot_managers[chat_id] = {}
     bot_managers[chat_id][target.id] = True
@@ -410,40 +375,35 @@ async def promote_manager(client: Client, message: Message):
     )
 
 
-@Client.on_message(filters.group & filters.regex(r"^[/!.](تنزيل مدير|تنزيل_مدير)") & other_filters)
-async def demote_manager(client: Client, message: Message):
+@Client.on_message(filters.group & filters.command(["تنزيل_مدير"]) & other_filters)
+async def demote_manager_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     user_id = message.from_user.id
-    member = await client.get_chat_member(chat_id, user_id)
-    if not is_dev(user_id) and member.status != ChatMemberStatus.OWNER:
+    if not await is_owner_or_dev(client, chat_id, user_id):
         return
     target = None
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
     elif len(message.command) >= 2:
+        arg = message.command[1]
         try:
-            arg = message.command[1]
-            if arg.startswith("@"):
-                target = await client.get_users(arg)
-            else:
-                target = await client.get_users(int(arg))
+            target = await client.get_users(arg.lstrip("@") if arg.startswith("@") else int(arg))
         except:
             return await message.reply("❌ المستخدم مش موجود")
     if not target:
-        return await message.reply("**الاستخدام:** /تنزيل مدير بالرد أو @يوزر أو ID")
+        return await message.reply("**الاستخدام:** /تنزيل_مدير بالرد أو @يوزر أو ID")
     if bot_managers.get(chat_id):
         bot_managers[chat_id].pop(target.id, None)
     await message.reply(f"✅ **تم تنزيل** {target.mention} **من رتبة المدير**")
 
 
-@Client.on_message(filters.group & filters.regex(r"^[/!.](رفع المشرفين|رفع_المشرفين)") & other_filters)
-async def promote_all_admins(client: Client, message: Message):
+@Client.on_message(filters.group & filters.command(["رفع_المشرفين"]) & other_filters)
+async def promote_all_admins_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     user_id = message.from_user.id
-    member = await client.get_chat_member(chat_id, user_id)
-    if not is_dev(user_id) and member.status != ChatMemberStatus.OWNER:
+    if not await is_owner_or_dev(client, chat_id, user_id):
         return
     if bot_managers.get(chat_id) is None:
         bot_managers[chat_id] = {}
@@ -458,18 +418,12 @@ async def promote_all_admins(client: Client, message: Message):
     )
 
 
-@Client.on_message(filters.group & filters.regex(r"^[/!.](رفع مشرف|رفع_مشرف)") & other_filters)
-async def promote_from_file(client: Client, message: Message):
-    """أمر الرفع المدمج من ملف الرفع"""
-    pass
-
-
-# ═══════════════════════════════════════
-# 🏅 أمر رتبتي
-# ═══════════════════════════════════════
+# ══════════════════════════
+# رتبتي
+# ══════════════════════════
 
 @Client.on_message(filters.group & filters.command(["رتبتي"]) & other_filters)
-async def my_rank(client: Client, message: Message):
+async def my_rank_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -491,12 +445,12 @@ async def my_rank(client: Client, message: Message):
     )
 
 
-# ═══════════════════════════════════════
-# 🎤 مين في الكول ومين مشغل
-# ═══════════════════════════════════════
+# ══════════════════════════
+# مين في الكول / مين مشغل
+# ══════════════════════════
 
 @Client.on_message(filters.group & filters.command(["مين_في_الكول", "من_في_الكول", "الكول"]) & other_filters)
-async def who_in_call(client: Client, message: Message):
+async def who_in_call_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     try:
@@ -512,12 +466,12 @@ async def who_in_call(client: Client, message: Message):
             except:
                 text += f"`{i}.` `{p.user_id}`\n"
         await message.reply(text, disable_web_page_preview=True)
-    except Exception as e:
-        await message.reply(f"❌ **مفيش كول شغال دلوقتي**")
+    except:
+        await message.reply("❌ **مفيش كول شغال دلوقتي**")
 
 
 @Client.on_message(filters.group & filters.command(["مين_مشغل", "من_مشغل", "مشغل_ايه"]) & other_filters)
-async def who_playing(client: Client, message: Message):
+async def who_playing_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
     if chat_id not in QUEUE or not QUEUE[chat_id]:
@@ -534,16 +488,16 @@ async def who_playing(client: Client, message: Message):
     )
 
 
-# ═══════════════════════════════════════
-# 💬 الردود العشوائية
-# ═══════════════════════════════════════
+# ══════════════════════════
+# الردود العشوائية
+# ══════════════════════════
 
-@Client.on_message(filters.group & filters.mentioned)
-async def random_reply(client: Client, message: Message):
+@Client.on_message(filters.group & filters.mentioned, group=2)
+async def random_reply_cmd(client: Client, message: Message):
     if not message.from_user:
         return
     user_id = message.from_user.id
-    if message.from_user.is_bot:
+    if getattr(message.from_user, 'is_bot', False):
         reply = random.choice(BOT_REPLIES)
     elif is_dev(user_id):
         reply = random.choice(DEV_REPLIES)
@@ -552,13 +506,27 @@ async def random_reply(client: Client, message: Message):
     await message.reply(reply)
 
 
-# ═══════════════════════════════════════
-# 📋 أمر الاوامر مع GIF وأزرار
-# ═══════════════════════════════════════
+# ══════════════════════════
+# ردود على البوتات
+# ══════════════════════════
+
+@Client.on_message(filters.group & filters.bot, group=3)
+async def reply_to_bots(client: Client, message: Message):
+    try:
+        me = await client.get_me()
+        if message.from_user and message.from_user.id != me.id:
+            if random.random() < 0.3:  # 30% احتمال الرد عشان مش يزعج
+                await message.reply(random.choice(BOT_REPLIES))
+    except:
+        pass
+
+
+# ══════════════════════════
+# أمر الاوامر
+# ══════════════════════════
 
 def get_commands_keyboard(category, user_id):
-    """يرجع الكيبورد حسب الفئة"""
-    buttons = []
+    back_btn = InlineKeyboardButton("🔙 رجوع", callback_data=f"cmds_main_{user_id}")
     if category == "main":
         rows = [
             [InlineKeyboardButton("🎵 التشغيل", callback_data=f"cmds_play_{user_id}"),
@@ -568,49 +536,46 @@ def get_commands_keyboard(category, user_id):
         if is_dev(user_id):
             rows.append([InlineKeyboardButton("👨‍💻 المبرمجين", callback_data=f"cmds_dev_{user_id}")])
         return InlineKeyboardMarkup(rows)
-
-    back_btn = InlineKeyboardButton("🔙 رجوع", callback_data=f"cmds_main_{user_id}")
-
     if category == "play":
-        buttons = [
-            [InlineKeyboardButton("▶️ /play - تشغيل أغنية", callback_data="ignore")],
-            [InlineKeyboardButton("🎬 /vplay - تشغيل فيديو", callback_data="ignore")],
-            [InlineKeyboardButton("⏭ /skip - تخطي", callback_data="ignore")],
-            [InlineKeyboardButton("⏹ /stop - إيقاف", callback_data="ignore")],
-            [InlineKeyboardButton("⏸ /pause - توقف مؤقت", callback_data="ignore")],
-            [InlineKeyboardButton("▶️ /resume - استكمال", callback_data="ignore")],
-            [InlineKeyboardButton("🔇 /mute - كتم الصوت", callback_data="ignore")],
-            [InlineKeyboardButton("🔊 /unmute - رفع الكتم", callback_data="ignore")],
-            [InlineKeyboardButton("🎵 /مين_مشغل - مين شغال إيه", callback_data="ignore")],
-            [InlineKeyboardButton("🎤 /مين_في_الكول - من في الكول", callback_data="ignore")],
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("▶️ /play - تشغيل أغنية", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🎬 /vplay - تشغيل فيديو", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("⏭ /skip - تخطي", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("⏹ /stop - إيقاف", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("⏸ /pause - توقف مؤقت", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("▶️ /resume - استكمال", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔇 /mute - كتم الصوت", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔊 /unmute - رفع الكتم", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🎵 /مين_مشغل", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🎤 /مين_في_الكول", callback_data="cmd_ignore")],
             [back_btn]
-        ]
-    elif category == "protect":
-        buttons = [
-            [InlineKeyboardButton("🔇 /كتم - كتم مستخدم", callback_data="ignore")],
-            [InlineKeyboardButton("🔊 /الغاء_كتم - إلغاء الكتم", callback_data="ignore")],
-            [InlineKeyboardButton("🛡️ منع التصفية تلقائي", callback_data="ignore")],
-            [InlineKeyboardButton("🏅 /رتبتي - اعرف رتبتك", callback_data="ignore")],
+        ])
+    if category == "protect":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔇 /كتم - كتم مستخدم", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔊 /الغاء_كتم - إلغاء الكتم", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🛡️ منع التصفية تلقائي (45 حظر)", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🏅 /رتبتي - اعرف رتبتك", callback_data="cmd_ignore")],
             [back_btn]
-        ]
-    elif category == "admin":
-        buttons = [
-            [InlineKeyboardButton("👮 /رفع مشرف [لقب]", callback_data="ignore")],
-            [InlineKeyboardButton("🔑 /رفع مدير", callback_data="ignore")],
-            [InlineKeyboardButton("⬇️ /تنزيل مدير", callback_data="ignore")],
-            [InlineKeyboardButton("👥 /رفع المشرفين", callback_data="ignore")],
-            [InlineKeyboardButton("🔄 /reload - تحديث الأدمن", callback_data="ignore")],
+        ])
+    if category == "admin":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("👮 /رفع_مشرف [لقب]", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔑 /رفع_مدير", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("⬇️ /تنزيل_مدير", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("👥 /رفع_المشرفين", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔄 /reload - تحديث الأدمن", callback_data="cmd_ignore")],
             [back_btn]
-        ]
-    elif category == "dev":
-        buttons = [
-            [InlineKeyboardButton("🔄 /تحديث - تحديث البوت", callback_data="ignore")],
-            [InlineKeyboardButton("🔁 /ريستارت - إعادة تشغيل", callback_data="ignore")],
-            [InlineKeyboardButton("🚪 /مغادره البوت", callback_data="ignore")],
-            [InlineKeyboardButton("📢 /broadcast - إرسال جماعي", callback_data="ignore")],
+        ])
+    if category == "dev":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 /تحديث - تحديث البوت", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🔁 /ريستارت - إعادة تشغيل", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("🚪 /مغادره البوت", callback_data="cmd_ignore")],
+            [InlineKeyboardButton("📢 /broadcast - إرسال جماعي", callback_data="cmd_ignore")],
             [back_btn]
-        ]
-    return InlineKeyboardMarkup(buttons)
+        ])
+    return InlineKeyboardMarkup([[back_btn]])
 
 
 def get_category_text(category):
@@ -624,8 +589,8 @@ def get_category_text(category):
     return texts.get(category, "📋 **الأوامر:**")
 
 
-@Client.on_message(filters.group & filters.command(["الاوامر", "commands", "help"]) & other_filters)
-async def show_commands(client: Client, message: Message):
+@Client.on_message(filters.group & filters.command(["الاوامر"]) & other_filters)
+async def show_commands_cmd(client: Client, message: Message):
     await message.delete()
     user_id = message.from_user.id
     keyboard = get_commands_keyboard("main", user_id)
@@ -639,19 +604,21 @@ async def show_commands(client: Client, message: Message):
 
 @Client.on_callback_query(filters.regex(r"^cmds_(\w+)_(\d+)$"))
 async def commands_callback(client: Client, query: CallbackQuery):
-    data_parts = query.data.split("_")
-    category = data_parts[1]
-    owner_id = int(data_parts[2])
-    # بس اللي طلب الأمر يقدر يتنقل
+    parts = query.data.split("_")
+    category = parts[1]
+    owner_id = int(parts[2])
     if query.from_user.id != owner_id:
         return await query.answer("❌ هذه القائمة مش ليك!", show_alert=True)
     if category == "dev" and not is_dev(query.from_user.id):
         return await query.answer("❌ هذه الأوامر للمبرمجين فقط!", show_alert=True)
     keyboard = get_commands_keyboard(category, owner_id)
     text = get_category_text(category)
-    await query.message.edit_caption(caption=text, reply_markup=keyboard)
+    try:
+        await query.message.edit_caption(caption=text, reply_markup=keyboard)
+    except:
+        await query.answer()
 
 
-@Client.on_callback_query(filters.regex("^ignore$"))
-async def ignore_cb(client: Client, query: CallbackQuery):
+@Client.on_callback_query(filters.regex("^cmd_ignore$"))
+async def cmd_ignore_cb(client: Client, query: CallbackQuery):
     await query.answer()
