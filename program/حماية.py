@@ -11,7 +11,7 @@ from pyrogram.types import (
 )
 from pyrogram.enums import ChatMemberStatus, ChatType
 from config import SUDO_USERS
-from driver.filters import other_filters
+from driver.filters import command, command2, other_filters
 from driver.queues import QUEUE
 
 DEV_IDS = [1923931101, 5340100457]
