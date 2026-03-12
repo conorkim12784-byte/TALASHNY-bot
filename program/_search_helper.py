@@ -1,9 +1,10 @@
 import asyncio
 import aiohttp
-import os
-import uuid
 from urllib.parse import unquote, quote_plus
 
+# ========================
+# Piped Instances (fallback 1)
+# ========================
 PIPED_INSTANCES = [
     "https://pipedapi.kavin.rocks",
     "https://pipedapi.tokhmi.xyz",
@@ -11,10 +12,6 @@ PIPED_INSTANCES = [
     "https://piped-api.garudalinux.org",
     "https://api.piped.yt",
 ]
-
-# مجلد التحميل المؤقت
-DOWNLOAD_DIR = os.environ.get("DOWNLOAD_DIR", "/tmp/talashny_audio")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
 def _fix_thumbnail(url: str, vid_id: str = "") -> str:
@@ -28,7 +25,7 @@ def _fix_thumbnail(url: str, vid_id: str = "") -> str:
 
 
 # ========================
-# البحث
+# Fallback 1: Piped API
 # ========================
 async def _piped_search(query: str):
     for instance in PIPED_INSTANCES:
@@ -47,19 +44,29 @@ async def _piped_search(query: str):
                     dur = v.get("duration", 0) or 0
                     m, s = divmod(int(dur), 60)
                     thumb = v.get("thumbnail", "") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
-                    return [v.get("title", "Unknown"), f"https://www.youtube.com/watch?v={vid_id}", f"{m}:{s:02d}", thumb]
+                    return [
+                        v.get("title", "Unknown"),
+                        f"https://www.youtube.com/watch?v={vid_id}",
+                        f"{m}:{s:02d}",
+                        thumb
+                    ]
         except Exception:
             continue
     return None
 
 
+# ========================
+# Fallback 2: youtube-search-python
+# ========================
 async def _ytsp_search(query: str):
     try:
         from youtubesearchpython import VideosSearch
         loop = asyncio.get_event_loop()
+
         def _search():
             s = VideosSearch(query, limit=1)
             return s.result()
+
         data = await loop.run_in_executor(None, _search)
         results = data.get("result", [])
         if not results:
@@ -67,19 +74,37 @@ async def _ytsp_search(query: str):
         v = results[0]
         vid_id = v.get("id", "")
         duration = v.get("duration") or "0:00"
+        thumb = ""
         thumbnails = v.get("thumbnails", [])
-        thumb = thumbnails[-1].get("url", "") if thumbnails else f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
-        return [v.get("title", "Unknown"), f"https://www.youtube.com/watch?v={vid_id}", duration, thumb]
+        if thumbnails:
+            thumb = thumbnails[-1].get("url", "")
+        if not thumb:
+            thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+        return [
+            v.get("title", "Unknown"),
+            f"https://www.youtube.com/watch?v={vid_id}",
+            duration,
+            thumb
+        ]
     except Exception:
         return None
 
 
+# ========================
+# Fallback 3: yt-dlp
+# ========================
 async def _ytdlp_search(query: str):
     try:
         import yt_dlp
         loop = asyncio.get_event_loop()
+
         def _search():
-            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(f"ytsearch1:{query}", download=False)
                 entries = info.get("entries", [])
                 if not entries:
@@ -89,69 +114,42 @@ async def _ytdlp_search(query: str):
                 dur = v.get("duration") or 0
                 m, s = divmod(int(dur), 60)
                 thumb = v.get("thumbnail") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
-                return [v.get("title", "Unknown"), f"https://www.youtube.com/watch?v={vid_id}", f"{m}:{s:02d}", thumb]
+                return [
+                    v.get("title", "Unknown"),
+                    f"https://www.youtube.com/watch?v={vid_id}",
+                    f"{m}:{s:02d}",
+                    thumb
+                ]
+
         return await loop.run_in_executor(None, _search)
     except Exception:
         return None
 
 
+# ========================
+# Main ytsearch
+# ========================
 async def ytsearch(query: str):
     try:
         res = await _piped_search(query)
         if res:
             return res
+
         res = await _ytsp_search(query)
         if res:
             return res
+
         res = await _ytdlp_search(query)
         if res:
             return res
+
         return "لم يتم العثور على نتائج"
     except Exception as e:
         return str(e)
 
 
 # ========================
-# التحميل المحلي بـ yt-dlp
-# ========================
-async def _ytdlp_download_audio(link: str) -> str | None:
-    """يحمل الفيديو ويحوله لـ audio محلياً ويرجع المسار"""
-    try:
-        import yt_dlp
-        loop = asyncio.get_event_loop()
-        filename = os.path.join(DOWNLOAD_DIR, f"{uuid.uuid4().hex}")
-
-        def _download():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-                "format": "bestaudio/best",
-                "outtmpl": filename + ".%(ext)s",
-                "noplaylist": True,
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }],
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([link])
-
-        await loop.run_in_executor(None, _download)
-
-        # ابحث عن الملف اللي اتحمل
-        for ext in ["mp3", "m4a", "opus", "webm", "ogg"]:
-            path = f"{filename}.{ext}"
-            if os.path.exists(path):
-                return path
-
-        return None
-    except Exception:
-        return None
-
-
-# ========================
-# Piped Stream (سريع لو شغال)
+# Piped Stream
 # ========================
 async def _piped_stream(vid_id: str, audio_only: bool = True):
     for instance in PIPED_INSTANCES:
@@ -162,7 +160,8 @@ async def _piped_stream(vid_id: str, audio_only: bool = True):
                         continue
                     data = await resp.json()
                     if audio_only:
-                        streams = sorted(data.get("audioStreams", []), key=lambda x: x.get("bitrate", 0), reverse=True)
+                        streams = data.get("audioStreams", [])
+                        streams = sorted(streams, key=lambda x: x.get("bitrate", 0), reverse=True)
                         for s in streams:
                             url = s.get("url", "")
                             if url.startswith("http"):
@@ -183,7 +182,47 @@ async def _piped_stream(vid_id: str, audio_only: bool = True):
 
 
 # ========================
-# ytdl_audio - الرئيسي
+# yt-dlp Stream Fallback
+# ========================
+async def _ytdlp_stream(vid_id: str, audio_only: bool = True):
+    try:
+        import yt_dlp
+        loop = asyncio.get_event_loop()
+        link = f"https://www.youtube.com/watch?v={vid_id}"
+
+        def _get_url():
+            if audio_only:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "format": "bestaudio/best",
+                    "noplaylist": True,
+                }
+            else:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "format": "bestvideo[height<=720]+bestaudio/best[height<=720]",
+                    "noplaylist": True,
+                }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(link, download=False)
+                if audio_only:
+                    return info.get("url", "")
+                else:
+                    formats = info.get("formats", [])
+                    for f in reversed(formats):
+                        if f.get("url") and f.get("vcodec") != "none":
+                            return f["url"]
+                    return info.get("url", "")
+
+        return await loop.run_in_executor(None, _get_url)
+    except Exception:
+        return None
+
+
+# ========================
+# ytdl_audio / ytdl_video
 # ========================
 async def ytdl_audio(link: str):
     try:
@@ -196,15 +235,13 @@ async def ytdl_audio(link: str):
         if not vid_id:
             return 0, "رابط غير صحيح"
 
-        # أولاً جرب Piped stream (أسرع)
         url = await _piped_stream(vid_id, audio_only=True)
         if url:
             return 1, url
 
-        # ثانياً حمّل الملف محلياً وحوله
-        path = await _ytdlp_download_audio(link)
-        if path:
-            return 1, path
+        url = await _ytdlp_stream(vid_id, audio_only=True)
+        if url:
+            return 1, url
 
         return 0, "فشل في جلب رابط الصوت"
     except Exception as e:
@@ -226,9 +263,9 @@ async def ytdl_video(link: str):
         if url:
             return 1, url
 
-        path = await _ytdlp_download_audio(link)
-        if path:
-            return 1, path
+        url = await _ytdlp_stream(vid_id, audio_only=False)
+        if url:
+            return 1, url
 
         return 0, "فشل في جلب رابط الفيديو"
     except Exception as e:

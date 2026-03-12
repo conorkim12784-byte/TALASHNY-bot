@@ -15,7 +15,7 @@ from config import BOT_USERNAME, IMG_5
 from program._search_helper import ytsearch, ytdl_audio as ytdl
 
 
-@Client.on_message(command2(["تشغيل", "شغل"]) & other_filters)
+@Client.on_message(command2(["تشغيل", "شغل", "play", "p"]) & other_filters)
 async def play_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
