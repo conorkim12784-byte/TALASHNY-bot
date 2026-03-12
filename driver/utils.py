@@ -82,3 +82,48 @@ async def skip_item(chat_id, h):
     else:
         return 0
 
+
+@call_py.on_update()
+async def stream_update_handler(client: PyTgCalls, update: Update):
+    chat_id = update.chat_id
+
+    # Handle kicked / closed / left
+    if isinstance(update, ChatUpdate):
+        if update.status in (
+            ChatUpdate.Status.KICKED,
+            ChatUpdate.Status.CLOSED_VOICE_CHAT,
+            ChatUpdate.Status.LEFT_GROUP,
+        ):
+            if chat_id in QUEUE:
+                clear_queue(chat_id)
+        return
+
+    # Handle stream ended
+    if isinstance(update, StreamEnded):
+        op = await skip_current_song(chat_id)
+        if op == 1:
+            pass
+        elif op == 2:
+            await bot.send_message(
+                chat_id,
+                "❌ an error occurred\n\n» **Clearing** __Queues__ and leaving video chat.",
+            )
+        elif op != 0:
+            await bot.send_message(
+                chat_id,
+                f"💡 **تم التخطي الئ المسار التالي**\n\n🗂 **الاسم:** [{op[0]}]({op[1]}) | `{op[2]}`\n💭 **المجموعه:** `{chat_id}`",
+                disable_web_page_preview=True,
+                reply_markup=keyboard,
+            )
+
+
+async def bash(cmd):
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    err = stderr.decode().strip()
+    out = stdout.decode().strip()
+    return out, err
