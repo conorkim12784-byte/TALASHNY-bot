@@ -45,7 +45,7 @@ PRIVILEGE_TEXT = {
 }
 
 
-@Client.on_message(filters.group & command2(["رفع"]) & other_filters)
+@Client.on_message(command2(["رفع"]) & other_filters)
 async def promote_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id

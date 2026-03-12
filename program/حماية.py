@@ -221,7 +221,7 @@ async def do_mute(client, message, target_id, target_mention):
     )
 
 
-@Client.on_message(filters.group & command2(["كتم"]) & other_filters)
+@Client.on_message(command2(["كتم"]) & other_filters)
 async def mute_user_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -243,7 +243,7 @@ async def mute_user_cmd(client: Client, message: Message):
         await message.reply("**الاستخدام:** /كتم بالرد أو /كتم @يوزر أو /كتم ID")
 
 
-@Client.on_message(filters.group & command2(["الغاء_كتم", "فك_كتم"]) & other_filters)
+@Client.on_message(command2(["الغاء_كتم", "فك_كتم"]) & other_filters)
 async def unmute_user_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -304,7 +304,7 @@ async def is_owner_or_dev(client, chat_id, user_id):
         return False
 
 
-@Client.on_message(filters.group & command2(["رفع_مشرف"]) & other_filters)
+@Client.on_message(command2(["رفع_مشرف"]) & other_filters)
 async def promote_admin_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -347,7 +347,7 @@ async def promote_admin_cmd(client: Client, message: Message):
         await message.reply(f"❌ **فشل الرفع:** `{e}`")
 
 
-@Client.on_message(filters.group & command2(["رفع_مدير"]) & other_filters)
+@Client.on_message(command2(["رفع_مدير"]) & other_filters)
 async def promote_manager_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -375,7 +375,7 @@ async def promote_manager_cmd(client: Client, message: Message):
     )
 
 
-@Client.on_message(filters.group & command2(["تنزيل_مدير"]) & other_filters)
+@Client.on_message(command2(["تنزيل_مدير"]) & other_filters)
 async def demote_manager_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -398,7 +398,7 @@ async def demote_manager_cmd(client: Client, message: Message):
     await message.reply(f"✅ **تم تنزيل** {target.mention} **من رتبة المدير**")
 
 
-@Client.on_message(filters.group & command2(["رفع_المشرفين"]) & other_filters)
+@Client.on_message(command2(["رفع_المشرفين"]) & other_filters)
 async def promote_all_admins_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -422,7 +422,7 @@ async def promote_all_admins_cmd(client: Client, message: Message):
 # رتبتي
 # ══════════════════════════
 
-@Client.on_message(filters.group & command2(["رتبتي"]) & other_filters)
+@Client.on_message(command2(["رتبتي"]) & other_filters)
 async def my_rank_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -449,7 +449,7 @@ async def my_rank_cmd(client: Client, message: Message):
 # مين في الكول / مين مشغل
 # ══════════════════════════
 
-@Client.on_message(filters.group & command2(["مين_في_الكول", "من_في_الكول", "الكول"]) & other_filters)
+@Client.on_message(command2(["مين_في_الكول", "من_في_الكول", "الكول"]) & other_filters)
 async def who_in_call_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -470,7 +470,7 @@ async def who_in_call_cmd(client: Client, message: Message):
         await message.reply("❌ **مفيش كول شغال دلوقتي**")
 
 
-@Client.on_message(filters.group & command2(["مين_مشغل", "من_مشغل", "مشغل_ايه"]) & other_filters)
+@Client.on_message(command2(["مين_مشغل", "من_مشغل", "مشغل_ايه"]) & other_filters)
 async def who_playing_cmd(client: Client, message: Message):
     await message.delete()
     chat_id = message.chat.id
@@ -589,7 +589,7 @@ def get_category_text(category):
     return texts.get(category, "📋 **الأوامر:**")
 
 
-@Client.on_message(filters.group & command2(["الاوامر"]) & other_filters)
+@Client.on_message(command2(["الاوامر"]) & other_filters)
 async def show_commands_cmd(client: Client, message: Message):
     await message.delete()
     user_id = message.from_user.id
