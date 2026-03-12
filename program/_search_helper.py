@@ -12,9 +12,10 @@ PIPED_INSTANCES = [
     "https://api.piped.yt",
 ]
 
-# مجلد التحميل المؤقت
 DOWNLOAD_DIR = os.environ.get("DOWNLOAD_DIR", "/tmp/talashny_audio")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+COOKIES_FILE = "cookies.txt"
 
 
 def _fix_thumbnail(url: str, vid_id: str = "") -> str:
@@ -79,7 +80,10 @@ async def _ytdlp_search(query: str):
         import yt_dlp
         loop = asyncio.get_event_loop()
         def _search():
-            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
+            opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
+            if os.path.exists(COOKIES_FILE):
+                opts["cookiefile"] = COOKIES_FILE
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(f"ytsearch1:{query}", download=False)
                 entries = info.get("entries", [])
                 if not entries:
@@ -114,8 +118,7 @@ async def ytsearch(query: str):
 # ========================
 # التحميل المحلي بـ yt-dlp
 # ========================
-async def _ytdlp_download_audio(link: str) -> str | None:
-    """يحمل الفيديو ويحوله لـ audio محلياً ويرجع المسار"""
+async def _ytdlp_download_audio(link: str):
     try:
         import yt_dlp
         loop = asyncio.get_event_loop()
@@ -134,12 +137,13 @@ async def _ytdlp_download_audio(link: str) -> str | None:
                     "preferredquality": "192",
                 }],
             }
+            if os.path.exists(COOKIES_FILE):
+                ydl_opts["cookiefile"] = COOKIES_FILE
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([link])
 
         await loop.run_in_executor(None, _download)
 
-        # ابحث عن الملف اللي اتحمل
         for ext in ["mp3", "m4a", "opus", "webm", "ogg"]:
             path = f"{filename}.{ext}"
             if os.path.exists(path):
@@ -201,7 +205,7 @@ async def ytdl_audio(link: str):
         if url:
             return 1, url
 
-        # ثانياً حمّل الملف محلياً وحوله
+        # ثانياً حمّل الملف محلياً
         path = await _ytdlp_download_audio(link)
         if path:
             return 1, path
