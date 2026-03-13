@@ -11,7 +11,7 @@ from pyrogram.types import (
 )
 from pyrogram import Client, filters
 from driver.queues import QUEUE, get_queue
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command
 
 
 keyboard = InlineKeyboardMarkup(
@@ -19,7 +19,7 @@ keyboard = InlineKeyboardMarkup(
 )
 
 
-@Client.on_message(command2(["القائمه","قائمه","قائمه التشغيل","قائمه_التشغيل"]) & other_filters)
+@Client.on_message((command2(["القائمه","قائمه","قائمه التشغيل","قائمه_التشغيل"]) | arabic_command(["القائمه","قائمه","قائمه التشغيل","قائمه_التشغيل"])) & other_filters)
 async def playlist(client, m: Message):
    await m.delete()
    chat_id = m.chat.id

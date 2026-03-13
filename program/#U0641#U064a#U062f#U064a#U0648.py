@@ -8,7 +8,7 @@ from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command, get_query
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from pyrogram import Client
@@ -21,7 +21,7 @@ def _ytsearch_sync(query: str):
     try:
         result = subprocess.run(
             ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist",
-             "--no-download", "--no-warnings", "--ignore-errors", "--cookies", "/app/cookies.txt"],
+             "--no-download", "--no-warnings", "--ignore-errors"],
             capture_output=True, text=True, timeout=60
         )
         if not result.stdout.strip():
@@ -40,7 +40,7 @@ def _ytsearch_sync(query: str):
 
 async def _ytdl_video(link):
     proc = await asyncio.create_subprocess_exec(
-        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", "--cookies", "/app/cookies.txt", link,
+        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", link,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -100,7 +100,7 @@ async def _check_and_join(c, m, chat_id):
     return True
 
 
-@Client.on_message(command2(["تشغيل_فيديو", "شغل_فيديو"]) & other_filters)
+@Client.on_message((command2(["تشغيل_فيديو", "شغل_فيديو"]) | arabic_command(["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"])) & other_filters)
 async def vplay_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -153,11 +153,11 @@ async def vplay_ar(c: Client, m: Message):
                 caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n⏱ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
             )
     else:
-        if len(m.command) < 2:
+        if not get_query(m, ["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"]):
             await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
         else:
             loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
-            query = m.text.split(None, 1)[1]
+            query = get_query(m, ["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"])
             search = _ytsearch_sync(query)
             Q = 720
             vq = VideoQuality.HD_720p
@@ -195,7 +195,7 @@ async def vplay_ar(c: Client, m: Message):
                     await m.reply_text(f"🚫 خطأ: `{ep}`")
 
 
-@Client.on_message(command2(["ستريم"]) & other_filters)
+@Client.on_message((command2(["ستريم"]) | arabic_command(["ستريم"])) & other_filters)
 async def vstream_ar(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

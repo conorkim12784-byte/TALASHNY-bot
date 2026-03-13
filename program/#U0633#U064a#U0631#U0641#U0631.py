@@ -7,11 +7,11 @@ import socket
 import psutil
 import platform
 from config import BOT_USERNAME
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command
 from pyrogram import Client, filters
 from driver.decorators import sudo_users_only, humanbytes
 
-@Client.on_message(command2(["سيرفر","معلومات السيرفر","بيانات السيرفر"]))
+@Client.on_message((command2(["سيرفر","معلومات السيرفر","بيانات السيرفر"]) | arabic_command(["سيرفر","معلومات السيرفر","بيانات السيرفر"])))
 @sudo_users_only
 async def give_sysinfo(client, message):
     await message.delete()

@@ -4,7 +4,7 @@ from driver.veez import call_py
 from pyrogram import Client
 from pyrogram.enums import ChatMembersFilter
 from driver.queues import QUEUE, clear_queue
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command, get_query
 from driver.decorators import authorized_users_only
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup
@@ -14,7 +14,7 @@ from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
 from pyrogram.types import InlineKeyboardMarkup, Message
 
 
-@Client.on_message(command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
+@Client.on_message((command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) | arabic_command(["اعاده", "تحديث_الادمن", "حدث_الادمن"])) & other_filters)
 @authorized_users_only
 async def update_admin_ar(client, message):
     await message.delete()
@@ -27,13 +27,13 @@ async def update_admin_ar(client, message):
     await message.reply_text("✅ تم إعادة تحميل البوت بشكل صحيح!\n✅ تم تحديث قائمة المسؤولين!")
 
 
-@Client.on_message(command2(["تخطي"]) & other_filters)
+@Client.on_message((command2(["تخطي"]) | arabic_command(["تخطي"])) & other_filters)
 @authorized_users_only
 async def skip_ar(c: Client, m: Message):
     await m.delete()
     user_id = m.from_user.id
     chat_id = m.chat.id
-    if len(m.command) < 2:
+    if not (m.command and len(m.command) >= 2) and not (m.text and " " in m.text.strip()):
         op = await skip_current_song(chat_id)
         if op == 0:
             await c.send_message(chat_id, "❌ قائمة التشغيل فارغه")
@@ -66,7 +66,7 @@ async def skip_ar(c: Client, m: Message):
             await m.reply(OP)
 
 
-@Client.on_message(command2(["انهاء"]) & other_filters)
+@Client.on_message((command2(["انهاء"]) | arabic_command(["انهاء"])) & other_filters)
 @authorized_users_only
 async def stop_ar(client, m: Message):
     await m.delete()
@@ -82,7 +82,7 @@ async def stop_ar(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
-@Client.on_message(command2(["اسكت"]) & other_filters)
+@Client.on_message((command2(["اسكت"]) | arabic_command(["اسكت"])) & other_filters)
 @authorized_users_only
 async def skt_ar(client, m: Message):
     await m.delete()
@@ -98,7 +98,7 @@ async def skt_ar(client, m: Message):
         await m.reply("مفيش حاجه شغاله عشان اسكت")
 
 
-@Client.on_message(command2(["ايقاف", "ايقاف_مؤقت", "توقف"]) & other_filters)
+@Client.on_message((command2(["ايقاف", "ايقاف_مؤقت", "توقف"]) | arabic_command(["ايقاف", "ايقاف_مؤقت", "توقف"])) & other_filters)
 @authorized_users_only
 async def pause_ar(client, m: Message):
     await m.delete()
@@ -113,7 +113,7 @@ async def pause_ar(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
-@Client.on_message(command2(["كمل", "استكمال", "استكمل"]) & other_filters)
+@Client.on_message((command2(["كمل", "استكمال", "استكمل"]) | arabic_command(["كمل", "استكمال", "استكمل"])) & other_filters)
 @authorized_users_only
 async def resume_ar(client, m: Message):
     await m.delete()
@@ -128,7 +128,7 @@ async def resume_ar(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
-@Client.on_message(command2(["ميوت"]) & other_filters)
+@Client.on_message((command2(["ميوت"]) | arabic_command(["ميوت"])) & other_filters)
 @authorized_users_only
 async def mute_ar(client, m: Message):
     await m.delete()
@@ -143,7 +143,7 @@ async def mute_ar(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
-@Client.on_message(command2(["فك_ميوت", "ازاله_ميوت"]) & other_filters)
+@Client.on_message((command2(["فك_ميوت", "ازاله_ميوت"]) | arabic_command(["فك_ميوت", "ازاله_ميوت"])) & other_filters)
 @authorized_users_only
 async def unmute_ar(client, m: Message):
     await m.delete()
@@ -158,13 +158,13 @@ async def unmute_ar(client, m: Message):
         await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
-@Client.on_message(command2(["تحكم", "صوت"]) & other_filters)
+@Client.on_message((command2(["تحكم", "صوت"]) | arabic_command(["تحكم", "صوت"])) & other_filters)
 @authorized_users_only
 async def volume_ar(client, m: Message):
     await m.delete()
-    if len(m.command) < 2:
+    vol = get_query(m, ["تحكم", "صوت"])
+    if not vol:
         return await m.reply("**الاستخدام:** تحكم [1-200]")
-    vol = m.command[1]
     chat_id = m.chat.id
     if chat_id in QUEUE:
         try:

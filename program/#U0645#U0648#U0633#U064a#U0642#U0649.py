@@ -6,8 +6,9 @@ from pytgcalls.types import MediaStream, AudioQuality
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
-from driver.filters import command2, other_filters, arabic_command
+from driver.filters import command2, other_filters, arabic_command, get_query
 from driver.queues import QUEUE, add_to_queue
+from driver.nowplaying import current_requester
 from driver.veez import call_py, user
 from config import BOT_USERNAME, IMG_5
 from program.video import ytsearch, ytdl as ytdl
@@ -88,6 +89,7 @@ async def play_ar(c: Client, m: Message):
                 await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                 await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
+                current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                 await suhu.delete()
                 buttons = stream_markup(user_id)
                 await m.reply_photo(
@@ -98,9 +100,7 @@ async def play_ar(c: Client, m: Message):
                 await suhu.delete()
                 await m.reply_text(f"خـطـا:\n\n» {e}")
     else:
-        # لو جاي من arabic_command مفيش m.command — نستخدم m.text مباشرة
-        parts = m.text.split(None, 1)
-        query = parts[1].strip() if len(parts) > 1 else ""
+        query = get_query(m, ["تشغيل", "شغل"])
         if not query:
             await m.reply("» عـلـيـك الـرد عـلـى **ملف صوتي** او **اكتب شي للبحث**")
         else:
@@ -129,6 +129,7 @@ async def play_ar(c: Client, m: Message):
                     await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                     await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                     add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
+                    current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                     await suhu.delete()
                     buttons = stream_markup(user_id)
                     await m.reply_photo(

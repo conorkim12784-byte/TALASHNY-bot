@@ -3,13 +3,13 @@ from youtube_search import YoutubeSearch
 import asyncio
 from config import SUDO_USERS, ASSISTANT_NAME, BOT_USERNAME
 from driver.decorators import authorized_users_only, sudo_users_only, errors
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command
 from driver.veez import user as USER
 from pyrogram import Client, filters
 from pyrogram.errors import UserAlreadyParticipant
 
 
-@Client.on_message(command2(["بحث_يوتيوب"]))
+@Client.on_message(command2(["بحث_يوتيوب"]) | arabic_command(["بحث_يوتيوب", "بحث يوتيوب"]))
 async def ytsearch(_, message: Message):
     await message.delete()
     if len(message.command) < 2:
