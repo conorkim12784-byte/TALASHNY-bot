@@ -4,37 +4,31 @@ import os
 import uuid
 from urllib.parse import unquote, quote_plus
 
+# Piped instances محدّثة وشغالة
 PIPED_INSTANCES = [
     "https://pipedapi.kavin.rocks",
     "https://pipedapi.tokhmi.xyz",
     "https://pipedapi.moomoo.me",
     "https://piped-api.garudalinux.org",
     "https://api.piped.yt",
+    "https://pipedapi.in.projectsegfau.lt",
+    "https://pipedapi.syncpundit.io",
+    "https://api.piped.projectsegfau.lt",
+    "https://pipedapi.r4fo.com",
+    "https://piped-api.privacy.com.de",
 ]
 
 DOWNLOAD_DIR = os.environ.get("DOWNLOAD_DIR", "/tmp/talashny_audio")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-COOKIES_FILE = "cookies.txt"
-
-
-def _fix_thumbnail(url: str, vid_id: str = "") -> str:
-    if not url:
-        return f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-    if "%" in url:
-        url = unquote(url)
-    if not url.startswith("http"):
-        return f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-    return url
-
 
 # ========================
-# البحث
+# البحث عبر Piped
 # ========================
 async def _piped_search(query: str):
     for instance in PIPED_INSTANCES:
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
                 url = f"{instance}/search?q={quote_plus(query)}&filter=videos"
                 async with session.get(url) as resp:
                     if resp.status != 200:
@@ -54,6 +48,9 @@ async def _piped_search(query: str):
     return None
 
 
+# ========================
+# البحث عبر youtubesearchpython
+# ========================
 async def _ytsp_search(query: str):
     try:
         from youtubesearchpython import VideosSearch
@@ -75,30 +72,6 @@ async def _ytsp_search(query: str):
         return None
 
 
-async def _ytdlp_search(query: str):
-    try:
-        import yt_dlp
-        loop = asyncio.get_event_loop()
-        def _search():
-            opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
-            if os.path.exists(COOKIES_FILE):
-                opts["cookiefile"] = COOKIES_FILE
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-                entries = info.get("entries", [])
-                if not entries:
-                    return None
-                v = entries[0]
-                vid_id = v.get("id", "")
-                dur = v.get("duration") or 0
-                m, s = divmod(int(dur), 60)
-                thumb = v.get("thumbnail") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
-                return [v.get("title", "Unknown"), f"https://www.youtube.com/watch?v={vid_id}", f"{m}:{s:02d}", thumb]
-        return await loop.run_in_executor(None, _search)
-    except Exception:
-        return None
-
-
 async def ytsearch(query: str):
     try:
         res = await _piped_search(query)
@@ -107,55 +80,13 @@ async def ytsearch(query: str):
         res = await _ytsp_search(query)
         if res:
             return res
-        res = await _ytdlp_search(query)
-        if res:
-            return res
         return "لم يتم العثور على نتائج"
     except Exception as e:
         return str(e)
 
 
 # ========================
-# التحميل المحلي بـ yt-dlp
-# ========================
-async def _ytdlp_download_audio(link: str):
-    try:
-        import yt_dlp
-        loop = asyncio.get_event_loop()
-        filename = os.path.join(DOWNLOAD_DIR, f"{uuid.uuid4().hex}")
-
-        def _download():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-                "format": "bestaudio/best",
-                "outtmpl": filename + ".%(ext)s",
-                "noplaylist": True,
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }],
-            }
-            if os.path.exists(COOKIES_FILE):
-                ydl_opts["cookiefile"] = COOKIES_FILE
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([link])
-
-        await loop.run_in_executor(None, _download)
-
-        for ext in ["mp3", "m4a", "opus", "webm", "ogg"]:
-            path = f"{filename}.{ext}"
-            if os.path.exists(path):
-                return path
-
-        return None
-    except Exception:
-        return None
-
-
-# ========================
-# Piped Stream (سريع لو شغال)
+# Piped Stream للتشغيل المباشر
 # ========================
 async def _piped_stream(vid_id: str, audio_only: bool = True):
     for instance in PIPED_INSTANCES:
@@ -166,7 +97,11 @@ async def _piped_stream(vid_id: str, audio_only: bool = True):
                         continue
                     data = await resp.json()
                     if audio_only:
-                        streams = sorted(data.get("audioStreams", []), key=lambda x: x.get("bitrate", 0), reverse=True)
+                        streams = sorted(
+                            data.get("audioStreams", []),
+                            key=lambda x: x.get("bitrate", 0),
+                            reverse=True
+                        )
                         for s in streams:
                             url = s.get("url", "")
                             if url.startswith("http"):
@@ -187,6 +122,46 @@ async def _piped_stream(vid_id: str, audio_only: bool = True):
 
 
 # ========================
+# yt-dlp كـ fallback فقط
+# ========================
+async def _ytdlp_download_audio(link: str):
+    try:
+        import yt_dlp
+        loop = asyncio.get_event_loop()
+        filename = os.path.join(DOWNLOAD_DIR, f"{uuid.uuid4().hex}")
+
+        def _download():
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "format": "bestaudio/best",
+                "outtmpl": filename + ".%(ext)s",
+                "noplaylist": True,
+                # تجنب bot detection
+                "extractor_args": {"youtube": {"player_client": ["android"]}},
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+            }
+            if os.path.exists("cookies.txt"):
+                ydl_opts["cookiefile"] = "cookies.txt"
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+
+        await loop.run_in_executor(None, _download)
+
+        for ext in ["mp3", "m4a", "opus", "webm", "ogg"]:
+            path = f"{filename}.{ext}"
+            if os.path.exists(path):
+                return path
+        return None
+    except Exception:
+        return None
+
+
+# ========================
 # ytdl_audio - الرئيسي
 # ========================
 async def ytdl_audio(link: str):
@@ -200,12 +175,12 @@ async def ytdl_audio(link: str):
         if not vid_id:
             return 0, "رابط غير صحيح"
 
-        # أولاً جرب Piped stream (أسرع)
+        # أولاً Piped (بدون قيود)
         url = await _piped_stream(vid_id, audio_only=True)
         if url:
             return 1, url
 
-        # ثانياً حمّل الملف محلياً
+        # ثانياً yt-dlp مع android client
         path = await _ytdlp_download_audio(link)
         if path:
             return 1, path
