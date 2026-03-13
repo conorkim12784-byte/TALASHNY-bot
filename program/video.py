@@ -10,6 +10,7 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.filters import command, other_filters, command2
 from driver.queues import QUEUE, add_to_queue
+from program.vcinfo import current_requester
 from driver.veez import call_py, user
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
@@ -144,6 +145,7 @@ async def vplay(c: Client, m: Message):
             ctitle = await CHAT_TITLE(gcname)
             image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
             pos = add_to_queue(chat_id, songname, dl, link, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(
@@ -158,6 +160,7 @@ async def vplay(c: Client, m: Message):
             await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
             await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, vq))
             add_to_queue(chat_id, songname, dl, link, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(
@@ -201,6 +204,7 @@ async def vplay(c: Client, m: Message):
                     await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
                     await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, vq))
                     add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
+                    current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                     await loser.delete()
                     buttons = stream_markup(user_id)
                     await m.reply_photo(
