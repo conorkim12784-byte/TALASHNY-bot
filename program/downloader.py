@@ -1,23 +1,16 @@
 # Copyright (C) 2021 By Amor Music-Project
+# Fixed: song() converted to async, lyric API replaced, cleanup improved
 
 from __future__ import unicode_literals
 
 import asyncio
-import math
 import os
-import time
-from random import randint
-from urllib.parse import urlparse
 
-import aiofiles
-import aiohttp
 import requests
 import wget
 import yt_dlp
-from pyrogram import Client, filters
-from pyrogram.errors import FloodWait, MessageNotModified
+from pyrogram import Client
 from pyrogram.types import Message
-from driver.filters import command2, other_filters
 from youtube_search import YoutubeSearch
 from yt_dlp import YoutubeDL
 
@@ -26,48 +19,54 @@ from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
 
-ydl_opts = {
-    'format': 'best',
-    'keepvideo': True,
-    'prefer_ffmpeg': False,
-    'geo_bypass': True,
-    'outtmpl': '%(title)s.%(ext)s',
-    'quite': True
-}
-
-
+# ─────────────────────────────────────────
+# /song  — تحميل أغنية كملف صوتي  [FIX: كانت sync، أصبحت async]
+# ─────────────────────────────────────────
 @Client.on_message(command(["song"]))
-def song(_, message):
+async def song(_, message: Message):
     query = " ".join(message.command[1:])
-    m = message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {"format": "bestaudio[ext=m4a]"}
+    if not query:
+        return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
+
+    m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
+    ydl_ops = {"format": "bestaudio[ext=m4a]", "outtmpl": "%(title)s.%(ext)s"}
+    audio_file = None
+    thumb_name = None
+
     try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
+        results = await asyncio.to_thread(
+            lambda: YoutubeSearch(query, max_results=1).to_dict()
+        )
         link = f"https://youtube.com{results[0]['url_suffix']}"
         title = results[0]["title"][:40]
         thumbnail = results[0]["thumbnails"][0]
         thumb_name = f"{title}.jpg"
-        thumb = requests.get(thumbnail, allow_redirects=True)
-        open(thumb_name, "wb").write(thumb.content)
+        thumb_data = await asyncio.to_thread(
+            requests.get, thumbnail, allow_redirects=True
+        )
+        with open(thumb_name, "wb") as f:
+            f.write(thumb_data.content)
         duration = results[0]["duration"]
-
     except Exception as e:
-        m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+        await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
         return
-    m.edit("📥 جاري تحميل الملف...")
+
+    await m.edit("📥 جاري تحميل الملف...")
     try:
-        with yt_dlp.YoutubeDL(ydl_ops) as ydl:
-            info_dict = ydl.extract_info(link, download=False)
-            audio_file = ydl.prepare_filename(info_dict)
-            ydl.process_info(info_dict)
+        def download_audio():
+            with yt_dlp.YoutubeDL(ydl_ops) as ydl:
+                info_dict = ydl.extract_info(link, download=True)
+                return ydl.prepare_filename(info_dict)
+
+        audio_file = await asyncio.to_thread(download_audio)
         rep = f"**🎧 الرافع @{bn}**"
         secmul, dur, dur_arr = 1, 0, duration.split(":")
         for i in range(len(dur_arr) - 1, -1, -1):
             dur += int(float(dur_arr[i])) * secmul
             secmul *= 60
-        m.edit("📤 جاري تحميل الملف...")
-        message.reply_audio(
+        await m.edit("📤 جاري رفع الملف...")
+        await message.reply_audio(
             audio_file,
             caption=rep,
             thumb=thumb_name,
@@ -75,21 +74,24 @@ def song(_, message):
             title=title,
             duration=dur,
         )
-        m.delete()
+        await m.delete()
     except Exception as e:
-        m.edit("❌ خطأ")
+        await m.edit(f"❌ خطأ: {e}")
         print(e)
+    finally:
+        for f in [audio_file, thumb_name]:
+            try:
+                if f and os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
 
-    try:
-        os.remove(audio_file)
-        os.remove(thumb_name)
-    except Exception as e:
-        print(e)
-        
-@Client.on_message(
-    command(["vsong","vsong@{bn}","video"])
-)
-async def vsong(client, message):
+
+# ─────────────────────────────────────────
+# /vsong /video — تحميل فيديو
+# ─────────────────────────────────────────
+@Client.on_message(command(["vsong", "video"]))
+async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
         "format": "best",
@@ -97,57 +99,96 @@ async def vsong(client, message):
         "prefer_ffmpeg": False,
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
-        "quite": True,
+        "quiet": True,
     }
     query = " ".join(message.command[1:])
+    if not query:
+        return await message.reply("» **أرسل اسم الفيديو بعد الأمر**")
+
+    file_name = None
+    preview = None
     try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
+        results = await asyncio.to_thread(
+            lambda: YoutubeSearch(query, max_results=1).to_dict()
+        )
         link = f"https://youtube.com{results[0]['url_suffix']}"
-        title = results[0]["title"][:40]
         thumbnail = results[0]["thumbnails"][0]
-        thumb_name = f"{title}.jpg"
-        thumb = requests.get(thumbnail, allow_redirects=True)
-        open(thumb_name, "wb").write(thumb.content)
-        results[0]["duration"]
-        results[0]["url_suffix"]
-        results[0]["views"]
-        message.from_user.mention
     except Exception as e:
-        print(e)
+        return await message.reply(f"❌ **خطأ في البحث:** {e}")
+
     try:
         msg = await message.reply("📥 **جاري تحميل الفيديو...**")
-        with YoutubeDL(ydl_opts) as ytdl:
-            ytdl_data = ytdl.extract_info(link, download=True)
-            file_name = ytdl.prepare_filename(ytdl_data)
+
+        def download_video():
+            with YoutubeDL(ydl_opts) as ytdl:
+                ytdl_data = ytdl.extract_info(link, download=True)
+                return ytdl.prepare_filename(ytdl_data), ytdl_data
+
+        file_name, ytdl_data = await asyncio.to_thread(download_video)
     except Exception as e:
         return await msg.edit(f"🚫 **خطأ:** {e}")
-    preview = wget.download(thumbnail)
-    await msg.edit("📤 **جاري تحميل الفيديو...**")
-    await message.reply_video(
-        file_name,
-        duration=int(ytdl_data["duration"]),
-        thumb=preview,
-        caption=ytdl_data["title"],
-    )
+
     try:
-        os.remove(file_name)
+        preview = await asyncio.to_thread(wget.download, thumbnail)
+        await msg.edit("📤 **جاري رفع الفيديو...**")
+        await message.reply_video(
+            file_name,
+            duration=int(ytdl_data["duration"]),
+            thumb=preview,
+            caption=ytdl_data["title"],
+        )
         await msg.delete()
     except Exception as e:
         print(e)
+    finally:
+        for f in [file_name, preview]:
+            try:
+                if f and os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
 
+
+# ─────────────────────────────────────────
+# /lyric — كلمات الأغنية  [FIX: API القديمة اتوقفت، استبدلها بـ lyrics.ovh]
+# ─────────────────────────────────────────
 @Client.on_message(command(["lyric"]))
-async def lyrics(_, message):
+async def lyrics(_, message: Message):
+    if len(message.command) < 2:
+        return await message.reply_text(
+            "» **قم بإرسال اسم الأغنية بعد الأمر**\nمثال: /lyric Fairuz - Ya Ana Ya Ana"
+        )
+    query = message.text.split(None, 1)[1]
+    rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
     try:
-        if len(message.command) < 2:
-            await message.reply_text("» **قم باارسال اسم المقطع**")
-            return
-        query = message.text.split(None, 1)[1]
-        rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
-        resp = requests.get(
-            f"https://api-tede.herokuapp.com/api/lirik?l={query}"
-        ).json()
-        result = f"{resp['data']}"
-        await rep.edit(result)
-    except Exception:
-        await rep.edit("❌ **لم يتم العثور على نتائج كلمات غنائية**\n\n» **يرجى إعطاء اسم أغنية صالح**")
-       
+        # استخدام lyrics.ovh API المجانية والشغالة
+        # الصيغة المفضلة: /lyric اسم الفنان - اسم الأغنية
+        parts = query.split("-", 1)
+        if len(parts) == 2:
+            artist = parts[0].strip()
+            title  = parts[1].strip()
+        else:
+            artist = query.strip()
+            title  = query.strip()
+
+        url  = f"https://api.lyrics.ovh/v1/{artist}/{title}"
+        resp = await asyncio.to_thread(requests.get, url, timeout=10)
+        data = resp.json()
+
+        if "lyrics" in data and data["lyrics"]:
+            lyric_text = data["lyrics"]
+            if len(lyric_text) > 4000:
+                lyric_text = lyric_text[:4000] + "\n\n... (مقتطع)"
+            await rep.edit(f"🎵 **{query}**\n\n{lyric_text}")
+        else:
+            await rep.edit(
+                "❌ **لم يتم العثور على كلمات**\n\n"
+                "» جرب الصيغة: /lyric اسم الفنان - اسم الأغنية"
+            )
+    except Exception as e:
+        await rep.edit(
+            "❌ **لم يتم العثور على نتائج كلمات غنائية**\n\n"
+            "» **يرجى إعطاء اسم أغنية صالح**\n"
+            "» مثال: /lyric Fairuz - Nassam Alayna"
+        )
+        print(e)
