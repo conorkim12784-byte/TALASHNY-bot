@@ -1,16 +1,18 @@
+import os
 from config import API_HASH, API_ID, BOT_TOKEN, SESSION_NAME
 from pyrogram import Client
 from pytgcalls import PyTgCalls
-import os
 
-# SESSION_NAME في الـ .env هي session string (سلسلة طويلة)
-# نتحقق: لو هي أطول من 50 حرف → نعاملها كـ session_string
-SESSION_STRING = os.getenv("SESSION_STRING", "")
+# الـ SESSION_NAME في .env هي session_string مباشرة (سلسلة طويلة BQA...)
+SESSION_STRING = os.getenv("SESSION_STRING") or ""
 if not SESSION_STRING and SESSION_NAME and len(SESSION_NAME) > 50:
     SESSION_STRING = SESSION_NAME
-    _session_name = "talashny_user"
-else:
-    _session_name = SESSION_NAME if SESSION_NAME and len(SESSION_NAME) <= 50 else "talashny_user"
+
+if not SESSION_STRING:
+    raise ValueError(
+        "❌ لم يتم العثور على SESSION_NAME أو SESSION_STRING في .env\n"
+        "يجب أن يكون SESSION_NAME = session string صالح (BQA...)"
+    )
 
 bot = Client(
     ":veez:",
@@ -20,18 +22,12 @@ bot = Client(
     plugins={"root": "program"},
 )
 
-if SESSION_STRING:
-    user = Client(
-        _session_name,
-        api_id=API_ID,
-        api_hash=API_HASH,
-        session_string=SESSION_STRING,
-    )
-else:
-    user = Client(
-        _session_name,
-        api_id=API_ID,
-        api_hash=API_HASH,
-    )
+# الـ user client يستخدم session_string مباشرة
+user = Client(
+    name="talashny_user",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=SESSION_STRING,
+)
 
 call_py = PyTgCalls(user)
