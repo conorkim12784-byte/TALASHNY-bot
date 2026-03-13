@@ -24,16 +24,13 @@ async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
 
 def build_perms_keyboard(user_id: int, perms: set) -> InlineKeyboardMarkup:
     buttons = []
-    items = list(ALL_PERMISSIONS.items())
-    for i in range(0, len(items), 2):
-        row = []
-        for key, label in items[i:i+2]:
-            icon = "✅" if key in perms else "❌"
-            row.append(InlineKeyboardButton(
-                f"{icon} {label}",
-                callback_data=f"ba|{user_id}|{key}|{int(key in perms)}"
-            ))
-        buttons.append(row)
+    # كل صلاحية في سطر لوحدها
+    for key, label in ALL_PERMISSIONS.items():
+        icon = "✅" if key in perms else "❌"
+        buttons.append([InlineKeyboardButton(
+            f"{icon} {label}",
+            callback_data=f"ba|{user_id}|{key}|{int(key in perms)}"
+        )])
     buttons.append([
         InlineKeyboardButton("✅ ارفعه دلوقتي", callback_data=f"ba_confirm|{user_id}"),
         InlineKeyboardButton("❌ الغاء", callback_data="ba_cancel"),

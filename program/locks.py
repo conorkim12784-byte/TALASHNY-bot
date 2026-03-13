@@ -1,0 +1,93 @@
+# locks.py — قفل وفتح الجروب
+
+from collections import defaultdict
+from pyrogram import Client, filters
+from pyrogram.types import Message, ChatPermissions
+from driver.filters import command, command2, other_filters
+from driver.decorators import bot_admin_check
+
+# { chat_id: { lock_type: bool } }
+locks_state: dict = defaultdict(lambda: {
+    "صور": False,
+    "روابط": False,
+    "توجيه": False,
+    "دردشة": False,
+})
+
+
+async def apply_locks(c: Client, chat_id: int):
+    state = locks_state[chat_id]
+    all_locked = state.get("دردشة", False)
+    try:
+        await c.set_chat_permissions(chat_id, ChatPermissions(
+            can_send_messages=not all_locked,
+            can_send_media_messages=not (all_locked or state.get("صور", False)),
+            can_add_web_page_previews=not (all_locked or state.get("روابط", False)),
+            can_forward_messages=not (all_locked or state.get("توجيه", False)),
+        ))
+    except Exception as e:
+        raise e
+
+
+@Client.on_message((command(["lock"]) | command2(["قفل"])) & other_filters)
+@bot_admin_check("lock")
+async def lock_cmd(c: Client, m: Message):
+    await m.delete()
+    chat_id = m.chat.id
+
+    types = {
+        "صور": "صور", "روابط": "روابط",
+        "توجيه": "توجيه", "دردشة": "دردشة", "الكل": "الكل"
+    }
+
+    if len(m.command) < 2 or m.command[1] not in types:
+        return await m.reply(
+            "**الاستخدام:** `قفل [نوع]`\n\n"
+            "**الأنواع المتاحة:**\n"
+            "» `قفل صور`\n» `قفل روابط`\n"
+            "» `قفل توجيه`\n» `قفل دردشة`\n» `قفل الكل`"
+        )
+
+    lock_type = m.command[1]
+
+    if lock_type == "الكل":
+        for k in locks_state[chat_id]:
+            locks_state[chat_id][k] = True
+        await apply_locks(c, chat_id)
+        return await m.reply("🔒 **تم قفل كل حاجة في الجروب**")
+
+    locks_state[chat_id][lock_type] = True
+    await apply_locks(c, chat_id)
+    await m.reply(f"🔒 **تم قفل {lock_type}**")
+
+
+@Client.on_message((command(["unlock"]) | command2(["فتح"])) & other_filters)
+@bot_admin_check("lock")
+async def unlock_cmd(c: Client, m: Message):
+    await m.delete()
+    chat_id = m.chat.id
+
+    types = {
+        "صور": "صور", "روابط": "روابط",
+        "توجيه": "توجيه", "دردشة": "دردشة", "الكل": "الكل"
+    }
+
+    if len(m.command) < 2 or m.command[1] not in types:
+        return await m.reply(
+            "**الاستخدام:** `فتح [نوع]`\n\n"
+            "**الأنواع المتاحة:**\n"
+            "» `فتح صور`\n» `فتح روابط`\n"
+            "» `فتح توجيه`\n» `فتح دردشة`\n» `فتح الكل`"
+        )
+
+    lock_type = m.command[1]
+
+    if lock_type == "الكل":
+        for k in locks_state[chat_id]:
+            locks_state[chat_id][k] = False
+        await apply_locks(c, chat_id)
+        return await m.reply("🔓 **تم فتح كل حاجة في الجروب**")
+
+    locks_state[chat_id][lock_type] = False
+    await apply_locks(c, chat_id)
+    await m.reply(f"🔓 **تم فتح {lock_type}**")

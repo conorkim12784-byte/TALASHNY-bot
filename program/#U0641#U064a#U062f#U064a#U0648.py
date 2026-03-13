@@ -1,4 +1,4 @@
-from driver.decorators import bot_admin_check
+from driver.decorators import bot_admin_check, all_members_check
 # فيديو.py - اوامر الفيديو العربية فقط (vplay + vstream الانجليزية موجودة في video.py)
 import re
 import asyncio

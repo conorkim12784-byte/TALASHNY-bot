@@ -1,4 +1,4 @@
-from driver.decorators import bot_admin_check
+from driver.decorators import bot_admin_check, all_members_check
 # Copyright (C) 2021 By Veez Music-Project
 # /play — صوت بس بدون فيديو (video_flags=IGNORE)
 
