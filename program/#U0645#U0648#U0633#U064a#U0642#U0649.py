@@ -6,14 +6,14 @@ from pytgcalls.types import MediaStream, AudioQuality
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, arabic_command
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from config import BOT_USERNAME, IMG_5
-from program._search_helper import ytsearch, ytdl_audio as ytdl
+from program.video import ytsearch, ytdl as ytdl
 
 
-@Client.on_message(command2(["تشغيل", "شغل"]) & other_filters)
+@Client.on_message((command2(["تشغيل", "شغل"]) | arabic_command(["تشغيل", "شغل"])) & other_filters)
 async def play_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -104,8 +104,8 @@ async def play_ar(c: Client, m: Message):
             suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
-            if not search or not isinstance(search, list) or len(search) != 4:
-                await suhu.edit("❌ **لـم يـتـم الـعـثـور عـلـى نـتـائـج**")
+            if not isinstance(search, list):
+                await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
                 return
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
