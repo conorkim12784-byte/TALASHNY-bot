@@ -1,9 +1,8 @@
 tgcrypto
-py-tgcalls==2.2.11
+pytgcalls>=3.0.0
 pyrofork
 youtube-search-python
 yt-dlp
-lyricsgenius
 speedtest-cli
 youtube-search
 python-dotenv
