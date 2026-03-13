@@ -1,6 +1,7 @@
 import asyncio
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
+import driver.utils  # تسجيل stream handlers
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
 
 
