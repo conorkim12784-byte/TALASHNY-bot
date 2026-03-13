@@ -21,7 +21,7 @@ def _ytsearch_sync(query: str):
     try:
         result = subprocess.run(
             ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist",
-             "--no-download", "--no-warnings", "--ignore-errors"],
+             "--no-download", "--no-warnings", "--ignore-errors", "--cookies", "/app/cookies.txt"],
             capture_output=True, text=True, timeout=60
         )
         if not result.stdout.strip():
@@ -40,7 +40,7 @@ def _ytsearch_sync(query: str):
 
 async def _ytdl_video(link):
     proc = await asyncio.create_subprocess_exec(
-        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", link,
+        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", "--cookies", "/app/cookies.txt", link,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

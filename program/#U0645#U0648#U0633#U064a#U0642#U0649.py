@@ -10,7 +10,7 @@ from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from config import BOT_USERNAME, IMG_5
-from program.video import ytsearch, ytdl as ytdl
+from program._search_helper import ytsearch, ytdl_audio as ytdl
 
 
 @Client.on_message(command2(["تشغيل", "شغل"]) & other_filters)
@@ -104,8 +104,8 @@ async def play_ar(c: Client, m: Message):
             suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
-            if not isinstance(search, list):
-                await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
+            if not search or not isinstance(search, list) or len(search) != 4:
+                await suhu.edit("❌ **لـم يـتـم الـعـثـور عـلـى نـتـائـج**")
                 return
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
