@@ -16,3 +16,15 @@ def command(commands: Union[str, List[str]]):
 
 def command2(commands: Union[str, List[str]]):
     return filters.command(commands, PREFIXES_NO_SLASH)
+
+def arabic_command(words: List[str]):
+    """فلتر بيتحقق إن الرسالة تبدأ بكلمة عربية من غير أي بادئة"""
+    async def func(_, __, message):
+        if not message.text:
+            return False
+        text = message.text.strip()
+        for word in words:
+            if text == word or text.startswith(word + " "):
+                return True
+        return False
+    return filters.create(func)
