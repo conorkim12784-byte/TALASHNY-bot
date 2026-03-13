@@ -53,7 +53,7 @@ def humanbytes(size):
 
 
 # الصلاحيات اللي مشرف الجروب الحقيقي بيقدر يستخدمها تلقائياً
-ADMIN_DEFAULT_PERMS = {"play", "skip", "mute_user"}
+ADMIN_DEFAULT_PERMS = {"skip", "mute_user"}
 
 
 def bot_admin_check(perm: str):
@@ -87,3 +87,10 @@ def bot_admin_check(perm: str):
             await message.reply("❌ مش عندك صلاحية تستخدم الامر ده")
         return decorator
     return wrapper
+
+
+def all_members_check(func: Callable) -> Callable:
+    """أوامر متاحة لكل الأعضاء"""
+    async def decorator(client: Client, message: Message):
+        return await func(client, message)
+    return decorator
