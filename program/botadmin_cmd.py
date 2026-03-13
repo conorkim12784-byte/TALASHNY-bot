@@ -1,9 +1,10 @@
-# botadmin_cmd.py — أوامر رفع وإدارة بوت ادمنز
+# botadmin_cmd.py — أوامر رفع وإدارة بوت ادمنز مع أزرار زرقاء
 
 from pyrogram import Client, filters
-from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, CallbackQuery
 
 from driver.filters import command, command2, other_filters
+from driver.blue_button import send_blue, edit_blue
 from driver.botadmin import (
     ALL_PERMISSIONS, MASTER_ID,
     is_master, is_bot_admin,
@@ -12,7 +13,7 @@ from driver.botadmin import (
 )
 
 
-async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
+async def is_allowed(c, chat_id, user_id):
     if is_master(user_id):
         return True
     try:
@@ -22,26 +23,53 @@ async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
         return False
 
 
-def build_perms_keyboard(user_id: int, perms: set) -> InlineKeyboardMarkup:
-    buttons = []
-    # كل صلاحية في سطر لوحدها
+def _perms_to_rows(user_id: int, perms: set) -> list:
+    rows = []
     for key, label in ALL_PERMISSIONS.items():
         icon = "✅" if key in perms else "❌"
-        buttons.append([InlineKeyboardButton(
-            f"{icon} {label}",
-            callback_data=f"ba|{user_id}|{key}|{int(key in perms)}"
-        )])
-    buttons.append([
-        InlineKeyboardButton("✅ ارفعه دلوقتي", callback_data=f"ba_confirm|{user_id}"),
-        InlineKeyboardButton("❌ الغاء", callback_data="ba_cancel"),
+        rows.append([{
+            "text": f"{icon} {label}",
+            "callback_data": f"ba|{user_id}|{key}|{int(key in perms)}",
+            "style": "primary"
+        }])
+    rows.append([
+        {"text": "✅ ارفعه دلوقتي", "callback_data": f"ba_confirm|{user_id}", "style": "primary"},
+        {"text": "❌ الغاء", "callback_data": "ba_cancel", "style": "primary"},
     ])
-    return InlineKeyboardMarkup(buttons)
+    return rows
+
+
+def _rows_to_perms(inline_keyboard) -> set:
+    """استخراج الصلاحيات من أزرار الرسالة"""
+    perms = set()
+    for row in inline_keyboard:
+        for btn in row:
+            cb = btn.get("callback_data", "") if isinstance(btn, dict) else getattr(btn, "callback_data", "")
+            if cb and cb.startswith("ba|"):
+                parts = cb.split("|")
+                if len(parts) >= 4 and bool(int(parts[3])):
+                    perms.add(parts[2])
+    return perms
+
+
+def _pyrogram_rows_to_perms(markup) -> set:
+    """استخراج الصلاحيات من pyrogram InlineKeyboardMarkup"""
+    perms = set()
+    if not markup:
+        return perms
+    for row in markup.inline_keyboard:
+        for btn in row:
+            if btn.callback_data and btn.callback_data.startswith("ba|"):
+                p = btn.callback_data.split("|")
+                if len(p) >= 4 and bool(int(p[3])):
+                    perms.add(p[2])
+    return perms
 
 
 # ═══════════════════════════════════════
 # رفع بوت ادمن
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmin"]) | command2(["بوت ادمن", "ادمن بوت", "رفع بوت"])) & other_filters)
+@Client.on_message((command(["botadmin"]) | command2(["رفع بوت", "بوت ادمن", "ادمن بوت"])) & other_filters)
 async def promote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -77,40 +105,44 @@ async def promote_bot_admin(c: Client, m: Message):
     if not current_perms:
         current_perms = set(ALL_PERMISSIONS.keys()) - {"promote"}
 
-    await m.reply(
+    rows = _perms_to_rows(target.id, current_perms)
+    await send_blue(
+        chat_id,
         f"👤 **رفع بوت ادمن**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
         f"**الايدي:** `{target.id}`\n\n"
         f"اختار الصلاحيات:",
-        reply_markup=build_perms_keyboard(target.id, current_perms)
+        rows
     )
 
 
+# ═══════════════════════════════════════
+# callback تبديل صلاحية
+# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex(r"^ba\|"))
 async def toggle_bot_perm(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
         return await query.answer("❌ مالك المجموعة بس", show_alert=True)
 
-    _, user_id, key, current = query.data.split("|")
-    user_id = int(user_id)
+    parts = query.data.split("|")
+    user_id = int(parts[1])
+    key = parts[2]
+    current = bool(int(parts[3]))
 
-    perms = set()
-    for row in query.message.reply_markup.inline_keyboard:
-        for btn in row:
-            if btn.callback_data and btn.callback_data.startswith("ba|"):
-                p = btn.callback_data.split("|")
-                if bool(int(p[3])):
-                    perms.add(p[2])
-
-    if bool(int(current)):
+    perms = _pyrogram_rows_to_perms(query.message.reply_markup)
+    if current:
         perms.discard(key)
     else:
         perms.add(key)
 
-    await query.edit_message_reply_markup(build_perms_keyboard(user_id, perms))
+    rows = _perms_to_rows(user_id, perms)
+    await edit_blue(query.message.chat.id, query.message.id, query.message.text, rows)
     await query.answer()
 
 
+# ═══════════════════════════════════════
+# callback تأكيد الرفع
+# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex(r"^ba_confirm\|"))
 async def confirm_bot_admin(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
@@ -119,14 +151,7 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
     user_id = int(query.data.split("|")[1])
     chat_id = query.message.chat.id
 
-    perms = set()
-    for row in query.message.reply_markup.inline_keyboard:
-        for btn in row:
-            if btn.callback_data and btn.callback_data.startswith("ba|"):
-                p = btn.callback_data.split("|")
-                if bool(int(p[3])):
-                    perms.add(p[2])
-
+    perms = _pyrogram_rows_to_perms(query.message.reply_markup)
     add_bot_admin(chat_id, user_id, perms)
     target = await c.get_users(user_id)
 
@@ -135,23 +160,29 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
         for k, v in ALL_PERMISSIONS.items()
     )
 
-    await query.edit_message_text(
+    await edit_blue(
+        chat_id, query.message.id,
         f"✅ **تم الرفع بنجاح**\n\n"
         f"👤 **المستخدم:** [{target.first_name}](tg://user?id={user_id})\n"
         f"🏠 **المجموعة:** `{chat_id}`\n\n"
-        f"**الصلاحيات:**\n{perms_text}"
+        f"**الصلاحيات:**\n{perms_text}",
+        []
     )
 
 
+# ═══════════════════════════════════════
+# callback الغاء
+# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex("^ba_cancel$"))
 async def cancel_bot_admin(c: Client, query: CallbackQuery):
-    await query.edit_message_text("❌ اتلغت العملية")
+    await query.message.delete()
+    await query.answer()
 
 
 # ═══════════════════════════════════════
 # نزول بوت ادمن
 # ═══════════════════════════════════════
-@Client.on_message((command(["rmbotadmin"]) | command2(["نزول بوت", "شيل بوت ادمن"])) & other_filters)
+@Client.on_message((command(["rmbotadmin"]) | command2(["شيل بوت ادمن", "نزول بوت"])) & other_filters)
 async def demote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -173,21 +204,17 @@ async def demote_bot_admin(c: Client, m: Message):
 
     if not target:
         return await m.reply("❌ مش عارف اتعرف على المستخدم ده")
-
     if not is_bot_admin(chat_id, target.id):
         return await m.reply("❌ الواد ده مش بوت ادمن اصلا")
 
     remove_bot_admin(chat_id, target.id)
-    await m.reply(
-        f"✅ **تم النزول**\n\n"
-        f"👤 [{target.first_name}](tg://user?id={target.id}) اتشال من البوت ادمنز"
-    )
+    await m.reply(f"✅ [{target.first_name}](tg://user?id={target.id}) اتشال من البوت ادمنز")
 
 
 # ═══════════════════════════════════════
 # قايمة البوت ادمنز
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmins"]) | command2(["بوت ادمنز", "ادمنز البوت", "قايمة الادمنز"])) & other_filters)
+@Client.on_message((command(["botadmins"]) | command2(["قايمة الادمنز", "بوت ادمنز"])) & other_filters)
 async def list_bot_admins(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

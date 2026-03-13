@@ -1,27 +1,21 @@
-# cmds.py — أمر الأوامر مع أزرار تنقل
+# cmds.py — أمر الأوامر مع أزرار زرقاء
 
 from pyrogram import Client, filters
-from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, CallbackQuery
 from driver.filters import command, command2, other_filters
+from driver.blue_button import send_blue_animation, send_blue, edit_blue_caption, edit_blue
 
 GIF_URL = "https://i.postimg.cc/wxV3PspQ/1756574872401.gif"
 
-# ═══════════════════════════════════════
-# نصوص الأوامر
-# ═══════════════════════════════════════
 MEMBERS_TEXT = """🎵 **أوامر الأعضاء**
 
-**تشغيل موسيقى:**
-» `تشغيل` + اسم الأغنية أو رابط
-» `شغل` + اسم الأغنية
-
-**تشغيل فيديو:**
+**تشغيل:**
+» `تشغيل` + اسم أو رابط
 » `تشغيل فيديو` + اسم أو رابط
-» `شغل فيديو` + اسم أو رابط
 
 **معلومات:**
-» `مشغل` — شوف إيه اللي شغال دلوقتي
-» `في الكول` — شوف مين في الدردشة الصوتية
+» `مشغل` — إيه اللي شغال دلوقتي
+» `في الكول` — مين في الدردشة الصوتية
 » `قايمة التشغيل` — قايمة الأغاني
 
 **بحث وتحميل:**
@@ -33,15 +27,15 @@ MEMBERS_TEXT = """🎵 **أوامر الأعضاء**
 ADMINS_TEXT = """👮 **أوامر المشرفين**
 
 **التحكم في التشغيل:**
-» `تخطي` — تخطي الأغنية الحالية
-» `انهاء` — إيقاف التشغيل نهائياً
+» `تخطي` — تخطي الأغنية
+» `انهاء` — إيقاف نهائي
 » `اسكت` — كتم الصوت
 » `ايقاف` — إيقاف مؤقت
-» `كمل` — استكمال التشغيل
-» `تحكم` + رقم — التحكم في مستوى الصوت
+» `كمل` — استكمال
+» `تحكم` + رقم — مستوى الصوت
 
 **كتم الأعضاء:**
-» `ميوت` — كتم مستخدم (رد على رسالته)
+» `ميوت` — كتم (رد على رسالته)
 » `فك ميوت` — فك الكتم"""
 
 BOT_ADMIN_TEXT = """⚙️ **أوامر بوت الادمن**
@@ -54,91 +48,78 @@ BOT_ADMIN_TEXT = """⚙️ **أوامر بوت الادمن**
 » `قفل الكل` / `فتح الكل`
 
 **إدارة بوت الادمنز:**
-» `رفع بوت` + معرف أو رد — رفع بوت ادمن
-» `شيل بوت ادمن` + معرف أو رد — نزول بوت ادمن
-» `قايمة الادمنز` — عرض البوت ادمنز
+» `رفع بوت` + معرف أو رد
+» `شيل بوت ادمن` + معرف أو رد
+» `قايمة الادمنز`
 
 **إدارة المشرفين:**
-» `رفع` + معرف أو رد — رفع مشرف جروب
-» `حد الحظر` + رقم — تغيير حد الحظر التلقائي"""
+» `رفع` + معرف أو رد
+» `حد الحظر` + رقم"""
 
 
-def main_keyboard():
-    return InlineKeyboardMarkup([
+def main_rows():
+    return [
         [
-            InlineKeyboardButton("🎵 أوامر الأعضاء", callback_data="cmds_members"),
-            InlineKeyboardButton("👮 أوامر المشرفين", callback_data="cmds_admins"),
+            {"text": "🎵 أوامر الأعضاء", "callback_data": "cmds_members", "style": "primary"},
+            {"text": "👮 أوامر المشرفين", "callback_data": "cmds_admins", "style": "primary"},
         ],
         [
-            InlineKeyboardButton("⚙️ بوت الادمن", callback_data="cmds_botadmin"),
+            {"text": "⚙️ بوت الادمن", "callback_data": "cmds_botadmin", "style": "primary"},
         ],
-        [InlineKeyboardButton("🗑 اغلاق", callback_data="cmds_close")],
-    ])
+        [{"text": "🗑 اغلاق", "callback_data": "cmds_close", "style": "primary"}],
+    ]
 
 
-def back_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("◀️ رجوع", callback_data="cmds_main")],
-        [InlineKeyboardButton("🗑 اغلاق", callback_data="cmds_close")],
-    ])
+def back_rows():
+    return [
+        [{"text": "◀️ رجوع", "callback_data": "cmds_main", "style": "primary"}],
+        [{"text": "🗑 اغلاق", "callback_data": "cmds_close", "style": "primary"}],
+    ]
 
 
-# ═══════════════════════════════════════
-# أمر الأوامر
-# ═══════════════════════════════════════
+# تخزين message_id لكل chat
+_msg_ids: dict = {}
+
+
 @Client.on_message((command(["commands", "cmds"]) | command2(["الاوامر", "اوامر"])) & other_filters)
 async def show_commands(c: Client, m: Message):
     await m.delete()
-    try:
-        await c.send_animation(
-            m.chat.id,
-            animation=GIF_URL,
-            caption="**اختار تصنيف الأوامر اللي عايزه 👇**",
-            reply_markup=main_keyboard()
-        )
-    except Exception:
-        await m.reply(
-            "**اختار تصنيف الأوامر اللي عايزه 👇**",
-            reply_markup=main_keyboard()
-        )
+    result = await send_blue_animation(
+        m.chat.id,
+        GIF_URL,
+        "**اختار تصنيف الأوامر 👇**",
+        main_rows()
+    )
+    if result and result.get("ok"):
+        _msg_ids[m.chat.id] = result["result"]["message_id"]
 
 
-# ═══════════════════════════════════════
-# callbacks التنقل
-# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex("^cmds_main$"))
 async def cmds_back_main(c: Client, query: CallbackQuery):
-    await query.edit_message_caption(
-        "**اختار تصنيف الأوامر اللي عايزه 👇**",
-        reply_markup=main_keyboard()
+    await edit_blue_caption(
+        query.message.chat.id,
+        query.message.id,
+        "**اختار تصنيف الأوامر 👇**",
+        main_rows()
     )
     await query.answer()
 
 
 @Client.on_callback_query(filters.regex("^cmds_members$"))
 async def cmds_members(c: Client, query: CallbackQuery):
-    await query.edit_message_caption(
-        MEMBERS_TEXT,
-        reply_markup=back_keyboard()
-    )
+    await edit_blue_caption(query.message.chat.id, query.message.id, MEMBERS_TEXT, back_rows())
     await query.answer()
 
 
 @Client.on_callback_query(filters.regex("^cmds_admins$"))
-async def cmds_admins(c: Client, query: CallbackQuery):
-    await query.edit_message_caption(
-        ADMINS_TEXT,
-        reply_markup=back_keyboard()
-    )
+async def cmds_admins_cb(c: Client, query: CallbackQuery):
+    await edit_blue_caption(query.message.chat.id, query.message.id, ADMINS_TEXT, back_rows())
     await query.answer()
 
 
 @Client.on_callback_query(filters.regex("^cmds_botadmin$"))
-async def cmds_botadmin(c: Client, query: CallbackQuery):
-    await query.edit_message_caption(
-        BOT_ADMIN_TEXT,
-        reply_markup=back_keyboard()
-    )
+async def cmds_botadmin_cb(c: Client, query: CallbackQuery):
+    await edit_blue_caption(query.message.chat.id, query.message.id, BOT_ADMIN_TEXT, back_rows())
     await query.answer()
 
 
