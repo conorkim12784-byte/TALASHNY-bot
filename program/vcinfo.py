@@ -16,15 +16,21 @@ async def who_in_call(c: Client, m: Message):
     chat_id = m.chat.id
 
     try:
-        # جلب المشتركين في الدردشة الصوتية عبر pyrogram
+        # نستخدم call_py (PyTgCalls) عبر الـ userbot عشان نجيب المشتركين
+        from driver.veez import call_py
+        participants = await call_py.get_participants(chat_id)
+
+        if not participants:
+            return await m.reply("🎙 **الدردشة الصوتية فارغة حالياً**")
+
         call_members = []
-        async for member in c.get_call_members(chat_id):
+        for p in participants:
             try:
-                user = member.user
-                if user and not user.is_bot:
+                uid = p.user_id
+                user = await c.get_users(uid)
+                if not user.is_bot:
                     name = user.first_name or "مجهول"
-                    mention = f"[{name}](tg://user?id={user.id})"
-                    call_members.append(mention)
+                    call_members.append(f"[{name}](tg://user?id={uid})")
             except Exception:
                 continue
 
@@ -40,7 +46,7 @@ async def who_in_call(c: Client, m: Message):
 
     except Exception as e:
         err = str(e).lower()
-        if "not found" in err or "chat_call_empty" in err or "no active" in err:
+        if "not found" in err or "empty" in err or "no active" in err or "not active" in err:
             await m.reply("🎙 **لا توجد دردشة صوتية نشطة**")
         else:
             await m.reply(f"❌ **خطأ:** `{e}`")
