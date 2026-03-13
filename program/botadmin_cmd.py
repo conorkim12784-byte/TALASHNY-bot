@@ -4,7 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 
 from driver.filters import command, command2, other_filters
-from driver.blue_button import send_blue, edit_blue
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from driver.botadmin import (
     ALL_PERMISSIONS, MASTER_ID,
     is_master, is_bot_admin,
