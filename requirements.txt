@@ -1,5 +1,5 @@
 tgcrypto
-pytgcalls>=3.0.0
+py-tgcalls==2.2.11
 pyrofork
 youtube-search-python
 yt-dlp
