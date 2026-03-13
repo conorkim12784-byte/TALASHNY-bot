@@ -3,6 +3,7 @@ from pyrogram import Client
 from pyrogram.types import Message
 from config import SUDO_USERS
 from driver.admins import get_administrators
+from driver.botadmin import has_permission, is_master
 
 
 
@@ -49,3 +50,40 @@ def humanbytes(size):
         size /= power
         raised_to_pow += 1
     return str(round(size, 2)) + " " + dict_power_n[raised_to_pow] + "B"
+
+
+# الصلاحيات اللي مشرف الجروب الحقيقي بيقدر يستخدمها تلقائياً
+ADMIN_DEFAULT_PERMS = {"play", "skip", "mute_user"}
+
+
+def bot_admin_check(perm: str):
+    """
+    decorator للتحقق من صلاحية معينة:
+    - ماستر وسودو: كل حاجة
+    - مشرف جروب حقيقي: play + skip + mute_user بس
+    - بوت ادمن: الصلاحيات اللي اتحددتله بس
+    """
+    def wrapper(func: Callable) -> Callable:
+        async def decorator(client: Client, message: Message):
+            user_id = message.from_user.id
+            chat_id = message.chat.id
+
+            # ماستر وسودو — فوق الكل
+            if user_id in SUDO_USERS or is_master(user_id):
+                return await func(client, message)
+
+            # مشرف جروب حقيقي — بس صلاحيات محددة
+            administrators = await get_administrators(message.chat)
+            if user_id in administrators:
+                if perm in ADMIN_DEFAULT_PERMS:
+                    return await func(client, message)
+                else:
+                    return await message.reply("❌ الصلاحية دي للبوت ادمن بس")
+
+            # بوت ادمن عنده الصلاحية دي
+            if has_permission(chat_id, user_id, perm):
+                return await func(client, message)
+
+            await message.reply("❌ مش عندك صلاحية تستخدم الامر ده")
+        return decorator
+    return wrapper
