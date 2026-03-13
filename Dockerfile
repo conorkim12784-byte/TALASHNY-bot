@@ -10,6 +10,5 @@ RUN apt-get update \
 COPY . /app/
 WORKDIR /app/
 RUN pip3 install --no-cache-dir --upgrade pip \
-    && pip3 install --no-cache-dir -r requirements.txt \
-    && pip3 install --no-cache-dir --upgrade yt-dlp
+    && pip3 install --no-cache-dir -r requirements.txt
 CMD ["python3", "main.py"]
