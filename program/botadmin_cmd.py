@@ -1,10 +1,9 @@
-# botadmin_cmd.py — أوامر رفع وإدارة بوت ادمنز مع أزرار زرقاء
+# botadmin_cmd.py
 
 from pyrogram import Client, filters
-from pyrogram.types import Message, CallbackQuery
+from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from driver.filters import command, command2, other_filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from driver.botadmin import (
     ALL_PERMISSIONS, MASTER_ID,
     is_master, is_bot_admin,
@@ -18,42 +17,27 @@ async def is_allowed(c, chat_id, user_id):
         return True
     try:
         member = await c.get_chat_member(chat_id, user_id)
-        return member.status.value == "creator"
+        return member.status.value == "owner"
     except Exception:
         return False
 
 
-def _perms_to_rows(user_id: int, perms: set) -> list:
+def _perms_to_keyboard(user_id: int, perms: set) -> InlineKeyboardMarkup:
     rows = []
     for key, label in ALL_PERMISSIONS.items():
         icon = "✅" if key in perms else "❌"
-        rows.append([{
-            "text": f"{icon} {label}",
-            "callback_data": f"ba|{user_id}|{key}|{int(key in perms)}",
-            "style": "primary"
-        }])
+        rows.append([InlineKeyboardButton(
+            f"{icon} {label}",
+            callback_data=f"ba|{user_id}|{key}|{int(key in perms)}"
+        )])
     rows.append([
-        {"text": "✅ ارفعه دلوقتي", "callback_data": f"ba_confirm|{user_id}", "style": "primary"},
-        {"text": "❌ الغاء", "callback_data": "ba_cancel", "style": "primary"},
+        InlineKeyboardButton("✅ ارفعه دلوقتي", callback_data=f"ba_confirm|{user_id}"),
+        InlineKeyboardButton("❌ الغاء", callback_data="ba_cancel"),
     ])
-    return rows
+    return InlineKeyboardMarkup(rows)
 
 
-def _rows_to_perms(inline_keyboard) -> set:
-    """استخراج الصلاحيات من أزرار الرسالة"""
-    perms = set()
-    for row in inline_keyboard:
-        for btn in row:
-            cb = btn.get("callback_data", "") if isinstance(btn, dict) else getattr(btn, "callback_data", "")
-            if cb and cb.startswith("ba|"):
-                parts = cb.split("|")
-                if len(parts) >= 4 and bool(int(parts[3])):
-                    perms.add(parts[2])
-    return perms
-
-
-def _pyrogram_rows_to_perms(markup) -> set:
-    """استخراج الصلاحيات من pyrogram InlineKeyboardMarkup"""
+def _extract_perms(markup) -> set:
     perms = set()
     if not markup:
         return perms
@@ -69,13 +53,13 @@ def _pyrogram_rows_to_perms(markup) -> set:
 # ═══════════════════════════════════════
 # رفع بوت ادمن
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmin"]) | command2(["رفع بوت", "بوت ادمن", "ادمن بوت"])) & other_filters)
+@Client.on_message((command(["botadmin"]) | command2(["رفع بوت", "بوت ادمن"])) & other_filters)
 async def promote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
 
     if not await is_allowed(c, chat_id, m.from_user.id):
-        return await m.reply("❌ الامر ده لمالك المجموعة بس")
+        return await m.reply("❌ مالك المجموعة بس")
 
     target = None
     if m.reply_to_message:
@@ -83,36 +67,81 @@ async def promote_bot_admin(c: Client, m: Message):
     elif len(m.command) >= 2:
         arg = m.command[1]
         try:
-            target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
+            target = await c.get_users(int(arg) if arg.isdigit() else arg)
         except Exception:
             return await m.reply("❌ مش لاقي المستخدم ده")
-    else:
-        return await m.reply(
-            "**الاستخدام:**\n"
-            "» رد على مستخدم: `رفع بوت`\n"
-            "» بالمعرف: `رفع بوت @username`\n"
-            "» بالايدي: `رفع بوت 123456789`"
-        )
 
     if not target:
-        return await m.reply("❌ مش عارف اتعرف على المستخدم ده")
+        return await m.reply("رد على المستخدم أو اكتب معرفه")
     if target.is_bot:
         return await m.reply("❌ مينفعش نرفع بوتات")
     if is_master(target.id):
-        return await m.reply("👑 الواد ده فوق الكل اصلا")
+        return await m.reply("👑 الواد ده فوق الكل أصلاً")
 
-    current_perms = get_permissions(chat_id, target.id)
-    if not current_perms:
-        current_perms = set(ALL_PERMISSIONS.keys()) - {"promote"}
+    current_perms = get_permissions(chat_id, target.id) or (set(ALL_PERMISSIONS.keys()) - {"promote"})
+    keyboard = _perms_to_keyboard(target.id, current_perms)
 
-    rows = _perms_to_rows(target.id, current_perms)
     await m.reply(
         f"👤 **رفع بوت ادمن**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
         f"**الايدي:** `{target.id}`\n\n"
         f"اختار الصلاحيات:",
-        reply_markup=InlineKeyboardMarkup(rows)
+        reply_markup=keyboard
     )
+
+
+# ═══════════════════════════════════════
+# شيل بوت ادمن
+# ═══════════════════════════════════════
+@Client.on_message((command(["rmbotadmin"]) | command2(["شيل بوت ادمن", "نزول بوت"])) & other_filters)
+async def demote_bot_admin(c: Client, m: Message):
+    await m.delete()
+    chat_id = m.chat.id
+
+    if not await is_allowed(c, chat_id, m.from_user.id):
+        return await m.reply("❌ مالك المجموعة بس")
+
+    target = None
+    if m.reply_to_message:
+        target = m.reply_to_message.from_user
+    elif len(m.command) >= 2:
+        arg = m.command[1]
+        try:
+            target = await c.get_users(int(arg) if arg.isdigit() else arg)
+        except Exception:
+            return await m.reply("❌ مش لاقي المستخدم ده")
+
+    if not target:
+        return await m.reply("رد على المستخدم أو اكتب معرفه")
+
+    if not is_bot_admin(chat_id, target.id):
+        return await m.reply("❌ الشخص ده مش بوت ادمن أصلاً")
+
+    remove_bot_admin(chat_id, target.id)
+    await m.reply(f"✅ تم شيل [{target.first_name}](tg://user?id={target.id}) من البوت ادمنز")
+
+
+# ═══════════════════════════════════════
+# قايمة البوت ادمنز
+# ═══════════════════════════════════════
+@Client.on_message((command(["botadmins"]) | command2(["قايمة الادمنز", "بوت ادمنز"])) & other_filters)
+async def list_bot_admins(c: Client, m: Message):
+    await m.delete()
+    admins = get_bot_admins(m.chat.id)
+    if not admins:
+        return await m.reply("❌ مفيش بوت ادمنز في الجروب ده")
+
+    text = "**⚙️ البوت ادمنز:**\n\n"
+    for user_id, perms in admins.items():
+        try:
+            user = await c.get_users(user_id)
+            name = user.first_name
+        except Exception:
+            name = str(user_id)
+        perms_text = ", ".join(ALL_PERMISSIONS.get(p, p) for p in perms)
+        text += f"👤 [{name}](tg://user?id={user_id})\n» {perms_text}\n\n"
+
+    await m.reply(text, disable_web_page_preview=True)
 
 
 # ═══════════════════════════════════════
@@ -128,14 +157,13 @@ async def toggle_bot_perm(c: Client, query: CallbackQuery):
     key = parts[2]
     current = bool(int(parts[3]))
 
-    perms = _pyrogram_rows_to_perms(query.message.reply_markup)
+    perms = _extract_perms(query.message.reply_markup)
     if current:
         perms.discard(key)
     else:
         perms.add(key)
 
-    rows = _perms_to_rows(user_id, perms)
-    await query.message.edit_text(query.message.text, reply_markup=InlineKeyboardMarkup(rows))
+    await query.message.edit_reply_markup(_perms_to_keyboard(user_id, perms))
     await query.answer()
 
 
@@ -150,7 +178,7 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
     user_id = int(query.data.split("|")[1])
     chat_id = query.message.chat.id
 
-    perms = _pyrogram_rows_to_perms(query.message.reply_markup)
+    perms = _extract_perms(query.message.reply_markup)
     add_bot_admin(chat_id, user_id, perms)
     target = await c.get_users(user_id)
 
@@ -165,6 +193,7 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
         f"🏠 **المجموعة:** `{chat_id}`\n\n"
         f"**الصلاحيات:**\n{perms_text}"
     )
+    await query.answer()
 
 
 # ═══════════════════════════════════════
@@ -174,60 +203,3 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
 async def cancel_bot_admin(c: Client, query: CallbackQuery):
     await query.message.delete()
     await query.answer()
-
-
-# ═══════════════════════════════════════
-# نزول بوت ادمن
-# ═══════════════════════════════════════
-@Client.on_message((command(["rmbotadmin"]) | command2(["شيل بوت ادمن", "نزول بوت"])) & other_filters)
-async def demote_bot_admin(c: Client, m: Message):
-    await m.delete()
-    chat_id = m.chat.id
-
-    if not await is_allowed(c, chat_id, m.from_user.id):
-        return await m.reply("❌ الامر ده لمالك المجموعة بس")
-
-    target = None
-    if m.reply_to_message:
-        target = m.reply_to_message.from_user
-    elif len(m.command) >= 2:
-        arg = m.command[1]
-        try:
-            target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
-        except Exception:
-            return await m.reply("❌ مش لاقي المستخدم ده")
-    else:
-        return await m.reply("» رد على المستخدم او ابعت معرفه")
-
-    if not target:
-        return await m.reply("❌ مش عارف اتعرف على المستخدم ده")
-    if not is_bot_admin(chat_id, target.id):
-        return await m.reply("❌ الواد ده مش بوت ادمن اصلا")
-
-    remove_bot_admin(chat_id, target.id)
-    await m.reply(f"✅ [{target.first_name}](tg://user?id={target.id}) اتشال من البوت ادمنز")
-
-
-# ═══════════════════════════════════════
-# قايمة البوت ادمنز
-# ═══════════════════════════════════════
-@Client.on_message((command(["botadmins"]) | command2(["قايمة الادمنز", "بوت ادمنز"])) & other_filters)
-async def list_bot_admins(c: Client, m: Message):
-    await m.delete()
-    chat_id = m.chat.id
-    admins = get_bot_admins(chat_id)
-
-    if not admins:
-        return await m.reply("📋 مفيش بوت ادمنز في الجروب ده")
-
-    text = "📋 **بوت ادمنز الجروب:**\n\n"
-    for uid, perms in admins.items():
-        try:
-            user = await c.get_users(uid)
-            name = user.first_name
-        except Exception:
-            name = str(uid)
-        perms_names = " | ".join(ALL_PERMISSIONS.get(p, p) for p in perms) or "بدون صلاحيات"
-        text += f"👤 [{name}](tg://user?id={uid})\n└ {perms_names}\n\n"
-
-    await m.reply(text)
