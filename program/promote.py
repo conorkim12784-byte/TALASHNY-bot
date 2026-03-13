@@ -9,7 +9,7 @@ from pyrogram.types import (
 )
 from pyrogram.errors import ChatAdminRequired
 
-from driver.filters import command, other_filters
+from driver.filters import command, command2, other_filters
 from driver.decorators import authorized_users_only
 
 # ═══════════════════════════════════════
@@ -34,7 +34,7 @@ def BAN_LIMIT(chat_id: int) -> int:
 # ═══════════════════════════════════════
 # أمر تغيير حد الحظر
 # ═══════════════════════════════════════
-@Client.on_message(command(["عدد الحظر ", "setbanlimit"]) & other_filters)
+@Client.on_message((command(["setbanlimit"]) | command2(["حد_الحظر"])) & other_filters)
 async def set_ban_limit(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -108,7 +108,7 @@ def build_permissions_keyboard(user_id: int, title: str, perms: dict) -> InlineK
 # ═══════════════════════════════════════
 # أمر رفع مشرف
 # ═══════════════════════════════════════
-@Client.on_message(command(["رفع", "promote"]) & other_filters)
+@Client.on_message((command(["promote"]) | command2(["رفع"])) & other_filters)
 @authorized_users_only
 async def promote_user(c: Client, m: Message):
     await m.delete()
