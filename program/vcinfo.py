@@ -4,13 +4,7 @@ from pyrogram import Client
 from pyrogram.types import Message
 from driver.filters import command, command2, other_filters
 from driver.queues import QUEUE
-
-# ─────────────────────────────────────────
-# dict لتتبع مين طلب الأغنية الحالية
-# { chat_id: {"name": str, "user_id": int, "first_name": str} }
-# يتحدث من music.py و video.py عند كل تشغيل
-# ─────────────────────────────────────────
-current_requester: dict = {}
+from driver.nowplaying import current_requester
 
 
 # ─────────────────────────────────────────

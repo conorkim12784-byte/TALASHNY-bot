@@ -12,7 +12,7 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.filters import command, other_filters
 from driver.queues import QUEUE, add_to_queue
-from program.vcinfo import current_requester
+from driver.nowplaying import current_requester
 from driver.veez import call_py, user
 from program.video import ytsearch, ytdl as ytdl
 from config import BOT_USERNAME, IMG_5
@@ -165,7 +165,6 @@ async def play(c: Client, m: Message):
 
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
-            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await suhu.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(

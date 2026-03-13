@@ -10,7 +10,7 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.filters import command, other_filters, command2
 from driver.queues import QUEUE, add_to_queue
-from program.vcinfo import current_requester
+from driver.nowplaying import current_requester
 from driver.veez import call_py, user
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
