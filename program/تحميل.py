@@ -12,10 +12,10 @@ from pyrogram.types import Message
 from youtube_search import YoutubeSearch
 from yt_dlp import YoutubeDL
 from config import BOT_USERNAME as bn
-from driver.filters import command2, other_filters, arabic_command
+from driver.filters import command2, other_filters
 
 
-@Client.on_message((command2(["تحميل", "تحميل_موسيقي"]) | arabic_command(["تحميل", "تحميل_موسيقي"])))
+@Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))
 async def song(_, message: Message):
     query = " ".join(message.command[1:])
     if not query:
@@ -66,7 +66,7 @@ async def song(_, message: Message):
                 pass
 
 
-@Client.on_message((command2(["تحميل_فيديو", "تحميل فيديو"]) | arabic_command(["تحميل_فيديو", "تحميل فيديو"])))
+@Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {"format": "best", "keepvideo": True, "geo_bypass": True,
@@ -108,7 +108,7 @@ async def vsong(client, message: Message):
                 pass
 
 
-@Client.on_message((command2(["بحث"]) | arabic_command(["بحث"])))
+@Client.on_message(command2(["بحث"]))
 async def search_lyrics(_, message: Message):
     await message.delete()
     try:

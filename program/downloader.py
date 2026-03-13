@@ -29,7 +29,7 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {"format": "bestaudio[ext=m4a]", "outtmpl": "%(title)s.%(ext)s", "cookiefile": "/app/cookies.txt"}
+    ydl_ops = {"format": "bestaudio[ext=m4a]", "outtmpl": "%(title)s.%(ext)s"}
     audio_file = None
     thumb_name = None
 
@@ -100,7 +100,6 @@ async def vsong(client, message: Message):
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
-        "cookiefile": "/app/cookies.txt",
     }
     query = " ".join(message.command[1:])
     if not query:

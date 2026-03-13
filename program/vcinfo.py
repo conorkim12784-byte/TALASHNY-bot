@@ -1,8 +1,9 @@
+from driver.decorators import bot_admin_check, all_members_check
 # vcinfo.py — مين في الكول + مين مشغّل الأغنية
 
 from pyrogram import Client
 from pyrogram.types import Message
-from driver.filters import command, command2, other_filters, arabic_command
+from driver.filters import command, command2, other_filters
 from driver.queues import QUEUE
 from driver.nowplaying import current_requester
 
@@ -10,7 +11,7 @@ from driver.nowplaying import current_requester
 # ─────────────────────────────────────────
 # أمر: مين في الكول
 # ─────────────────────────────────────────
-@Client.on_message((command(["incall"]) | (command2(["في_الكول", "الكول"]) | arabic_command(["في_الكول", "الكول", "في الكول"]))) & other_filters)
+@Client.on_message((command(["incall"]) | command2(["في_الكول", "الكول"])) & other_filters)
 async def who_in_call(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -55,7 +56,7 @@ async def who_in_call(c: Client, m: Message):
 # ─────────────────────────────────────────
 # أمر: مين مشغّل
 # ─────────────────────────────────────────
-@Client.on_message((command(["nowplaying", "np"]) | (command2(["مشغّل", "مشغل", "الان"]) | arabic_command(["مشغّل", "مشغل", "الان"]))) & other_filters)
+@Client.on_message((command(["nowplaying", "np"]) | command2(["مشغّل", "مشغل", "الان"])) & other_filters)
 async def now_playing(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

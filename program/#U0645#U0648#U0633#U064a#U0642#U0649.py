@@ -6,15 +6,14 @@ from pytgcalls.types import MediaStream, AudioQuality
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
-from driver.filters import command2, other_filters, arabic_command, get_query
+from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
-from driver.nowplaying import current_requester
 from driver.veez import call_py, user
 from config import BOT_USERNAME, IMG_5
 from program.video import ytsearch, ytdl as ytdl
 
 
-@Client.on_message((command2(["تشغيل", "شغل"]) | arabic_command(["تشغيل", "شغل"])) & other_filters)
+@Client.on_message(command2(["تشغيل", "شغل"]) & other_filters)
 async def play_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -89,7 +88,6 @@ async def play_ar(c: Client, m: Message):
                 await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                 await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
-                current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                 await suhu.delete()
                 buttons = stream_markup(user_id)
                 await m.reply_photo(
@@ -100,11 +98,11 @@ async def play_ar(c: Client, m: Message):
                 await suhu.delete()
                 await m.reply_text(f"خـطـا:\n\n» {e}")
     else:
-        query = get_query(m, ["تشغيل", "شغل"])
-        if not query:
+        if len(m.command) < 2:
             await m.reply("» عـلـيـك الـرد عـلـى **ملف صوتي** او **اكتب شي للبحث**")
         else:
             suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
+            query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             if not isinstance(search, list):
                 await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
@@ -129,7 +127,6 @@ async def play_ar(c: Client, m: Message):
                     await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                     await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
                     add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
-                    current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                     await suhu.delete()
                     buttons = stream_markup(user_id)
                     await m.reply_photo(

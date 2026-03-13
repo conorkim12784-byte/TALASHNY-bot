@@ -14,7 +14,7 @@ def ytsearch(query: str):
     try:
         result = subprocess.run(
             ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist",
-             "--no-download", "--no-warnings", "--ignore-errors", "--cookies", "/app/cookies.txt"],
+             "--no-download", "--no-warnings", "--ignore-errors"],
             capture_output=True, text=True, timeout=60
         )
         if not result.stdout.strip():
@@ -40,7 +40,7 @@ async def ytdl_audio(link: str):
     """
     proc = await asyncio.create_subprocess_exec(
         "yt-dlp", "-g", "-f", "bestaudio/best",
-        "--no-playlist", "--cookies", "/app/cookies.txt",
+        "--no-playlist",
         link,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

@@ -9,7 +9,7 @@ from time import time
 from io import StringIO
 from sys import version as pyver
 from inspect import getfullargspec
-from driver.filters import command2, other_filters, arabic_command
+from driver.filters import command2, other_filters
 from config import BOT_USERNAME as bname
 from driver.veez import bot
 from pyrogram import Client, filters
@@ -30,7 +30,7 @@ async def edit_or_reply(msg: Message, **kwargs):
     await func(**{k: v for k, v in kwargs.items() if k in spec})
 
 
-@Client.on_message((command2(["مغادره البوت"]) | arabic_command(["مغادره البوت"])))
+@Client.on_message(command2(["مغادره البوت"]))
 @sudo_users_only
 async def bot_leave_group(_, message):
     if len(message.command) != 2:

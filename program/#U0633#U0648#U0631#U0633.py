@@ -11,7 +11,7 @@ from config import (
 )
 from program import __version__
 from driver.veez import user
-from driver.filters import command2, other_filters, arabic_command
+from driver.filters import command2, other_filters
 from driver.decorators import sudo_users_only
 from driver.database.dbchat import add_served_chat, is_served_chat
 from driver.database.dbpunish import is_gbanned_user
@@ -47,7 +47,7 @@ async def _human_time_duration(seconds):
     return ", ".join(parts)
 
 
-@Client.on_message((command2(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"]) | arabic_command(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"])) & filters.group)
+@Client.on_message(command2(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"]) & filters.group)
 async def source_ar(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -59,7 +59,7 @@ async def source_ar(client: Client, message: Message):
     )
 
 
-@Client.on_message((command2(["المطور", "مطور"]) | arabic_command(["المطور", "مطور"])) & filters.group)
+@Client.on_message(command2(["المطور", "مطور"]) & filters.group)
 async def dev_ar(client: Client, message: Message):
     await message.delete()
     await message.reply_photo(
@@ -72,7 +72,7 @@ async def dev_ar(client: Client, message: Message):
     )
 
 
-@Client.on_message((command2(["بينج", "بنج", "البنج"]) | arabic_command(["بينج", "بنج", "البنج"])))
+@Client.on_message(command2(["بينج", "بنج", "البنج"]))
 async def ping_pong_ar(client: Client, message: Message):
     await message.delete()
     start = time()
@@ -81,7 +81,7 @@ async def ping_pong_ar(client: Client, message: Message):
     await m_reply.edit_text(f"PONG!!\n`{delta_ping * 1000:.3f} ms`")
 
 
-@Client.on_message((command2(["مده التشغيل", "مده_التشغيل", "فتره التشغيل", "فتره_التشغيل"]) | arabic_command(["مده التشغيل", "مده_التشغيل", "فتره التشغيل", "فتره_التشغيل"])))
+@Client.on_message(command2(["مده التشغيل", "مده_التشغيل", "فتره التشغيل", "فتره_التشغيل"]))
 async def get_uptime_ar(client: Client, message: Message):
     await message.delete()
     current_time = datetime.utcnow()

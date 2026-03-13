@@ -1,11 +1,11 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from config import BOT_USERNAME
-from driver.filters import command2, other_filters, arabic_command
+from driver.filters import command2, other_filters
 from driver.get_file_id import get_file_id
 
 
-@Client.on_message((command2(["ايدي", "الايدي"]) | arabic_command(["ايدي", "الايدي"])) & (filters.group | filters.private))
+@Client.on_message(command2(["ايدي", "الايدي"]) & (filters.group | filters.private))
 async def showid_ar(_, message: Message):
     await message.delete()
     chat_type = str(message.chat.type)

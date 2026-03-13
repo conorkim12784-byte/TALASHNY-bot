@@ -8,7 +8,7 @@ from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
-from driver.filters import command2, other_filters, arabic_command, get_query
+from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from pyrogram import Client
@@ -100,7 +100,7 @@ async def _check_and_join(c, m, chat_id):
     return True
 
 
-@Client.on_message((command2(["تشغيل_فيديو", "شغل_فيديو"]) | arabic_command(["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"])) & other_filters)
+@Client.on_message(command2(["تشغيل_فيديو", "شغل_فيديو"]) & other_filters)
 async def vplay_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -153,11 +153,11 @@ async def vplay_ar(c: Client, m: Message):
                 caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n⏱ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
             )
     else:
-        if not get_query(m, ["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"]):
+        if len(m.command) < 2:
             await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
         else:
             loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
-            query = get_query(m, ["تشغيل_فيديو", "شغل_فيديو", "شغل فيديو", "تشغيل فيديو"])
+            query = m.text.split(None, 1)[1]
             search = _ytsearch_sync(query)
             Q = 720
             vq = VideoQuality.HD_720p
@@ -195,7 +195,7 @@ async def vplay_ar(c: Client, m: Message):
                     await m.reply_text(f"🚫 خطأ: `{ep}`")
 
 
-@Client.on_message((command2(["ستريم"]) | arabic_command(["ستريم"])) & other_filters)
+@Client.on_message(command2(["ستريم"]) & other_filters)
 async def vstream_ar(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

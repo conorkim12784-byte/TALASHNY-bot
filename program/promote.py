@@ -71,7 +71,7 @@ def build_keyboard(user_id: int, perms: dict) -> InlineKeyboardMarkup:
 # الاستخدام: رفع @username لقبه
 #         أو رد على مستخدم: رفع لقبه
 # ═══════════════════════════════════════
-@Client.on_message((command(["promote"]) | (command2(["رفع"]) | arabic_command(["رفع"]))) & other_filters)
+@Client.on_message((command(["promote"]) | command2(["رفع"])) & other_filters)
 async def promote_user(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -242,7 +242,7 @@ async def cancel_promote(c: Client, query: CallbackQuery):
 # ═══════════════════════════════════════
 # أمر تغيير حد الحظر
 # ═══════════════════════════════════════
-@Client.on_message((command(["setbanlimit"]) | (command2(["حد_الحظر"]) | arabic_command(["حد_الحظر", "حد الحظر"]))) & other_filters)
+@Client.on_message((command(["setbanlimit"]) | command2(["حد_الحظر"])) & other_filters)
 async def set_ban_limit(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
