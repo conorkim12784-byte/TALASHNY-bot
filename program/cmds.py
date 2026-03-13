@@ -3,7 +3,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from driver.filters import command, command2, other_filters
-from driver.blue_button import send_blue_animation, send_blue, edit_blue_caption, edit_blue
 
 GIF_URL = "https://i.postimg.cc/wxV3PspQ/1756574872401.gif"
 
