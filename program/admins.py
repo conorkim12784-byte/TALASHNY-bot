@@ -7,7 +7,7 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.queues import QUEUE, clear_queue
 from driver.filters import command, other_filters
-from driver.decorators import authorized_users_only
+from driver.decorators import bot_admin_check, authorized_users_only
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup, close_mark, back_mark
 from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
@@ -15,7 +15,7 @@ from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMa
 
 
 @Client.on_message(command(["reload"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def update_admin(client, message):
     await message.delete()
     global admins
@@ -28,7 +28,7 @@ async def update_admin(client, message):
 
 
 @Client.on_message(command(["skip"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def skip(c: Client, m: Message):
     await m.delete()
     user_id = m.from_user.id
@@ -67,7 +67,7 @@ async def skip(c: Client, m: Message):
 
 
 @Client.on_message(command(["stop", "end"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def stop(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -83,7 +83,7 @@ async def stop(client, m: Message):
 
 
 @Client.on_message(command(["pause"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def pause(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -98,7 +98,7 @@ async def pause(client, m: Message):
 
 
 @Client.on_message(command(["resume", "vresume"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def resume(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -113,7 +113,7 @@ async def resume(client, m: Message):
 
 
 @Client.on_message(command(["mute"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def mute(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -128,7 +128,7 @@ async def mute(client, m: Message):
 
 
 @Client.on_message(command(["unmute"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def unmute(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -143,7 +143,7 @@ async def unmute(client, m: Message):
 
 
 @Client.on_message(command(["volume"]) & other_filters)
-@authorized_users_only
+@bot_admin_check("skip")
 async def change_volume(client, m: Message):
     if len(m.command) < 2:
         return await m.reply("**الاستخدام:** /volume [1-200]")

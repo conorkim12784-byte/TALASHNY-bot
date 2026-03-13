@@ -1,3 +1,4 @@
+from driver.decorators import bot_admin_check
 # موسيقى.py - اوامر التشغيل العربية فقط (play الانجليزي موجود في music.py)
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant

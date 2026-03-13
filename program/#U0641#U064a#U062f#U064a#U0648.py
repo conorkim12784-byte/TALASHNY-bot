@@ -1,3 +1,4 @@
+from driver.decorators import bot_admin_check
 # فيديو.py - اوامر الفيديو العربية فقط (vplay + vstream الانجليزية موجودة في video.py)
 import re
 import asyncio
@@ -10,6 +11,7 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
+from driver.nowplaying import current_requester
 from driver.veez import call_py, user
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
@@ -136,6 +138,7 @@ async def vplay_ar(c: Client, m: Message):
         image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, dl, link, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(
@@ -146,6 +149,7 @@ async def vplay_ar(c: Client, m: Message):
             await loser.edit("🔄 **جاري التشغيل...**")
             await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, vq))
             add_to_queue(chat_id, songname, dl, link, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(
@@ -173,6 +177,7 @@ async def vplay_ar(c: Client, m: Message):
                 await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{ytlink}`")
             elif chat_id in QUEUE:
                 pos = add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
+                current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                 await loser.delete()
                 buttons = stream_markup(user_id)
                 await m.reply_photo(
@@ -184,6 +189,7 @@ async def vplay_ar(c: Client, m: Message):
                     await loser.edit("🔄 **جاري التشغيل...**")
                     await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, vq))
                     add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
+                    current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
                     await loser.delete()
                     buttons = stream_markup(user_id)
                     await m.reply_photo(
@@ -232,6 +238,7 @@ async def vstream_ar(c: Client, m: Message):
     vq = _get_vq(Q)
     if chat_id in QUEUE:
         pos = add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
+        current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
         await loser.delete()
         buttons = stream_markup(user_id)
         await m.reply_photo(
@@ -243,6 +250,7 @@ async def vstream_ar(c: Client, m: Message):
             await loser.edit("🔄 **جاري التشغيل...**")
             await call_py.play(chat_id, MediaStream(livelink, AudioQuality.HIGH, vq))
             add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
             await m.reply_photo(

@@ -1,3 +1,4 @@
+from driver.decorators import bot_admin_check
 # Copyright (C) 2021 By Veez Music-Project
 # Fixed: ytsearch error handling + unpacking guard
 
