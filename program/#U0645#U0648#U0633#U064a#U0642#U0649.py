@@ -98,11 +98,13 @@ async def play_ar(c: Client, m: Message):
                 await suhu.delete()
                 await m.reply_text(f"خـطـا:\n\n» {e}")
     else:
-        if len(m.command) < 2:
+        # لو جاي من arabic_command مفيش m.command — نستخدم m.text مباشرة
+        parts = m.text.split(None, 1)
+        query = parts[1].strip() if len(parts) > 1 else ""
+        if not query:
             await m.reply("» عـلـيـك الـرد عـلـى **ملف صوتي** او **اكتب شي للبحث**")
         else:
             suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
-            query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             if not isinstance(search, list):
                 await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
