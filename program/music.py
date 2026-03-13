@@ -1,5 +1,5 @@
 # Copyright (C) 2021 By Veez Music-Project
-# Fixed: duration check, search result unpacking, error messages
+# /play — صوت بس بدون فيديو (video_flags=IGNORE)
 
 import asyncio
 
@@ -14,7 +14,7 @@ from driver.filters import command, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from program._search_helper import ytsearch, ytdl_audio as ytdl
-from config import BOT_USERNAME, IMG_5, DURATION_LIMIT
+from config import BOT_USERNAME, IMG_5
 
 
 @Client.on_message(command(["mplay", "play"]) & other_filters)
@@ -70,7 +70,7 @@ async def play(c: Client, m: Message):
             return await m.reply_text(f"**فـشـل الـمـسـاعـد فـي الـانـضـمـام**\n\n**السبب**: `{e}`")
 
     # ════════════════════════════
-    # تشغيل ملف صوتي مرفق
+    # ملف صوتي مرفق
     # ════════════════════════════
     if replied and (replied.audio or replied.voice):
         suhu = await replied.reply("**جـاري تـنـزيـل الـصـوت...**")
@@ -111,7 +111,11 @@ async def play(c: Client, m: Message):
                 ctitle = await CHAT_TITLE(gcname)
                 image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
                 await suhu.edit("**يـتـم الـتـشـغـيـل...**")
-                await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
+                # صوت بس — بدون فيديو
+                await call_py.play(chat_id, MediaStream(
+                    dl, AudioQuality.HIGH,
+                    video_flags=MediaStream.Flags.IGNORE
+                ))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                 await suhu.delete()
                 buttons = stream_markup(user_id)
@@ -136,36 +140,22 @@ async def play(c: Client, m: Message):
         if len(m.command) < 2:
             return await m.reply("» عـلـيـك الـرد عـلـى **مـلـف صـوتـي** او **اكـتـب شـي لـلـبـحـث**")
 
-        suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
+        suhu = await c.send_message(chat_id, "**🔎 جـاري الـبـحـث...**")
         query = m.text.split(None, 1)[1]
 
-        search = await ytsearch(query)
+        # نفس ytsearch الشغالة في video.py
+        search = ytsearch(query)
 
-        # ── حالة: المدة تجاوزت الحد المسموح ──
-        if search == "duration_exceeded":
-            mins = DURATION_LIMIT // 60
-            return await suhu.edit(
-                f"❌ **مدة الأغنية تتجاوز الحد المسموح به**\n\n"
-                f"» الحد الأقصى: `{mins} دقيقة`"
-            )
+        if not search or not isinstance(search, list) or len(search) != 4:
+            return await suhu.edit("❌ **لـم يـتـم الـعـثـور عـلـى نـتـائـج**")
 
-        # ── حالة: مفيش نتائج ──
-        if not search or not isinstance(search, list) or len(search) < 4:
-            return await suhu.edit("❌ **لـم يـتـم الـعـثـور عـلـى نـتـائـج، جرب كلمات مختلفة**")
+        songname, url, duration, thumbnail = search
 
-        # ── unpack آمن ──
-        songname = search[0]
-        url      = search[1]
-        duration = search[2]
-        thumbnail = search[3]
-
-        await suhu.edit("**⏳ جـاري جـلـب رابـط الـتـشـغـيـل...**")
+        await suhu.edit("**⏳ جـاري تـحـضـيـر الـتـشـغـيـل...**")
         veez, ytlink = await ytdl(url)
 
         if veez == 0:
-            return await suhu.edit(
-                f"❌ **تـعـذر جـلـب رابـط الـتـشـغـيـل**\n\n» `{ytlink}`"
-            )
+            return await suhu.edit(f"❌ **تـعـذر جـلـب رابـط الـتـشـغـيـل**\n\n» `{ytlink}`")
 
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)
@@ -188,8 +178,12 @@ async def play(c: Client, m: Message):
             )
         else:
             try:
-                await suhu.edit("**يـتـم الـتـشـغـيـل...**")
-                await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE))
+                await suhu.edit("**▶️ يـتـم الـتـشـغـيـل...**")
+                # صوت بس — بدون فيديو
+                await call_py.play(chat_id, MediaStream(
+                    ytlink, AudioQuality.HIGH,
+                    video_flags=MediaStream.Flags.IGNORE
+                ))
                 add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                 await suhu.delete()
                 buttons = stream_markup(user_id)
