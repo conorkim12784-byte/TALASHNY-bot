@@ -65,7 +65,6 @@ async def now_playing(c: Client, m: Message):
 
     current = QUEUE[chat_id][0]
     songname = current[0]
-    ref = current[2]      # رابط يوتيوب أو مصدر
     media_type = current[3]  # Audio أو Video
 
     # مين طلبها
@@ -84,7 +83,7 @@ async def now_playing(c: Client, m: Message):
 
     await m.reply(
         f"{type_icon} **يعزف الآن**\n\n"
-        f"**الاسم:** [{songname}]({ref})\n"
+        f"**الاسم:** `{songname}`\n"
         f"**النوع:** `{type_text}`\n"
         f"{req_text}"
         f"{queue_text}"
