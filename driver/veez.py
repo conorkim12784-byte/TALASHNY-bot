@@ -3,7 +3,14 @@ from pyrogram import Client
 from pytgcalls import PyTgCalls
 import os
 
+# SESSION_NAME في الـ .env هي session string (سلسلة طويلة)
+# نتحقق: لو هي أطول من 50 حرف → نعاملها كـ session_string
 SESSION_STRING = os.getenv("SESSION_STRING", "")
+if not SESSION_STRING and SESSION_NAME and len(SESSION_NAME) > 50:
+    SESSION_STRING = SESSION_NAME
+    _session_name = "talashny_user"
+else:
+    _session_name = SESSION_NAME if SESSION_NAME and len(SESSION_NAME) <= 50 else "talashny_user"
 
 bot = Client(
     ":veez:",
@@ -15,14 +22,14 @@ bot = Client(
 
 if SESSION_STRING:
     user = Client(
-        SESSION_NAME,
+        _session_name,
         api_id=API_ID,
         api_hash=API_HASH,
         session_string=SESSION_STRING,
     )
 else:
     user = Client(
-        SESSION_NAME,
+        _session_name,
         api_id=API_ID,
         api_hash=API_HASH,
     )
