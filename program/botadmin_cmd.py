@@ -106,13 +106,12 @@ async def promote_bot_admin(c: Client, m: Message):
         current_perms = set(ALL_PERMISSIONS.keys()) - {"promote"}
 
     rows = _perms_to_rows(target.id, current_perms)
-    await send_blue(
-        chat_id,
+    await m.reply(
         f"👤 **رفع بوت ادمن**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
         f"**الايدي:** `{target.id}`\n\n"
         f"اختار الصلاحيات:",
-        rows
+        reply_markup=InlineKeyboardMarkup(rows)
     )
 
 
@@ -136,7 +135,7 @@ async def toggle_bot_perm(c: Client, query: CallbackQuery):
         perms.add(key)
 
     rows = _perms_to_rows(user_id, perms)
-    await edit_blue(query.message.chat.id, query.message.id, query.message.text, rows)
+    await query.message.edit_text(query.message.text, reply_markup=InlineKeyboardMarkup(rows))
     await query.answer()
 
 
@@ -160,13 +159,11 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
         for k, v in ALL_PERMISSIONS.items()
     )
 
-    await edit_blue(
-        chat_id, query.message.id,
+    await query.message.edit_text(
         f"✅ **تم الرفع بنجاح**\n\n"
         f"👤 **المستخدم:** [{target.first_name}](tg://user?id={user_id})\n"
         f"🏠 **المجموعة:** `{chat_id}`\n\n"
-        f"**الصلاحيات:**\n{perms_text}",
-        []
+        f"**الصلاحيات:**\n{perms_text}"
     )
 
 
