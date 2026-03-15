@@ -5,6 +5,7 @@
 from collections import defaultdict
 from pyrogram import Client, filters, raw
 from pyrogram.types import Message, ChatPermissions
+from pyrogram.errors import ChatNotModified
 from driver.filters import command, command2, other_filters
 from driver.decorators import bot_admin_check
 
@@ -28,6 +29,8 @@ async def apply_locks(c: Client, chat_id: int):
             # FIX: can_forward_messages اتشالت من pyrofork الجديدة
             # بنستخدم Raw API بدلها
         ))
+    except ChatNotModified:
+        pass  # الـ permissions مش اتغيرت — مش مشكلة
     except Exception as e:
         raise e
 
