@@ -9,7 +9,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import UserAlreadyParticipant
 
 
-@Client.on_message(command2(["يوت"]))
+@Client.on_message(command2(["بحث_يوتيوب"]))
 async def ytsearch(_, message: Message):
     await message.delete()
     if len(message.command) < 2:

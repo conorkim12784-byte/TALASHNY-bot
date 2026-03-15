@@ -24,7 +24,7 @@ async def update_admin(client, message):
     async for u in new_ads:
         new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
-    await message.reply_text("✔ تم إعادة تحميل البوت بشكل صحيح!\n✔ تم تحديث قائمة المسؤولين!")
+    await message.reply_text("✅ تم إعادة تحميل البوت بشكل صحيح!\n✅ تم تحديث قائمة المسؤولين!")
 
 
 @Client.on_message(command(["skip"]) & other_filters)
@@ -36,9 +36,9 @@ async def skip(c: Client, m: Message):
     if len(m.command) < 2:
         op = await skip_current_song(chat_id)
         if op == 0:
-            await c.send_message(chat_id, "✘ قائمة التشغيل فارغه")
+            await c.send_message(chat_id, "❌ قائمة التشغيل فارغه")
         elif op == 1:
-            await c.send_message(chat_id, "✔ قوائم الانتظار **فارغة.**\n\n**• خروج المستخدم من الدردشة الصوتية**")
+            await c.send_message(chat_id, "✅ قوائم الانتظار **فارغة.**\n\n**• خروج المستخدم من الدردشة الصوتية**")
         elif op == 2:
             await c.send_message(chat_id, "🗑️ مسح قوائم الانتظار\n\n**• مغادرة المستخدم الآلي للدردشة الصوتية**")
         else:
@@ -75,11 +75,11 @@ async def stop(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
-            await m.reply("✔ **تم ايقاف التشغيل**")
+            await m.reply("✅ **تم ايقاف التشغيل**")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command(["pause"]) & other_filters)
@@ -94,7 +94,7 @@ async def pause(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command(["resume", "vresume"]) & other_filters)
@@ -109,7 +109,7 @@ async def resume(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command(["mute"]) & other_filters)
@@ -124,7 +124,7 @@ async def mute(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command(["unmute"]) & other_filters)
@@ -139,7 +139,7 @@ async def unmute(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command(["volume"]) & other_filters)
@@ -152,11 +152,11 @@ async def change_volume(client, m: Message):
     if chat_id in QUEUE:
         try:
             await call_py.change_volume_call(chat_id, volume=int(vol))
-            await m.reply(f"✔ **تم ضبط الصوت على** `{vol}`%")
+            await m.reply(f"✅ **تم ضبط الصوت على** `{vol}`%")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_callback_query(filters.regex("cbpause"))
@@ -173,7 +173,7 @@ async def cbpause(_, query: CallbackQuery):
         except Exception as e:
             await query.edit_message_text(f"🚫 **خطأ:**\n\n`{e}`", reply_markup=close_mark)
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)
 
 
 @Client.on_callback_query(filters.regex("cbresume"))
@@ -190,7 +190,7 @@ async def cbresume(_, query: CallbackQuery):
         except Exception as e:
             await query.edit_message_text(f"🚫 **خطأ:**\n\n`{e}`", reply_markup=close_mark)
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)
 
 
 @Client.on_callback_query(filters.regex("cbstop"))
@@ -203,11 +203,11 @@ async def cbstop(_, query: CallbackQuery):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
-            await query.edit_message_text("✔ **تم ايقاف التشغيل**", reply_markup=close_mark)
+            await query.edit_message_text("✅ **تم ايقاف التشغيل**", reply_markup=close_mark)
         except Exception as e:
             await query.edit_message_text(f"🚫 **خطأ:**\n\n`{e}`", reply_markup=close_mark)
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)
 
 
 @Client.on_callback_query(filters.regex("cbmute"))
@@ -224,7 +224,7 @@ async def cbmute(_, query: CallbackQuery):
         except Exception as e:
             await query.edit_message_text(f"🚫 **خطأ:**\n\n`{e}`", reply_markup=close_mark)
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)
 
 
 @Client.on_callback_query(filters.regex("cbunmute"))
@@ -241,4 +241,4 @@ async def cbunmute(_, query: CallbackQuery):
         except Exception as e:
             await query.edit_message_text(f"🚫 **خطأ:**\n\n`{e}`", reply_markup=close_mark)
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)

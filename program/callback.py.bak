@@ -19,19 +19,19 @@ async def cbstart(_, query: CallbackQuery):
         "+ اضـفـنـي الـى مـجـمـوعـتـك وارفـعـنـي ادمـن مـع كـامـل الـصـلاحـيـات\n"
         "البـوت يـشـتـغـل بـالاوامـر عـربـي وانـجـلـيـزي\n"
         "لانـضـمـام الـحـسـاب الـمـسـاعـد اكـتـب انـضـم\n\n"
-        "[ძᥲᖇᥱძᥱ᥎Ꭵᥣ](https://t.me/FY_TF)\n"
+        "DEV [TALASHNY](https://t.me/FY_TF)\n"
         "━━━━━━━━━━━━━━━━━━**",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✔",
+            [InlineKeyboardButton("ضيـف البـوت لمجمـوعتـك ✅",
                 url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
             [
                 InlineKeyboardButton("الاوامر",
                     url="https://telegra.ph/%F0%9D%99%B2%E1%B4%8F%E1%B4%8D%E1%B4%8D%E1%B4%80%C9%B4%E1%B4%85s-04-06"),
-                InlineKeyboardButton(" المطور", url=f"https://t.me/{OWNER_NAME}"),
+                InlineKeyboardButton("❤️ المطور", url=f"https://t.me/{OWNER_NAME}"),
             ],
             [
-                InlineKeyboardButton(" جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"),
-                InlineKeyboardButton(" قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
+                InlineKeyboardButton("👥 جروب الدعم", url=f"https://t.me/{GROUP_SUPPORT}"),
+                InlineKeyboardButton("📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"),
             ],
         ]),
         disable_web_page_preview=True,
@@ -65,11 +65,11 @@ async def cbcmds(_, query: CallbackQuery):
         f"⚡ قناة البوت @{UPDATES_CHANNEL}",
         reply_markup=InlineKeyboardMarkup([
             [
-                InlineKeyboardButton(" اوامر الادمنيه", callback_data="cbadmin"),
-                InlineKeyboardButton(" اوامر المطور", callback_data="cbsudo"),
+                InlineKeyboardButton("👷🏻 اوامر الادمنيه", callback_data="cbadmin"),
+                InlineKeyboardButton("🧙🏻 اوامر المطور", callback_data="cbsudo"),
             ],
-            [InlineKeyboardButton(" اوامر اساسيه", callback_data="cbbasic")],
-            [InlineKeyboardButton(" رجوع", callback_data="cbstart")],
+            [InlineKeyboardButton("📚 اوامر اساسيه", callback_data="cbbasic")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="cbstart")],
         ]),
     )
 
@@ -132,7 +132,7 @@ async def cbsudo(_, query: CallbackQuery):
         "» /sh「تشغيل امر في السيرفر」\n\n"
         f"⚡ قناة البوت @{UPDATES_CHANNEL}",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton(" رجوع", callback_data="cbcmds")]]
+            [[InlineKeyboardButton("🔙 رجوع", callback_data="cbcmds")]]
         ),
     )
 
@@ -147,21 +147,21 @@ async def cbmenu(_, query: CallbackQuery):
                 "💡 يجب أن تكون مشرفاً لاستخدام هذا الزر!", show_alert=True
             )
     except Exception:
-        return await query.answer("✘ تعذر التحقق من صلاحياتك", show_alert=True)
+        return await query.answer("❌ تعذر التحقق من صلاحياتك", show_alert=True)
     user_id = query.from_user.id
     buttons = menu_markup(user_id)
     if chat_id in QUEUE:
         await query.edit_message_text(
-            f" **الإعدادات** {query.message.chat.title}\n\n"
-            "⏸  ايقاف التشغيل موقتآ\n"
-            "▶️   استئناف التشغيل\n"
-            "🔇   كتم الصوت\n"
-            "🔊   الغاء كتم الصوت\n"
-            "⏹   ايقاف التشغيل",
+            f"⚙️ **الإعدادات** {query.message.chat.title}\n\n"
+            "⏸ : ايقاف التشغيل موقتآ\n"
+            "▶️ : استئناف التشغيل\n"
+            "🔇 : كتم الصوت\n"
+            "🔊 : الغاء كتم الصوت\n"
+            "⏹ : ايقاف التشغيل",
             reply_markup=InlineKeyboardMarkup(buttons),
         )
     else:
-        await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
+        await query.answer("❌ قائمة التشغيل فارغه", show_alert=True)
 
 
 @Client.on_callback_query(filters.regex("cls"))

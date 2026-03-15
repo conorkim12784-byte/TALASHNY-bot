@@ -43,7 +43,7 @@ async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
 # ═══════════════════════════════════════
 def build_keyboard(user_id: int, perms: dict) -> InlineKeyboardMarkup:
     def btn(label, key):
-        icon = "✔" if perms.get(key) else "✘"
+        icon = "✅" if perms.get(key) else "❌"
         val = int(perms.get(key, False))
         return InlineKeyboardButton(
             f"{icon} {label}",
@@ -60,8 +60,8 @@ def build_keyboard(user_id: int, perms: dict) -> InlineKeyboardMarkup:
         [btn("البقاء مجهول الهوية", "is_anonymous")],
         [btn("إضافة مشرفين جدد", "add_admins")],
         [
-            InlineKeyboardButton("✔ رفع الآن", callback_data=f"prm_confirm|{user_id}"),
-            InlineKeyboardButton("✘ إلغاء", callback_data="prm_cancel"),
+            InlineKeyboardButton("✅ رفع الآن", callback_data=f"prm_confirm|{user_id}"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="prm_cancel"),
         ],
     ])
 
@@ -78,7 +78,7 @@ async def promote_user(c: Client, m: Message):
     user_id = m.from_user.id
 
     if not await is_allowed(c, chat_id, user_id):
-        return await m.reply("✘ **هذا الأمر لمالك المجموعة فقط**")
+        return await m.reply("❌ **هذا الأمر لمالك المجموعة فقط**")
 
     target = None
     title = ""
@@ -93,7 +93,7 @@ async def promote_user(c: Client, m: Message):
         try:
             target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
         except Exception:
-            return await m.reply("✘ **لم يتم العثور على المستخدم**")
+            return await m.reply("❌ **لم يتم العثور على المستخدم**")
         # اللقب بعد المعرف
         parts = m.text.split(None, 2)
         title = parts[2].strip() if len(parts) > 2 else ""
@@ -107,9 +107,9 @@ async def promote_user(c: Client, m: Message):
         )
 
     if not target:
-        return await m.reply("✘ **لم يتم التعرف على المستخدم**")
+        return await m.reply("❌ **لم يتم التعرف على المستخدم**")
     if target.is_bot:
-        return await m.reply("✘ **لا يمكن رفع البوتات**")
+        return await m.reply("❌ **لا يمكن رفع البوتات**")
 
     perms = {
         "change_info": True,
@@ -147,7 +147,7 @@ pending_titles: dict = {}
 @Client.on_callback_query(filters.regex(r"^prm\|"))
 async def toggle_permission(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
-        return await query.answer("✘ فقط مالك المجموعة", show_alert=True)
+        return await query.answer("❌ فقط مالك المجموعة", show_alert=True)
 
     _, user_id, key, current = query.data.split("|")
     user_id = int(user_id)
@@ -171,7 +171,7 @@ async def toggle_permission(c: Client, query: CallbackQuery):
 @Client.on_callback_query(filters.regex(r"^prm_confirm\|"))
 async def confirm_promote(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
-        return await query.answer("✘ فقط مالك المجموعة", show_alert=True)
+        return await query.answer("❌ فقط مالك المجموعة", show_alert=True)
 
     user_id = int(query.data.split("|")[1])
     title = pending_titles.pop(user_id, "")
@@ -216,19 +216,19 @@ async def confirm_promote(c: Client, query: CallbackQuery):
 
         target = await c.get_users(user_id)
         perms_text = "\n".join(
-            f"  {'✔' if v else '✘'} {PERM_NAMES.get(k, k)}"
+            f"  {'✅' if v else '❌'} {PERM_NAMES.get(k, k)}"
             for k, v in perms.items()
         )
         await query.edit_message_text(
-            f"✔ **تم رفع المشرف بنجاح**\n\n"
+            f"✅ **تم رفع المشرف بنجاح**\n\n"
             f"👤 **المشرف:** [{target.first_name}](tg://user?id={user_id})\n"
             f"✏️ **اللقب:** `{title or 'بدون لقب'}`\n\n"
             f"**الصلاحيات:**\n{perms_text}"
         )
     except ChatAdminRequired:
-        await query.answer("✘ البوت ليس لديه صلاحية رفع مشرفين", show_alert=True)
+        await query.answer("❌ البوت ليس لديه صلاحية رفع مشرفين", show_alert=True)
     except Exception as e:
-        await query.answer(f"✘ خطأ: {e}", show_alert=True)
+        await query.answer(f"❌ خطأ: {e}", show_alert=True)
 
 
 # ═══════════════════════════════════════
@@ -236,7 +236,7 @@ async def confirm_promote(c: Client, query: CallbackQuery):
 # ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex("^prm_cancel$"))
 async def cancel_promote(c: Client, query: CallbackQuery):
-    await query.edit_message_text("✘ **تم إلغاء العملية**")
+    await query.edit_message_text("❌ **تم إلغاء العملية**")
 
 
 # ═══════════════════════════════════════
@@ -248,7 +248,7 @@ async def set_ban_limit(c: Client, m: Message):
     chat_id = m.chat.id
 
     if not await is_allowed(c, chat_id, m.from_user.id):
-        return await m.reply("✘ **هذا الأمر لمالك المجموعة فقط**")
+        return await m.reply("❌ **هذا الأمر لمالك المجموعة فقط**")
 
     if len(m.command) < 2 or not m.command[1].isdigit():
         return await m.reply(
@@ -259,13 +259,13 @@ async def set_ban_limit(c: Client, m: Message):
 
     new_limit = int(m.command[1])
     if new_limit < 1:
-        return await m.reply("✘ **الحد يجب أن يكون أكبر من 0**")
+        return await m.reply("❌ **الحد يجب أن يكون أكبر من 0**")
 
     old_limit = get_ban_limit(chat_id)
     ban_limits[chat_id] = new_limit
 
     await m.reply(
-        f"✔ **تم تغيير حد الحظر**\n\n"
+        f"✅ **تم تغيير حد الحظر**\n\n"
         f"📊 **الحد القديم:** `{old_limit}`\n"
         f"📊 **الحد الجديد:** `{new_limit}`\n\n"
         f"أي مشرف يتجاوز **{new_limit}** حظر يدوياً سيُنزَل تلقائياً."
@@ -356,7 +356,7 @@ async def _auto_demote(c: Client, chat_id: int, admin_id: int, count: int, limit
             f"⚠️ **تنبيه تلقائي**\n\n"
             f"👮 **المشرف:** [{admin.first_name}](tg://user?id={admin_id})\n"
             f"🚫 **تجاوز {count} حظر يدوي**\n\n"
-            f"✔ **تم نزوله من الإشراف تلقائياً** — الحد المسموح: `{limit}`"
+            f"✅ **تم نزوله من الإشراف تلقائياً** — الحد المسموح: `{limit}`"
         )
     except Exception as e:
         await c.send_message(

@@ -110,7 +110,7 @@ async def play(c: Client, m: Message):
                 gcname = m.chat.title
                 ctitle = await CHAT_TITLE(gcname)
                 image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
-                await suhu.edit("**⚡**")
+                await suhu.edit("**يـتـم الـتـشـغـيـل...**")
                 # صوت بس — بدون فيديو
                 await call_py.play(chat_id, MediaStream(
                     dl, AudioQuality.HIGH,
@@ -140,14 +140,14 @@ async def play(c: Client, m: Message):
         if len(m.command) < 2:
             return await m.reply("» عـلـيـك الـرد عـلـى **مـلـف صـوتـي** او **اكـتـب شـي لـلـبـحـث**")
 
-        suhu = await c.send_message(chat_id, "**🎶.**")
+        suhu = await c.send_message(chat_id, "**🔎 جـاري الـبـحـث...**")
         query = m.text.split(None, 1)[1]
 
         # نفس ytsearch الشغالة في video.py
         search = ytsearch(query)
 
         if not search or not isinstance(search, list) or len(search) != 4:
-            return await suhu.edit("✘ **لـم يـتـم الـعـثـور عـلـى نـتـائـج**")
+            return await suhu.edit("❌ **لـم يـتـم الـعـثـور عـلـى نـتـائـج**")
 
         songname, url, duration, thumbnail = search
 
@@ -155,7 +155,7 @@ async def play(c: Client, m: Message):
         veez, ytlink = await ytdl(url)
 
         if veez == 0:
-            return await suhu.edit(f"✘ **تـعـذر جـلـب رابـط الـتـشـغـيـل**\n\n» `{ytlink}`")
+            return await suhu.edit(f"❌ **تـعـذر جـلـب رابـط الـتـشـغـيـل**\n\n» `{ytlink}`")
 
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)

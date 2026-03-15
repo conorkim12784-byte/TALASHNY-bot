@@ -68,7 +68,11 @@ async def start_(client: Client, message: Message):
 يـمـكـنـنـي الـتـشـغـيـل بـصـوت رائـع وبـدون اي مـشـاكـل او تـقـطـيـع فـي الـاغـنـيـه
  + اضـفـنـي الـى مـجـمـوعـتـك وارفـعـنـي رول بـشـكـل مـع كـامـل الـصـلـاحـيـات
  الـبـوت يـشـتـغـل بـالـاوامـر عـربـي وانـجـلـيـزي
- لـانـضـمـام الـحـسـاب الـمـسـاعـد لـتـشـغـيـل الـبـوت اكـتـب الاوامر
+ لـانـضـمـام الـحـسـاب الـمـسـاعـد لـتـشـغـيـل الـبـوت اكـتـب انضم
+
+
+  لـمـعـرفـة اسـتـخـدامـي بـشـكـل صـحـيـح اضـغـط عـلـي زر الـاوامـر. DEV [TALASHNY](https://t.me/FY_TF)
+
 ━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -97,7 +101,7 @@ async def source_cmd(client: Client, message: Message):
     await message.delete()
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="**ძᥲᖇᥱძᥱ᥎Ꭵᥣ**\nتـواصـل مـعـنـا عـبـر الـازرار بـالـاسـفـل",
+        caption="**TALASHNY**\nتـواصـل مـعـنـا عـبـر الـازرار بـالـاسـفـل",
         reply_markup=InlineKeyboardMarkup(
             [
                 [
@@ -130,7 +134,7 @@ async def dev_cmd(client: Client, message: Message):
     )
 
 
-@Client.on_message(command(["شاني", "تلا", "تلاشاني"]) & filters.private)
+@Client.on_message(command(["لب التوكن", "لب_التوكن", "scolze"]) & filters.private)
 @sudo_users_only
 async def shadow(c: Client, message: Message):
     start = time()

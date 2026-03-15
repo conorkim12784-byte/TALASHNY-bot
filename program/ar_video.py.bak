@@ -66,16 +66,16 @@ async def _check_and_join(c, m, chat_id):
         return False
     a = await c.get_chat_member(chat_id, aing.id)
     if a.status.value not in ("administrator", "creator"):
-        await m.reply_text("💡 ارفعني **ادمن** مع صلاحيات:\n\n» ✘ حذف الرسائل\n» ✘ اضافة المستخدمين\n» ✘ ادارة المكالمات")
+        await m.reply_text("💡 ارفعني **ادمن** مع صلاحيات:\n\n» ❌ حذف الرسائل\n» ❌ اضافة المستخدمين\n» ❌ ادارة المكالمات")
         return False
     if not (a.privileges and a.privileges.can_manage_video_chats):
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✘ ادارة المكالمات المرئية")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ ادارة المكالمات المرئية")
         return False
     if not (a.privileges and a.privileges.can_delete_messages):
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✘ حذف الرسائل")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ حذف الرسائل")
         return False
     if not (a.privileges and a.privileges.can_invite_users):
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✘ اضافة مستخدمين")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ اضافة مستخدمين")
         return False
     try:
         ubot = (await user.get_me()).id
@@ -95,12 +95,12 @@ async def _check_and_join(c, m, chat_id):
         except UserAlreadyParticipant:
             pass
         except Exception as e:
-            await m.reply_text(f"✘ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`")
+            await m.reply_text(f"❌ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`")
             return False
     return True
 
 
-@Client.on_message(command2(["فيد", "فيديو"]) & other_filters)
+@Client.on_message(command2(["تشغيل_فيديو", "شغل_فيديو"]) & other_filters)
 async def vplay_ar(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -156,13 +156,13 @@ async def vplay_ar(c: Client, m: Message):
         if len(m.command) < 2:
             await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
         else:
-            loser = await c.send_message(chat_id, "🎶**")
+            loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
             query = m.text.split(None, 1)[1]
             search = _ytsearch_sync(query)
             Q = 720
             vq = VideoQuality.HD_720p
             if not search:
-                await loser.edit("✘ **لم يتم العثور على نتائج**")
+                await loser.edit("❌ **لم يتم العثور على نتائج**")
                 return
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
@@ -170,7 +170,7 @@ async def vplay_ar(c: Client, m: Message):
             image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
             veez, ytlink = await _ytdl_video(url)
             if veez == 0:
-                await loser.edit(f"✘ تم اكتشاف خطأ حاول مجددآ\n\n» `{ytlink}`")
+                await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{ytlink}`")
             elif chat_id in QUEUE:
                 pos = add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
                 await loser.delete()
@@ -227,7 +227,7 @@ async def vstream_ar(c: Client, m: Message):
         livelink = link
         veez = 1
     if veez == 0:
-        await loser.edit(f"✘ تم اكتشاف خطأ حاول مجددآ\n\n» `{livelink}`")
+        await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{livelink}`")
         return
     vq = _get_vq(Q)
     if chat_id in QUEUE:

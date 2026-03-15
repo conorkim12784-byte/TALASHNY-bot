@@ -115,7 +115,7 @@ async def search_lyrics(_, message: Message):
         if len(message.command) < 2:
             return await message.reply_text("» **قم بإرسال اسم الأغنية بعد الأمر**")
         query = message.text.split(None, 1)[1]
-        rep = await message.reply_text("⚡")
+        rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
         parts = query.split("-", 1)
         artist = parts[0].strip()
         title = parts[1].strip() if len(parts) == 2 else query.strip()

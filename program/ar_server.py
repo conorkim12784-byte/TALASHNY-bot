@@ -33,20 +33,20 @@ async def give_sysinfo(client, message):
     psutil.disk_io_counters()
     disk = f"{humanbytes(du.used)} / {humanbytes(du.total)} " f"({du.percent}%)"
     cpu_len = len(psutil.Process().cpu_affinity())
-    somsg = f""" **•• sʏsᴛᴇᴍ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ••**
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┣★ **ᴘʟᴀᴛꜰᴏʀᴍ :** `{splatform}`
-┣★ **ᴘʟᴀᴛꜰᴏʀᴍ ʀᴇʟᴇᴀsᴇ :** `{platform_release}`
-┣★ **ᴘʟᴀᴛꜰᴏʀᴍ ᴠᴇʀsɪᴏɴ​ :** `{platform_version}`
-┣★ **ᴀʀᴄʜɪᴛᴇᴄᴛᴜʀᴇ :** `{architecture}`
-┣★ **ʜᴏsᴛɴᴀᴍᴇ :** `{hostname}`
-┣★ **ɪᴘ :** `{ip_address}`
-┣★ **ᴍᴀᴄ :** `{mac_address}`
-┣★ **ᴘʀᴏᴄᴇssᴏʀ :** `{processor}`
-┣★ **ʀᴀᴍ : ** `{ram}`
-┣★ **ᴄᴘᴜ :** `{cpu_len}`
-┣★ **ᴄᴘᴜ ꜰʀᴇǫᴜᴇɴᴄʏ :** `{cpu_freq}`
-┣★ **ᴅɪsᴋ :** `{disk}`
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
+    somsg = f""" **•• ძᥲᖇᥱძᥱ᥎Ꭵᥣ ••**
+┏━━━━━━━━━━━━━━━━┓
+┣♘ ** :** `{splatform}`
+┣♘ **  :** `{platform_release}`
+┣♘ **  :** `{platform_version}`
+┣♘ ** :** `{architecture}`
+┣♘ ** :** `{hostname}`
+┣♘ ** :** `{ip_address}`
+┣♘ ** :** `{mac_address}`
+┣♘ ** :** `{processor}`
+┣♘ ** : ** `{ram}`
+┣♘ ** :** `{cpu_len}`
+┣♘ ** :** `{cpu_freq}`
+┣♘ ** :** `{disk}`
+┗━━━━━━━━━━━━━━━━┛
     """
     await message.reply(somsg)

@@ -35,7 +35,7 @@ async def song(_, message: Message):
             f.write(thumb_data.content)
         duration = results[0]["duration"]
     except Exception as e:
-        await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+        await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
         return
     await m.edit("📥 جاري تحميل الملف...")
@@ -55,7 +55,7 @@ async def song(_, message: Message):
                                    parse_mode="md", title=title, duration=dur)
         await m.delete()
     except Exception as e:
-        await m.edit(f"❌ خطأ: {e}")
+        await m.edit(f"✘ خطأ: {e}")
         print(e)
     finally:
         for f in [audio_file, thumb_name]:
@@ -81,7 +81,7 @@ async def vsong(client, message: Message):
         link = f"https://youtube.com{results[0]['url_suffix']}"
         thumbnail = results[0]["thumbnails"][0]
     except Exception as e:
-        return await message.reply(f"❌ خطأ في البحث: {e}")
+        return await message.reply(f"✘ خطأ في البحث: {e}")
     try:
         msg = await message.reply("📥 **جاري تحميل الفيديو...**")
         def download_video():
@@ -126,7 +126,7 @@ async def search_lyrics(_, message: Message):
             lyric_text = data["lyrics"][:4000]
             await rep.edit(f"🎵 **{query}**\n\n{lyric_text}")
         else:
-            await rep.edit("❌ **لم يتم العثور على كلمات**\n\n» جرب: /بحث فنان - أغنية")
+            await rep.edit("✘ **لم يتم العثور على كلمات**\n\n» جرب: /بحث فنان - أغنية")
     except Exception as e:
-        await rep.edit("❌ **لم يتم العثور على نتائج**\n\n» مثال: بحث Fairuz - Nassam Alayna")
+        await rep.edit("✘ **لم يتم العثور على نتائج**\n\n» مثال: بحث Fairuz - Nassam Alayna")
         print(e)

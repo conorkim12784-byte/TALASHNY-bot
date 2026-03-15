@@ -6,7 +6,7 @@ from driver.filters import command, command2, other_filters
 
 GIF_URL = "https://i.postimg.cc/wxV3PspQ/1756574872401.gif"
 
-MEMBERS_TEXT = """ **أوامر الأعضاء**
+MEMBERS_TEXT = """🎵 **أوامر الأعضاء**
 
 **تشغيل موسيقى:**
 » `شغل` / `تشغيل` + اسم الأغنية أو رابط
@@ -28,7 +28,7 @@ MEMBERS_TEXT = """ **أوامر الأعضاء**
 » `تحميل فيديو` / `vsong` + اسم — ملف فيديو
 » `كلمات` / `lyric` + اسم الأغنية"""
 
-ADMINS_TEXT = """ **أوامر المشرفين**
+ADMINS_TEXT = """👮 **أوامر المشرفين**
 
 **التحكم في التشغيل:**
 » `تخطي` / `skip` — تخطي الأغنية الحالية
@@ -45,7 +45,7 @@ ADMINS_TEXT = """ **أوامر المشرفين**
 » `كتم` / `كتم مستخدم` — رد على رسالة لكتم عضو
 » `فك كتم` / `رفع كتم` — رد على رسالة لفك الكتم"""
 
-BOT_ADMIN_TEXT = """ **أوامر المدريين**
+BOT_ADMIN_TEXT = """⚙️ **أوامر بوت الادمن**
 
 **القفل والفتح:**
 » `قفل صور` / `فتح صور`
@@ -54,7 +54,7 @@ BOT_ADMIN_TEXT = """ **أوامر المدريين**
 » `قفل دردشة` / `فتح دردشة`
 » `قفل الكل` / `فتح الكل`
 
-**إدارة المدريينز:**
+**إدارة بوت الادمنز:**
 » `رفع مدير` / `رفع بوت` + معرف أو رد
 » `شيل بوت ادمن` + معرف أو رد
 » `قايمة الادمنز` — عرض قايمة المديرين
@@ -67,18 +67,18 @@ BOT_ADMIN_TEXT = """ **أوامر المدريين**
 def main_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("  الأعضاء", callback_data="cmds_members"),
-            InlineKeyboardButton("  المشرفين", callback_data="cmds_admins"),
+            InlineKeyboardButton("🎵 أوامر الأعضاء", callback_data="cmds_members"),
+            InlineKeyboardButton("👮 أوامر المشرفين", callback_data="cmds_admins"),
         ],
-        [InlineKeyboardButton(" المدريين", callback_data="cmds_botadmin")],
-        [InlineKeyboardButton(" اغلاق", callback_data="cmds_close")],
+        [InlineKeyboardButton("⚙️ بوت الادمن", callback_data="cmds_botadmin")],
+        [InlineKeyboardButton("🗑 اغلاق", callback_data="cmds_close")],
     ])
 
 
 def back_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(" رجوع", callback_data="cmds_main")],
-        [InlineKeyboardButton(" اغلاق", callback_data="cmds_close")],
+        [InlineKeyboardButton("◀️ رجوع", callback_data="cmds_main")],
+        [InlineKeyboardButton("🗑 اغلاق", callback_data="cmds_close")],
     ])
 
 

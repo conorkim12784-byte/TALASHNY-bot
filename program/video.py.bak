@@ -145,16 +145,16 @@ async def _check_and_join(c, m, chat_id):
         return False
     a = await c.get_chat_member(chat_id, aing.id)
     if a.status.value not in ("administrator", "creator"):
-        await m.reply_text("💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ✔ __حذف الرسائل__\n» ✔ __اضافة المستخدمين__\n» ✔ __ادارة المكالمات المرئية__")
+        await m.reply_text("💡 لكي تستطيع استخدامي ارفعني **ادمن** مع **صلاحيات**:\n\n» ❌ __حذف الرسائل__\n» ❌ __اضافة المستخدمين__\n» ❌ __ادارة المكالمات المرئية__")
         return False
     if not a.privileges.can_manage_video_chats:
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✔ __ادارة المكالمات المرئية__")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ __ادارة المكالمات المرئية__")
         return False
     if not a.privileges.can_delete_messages:
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✔ __حذف الرسائل__")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ __حذف الرسائل__")
         return False
     if not a.privileges.can_invite_users:
-        await m.reply_text("ليس لدي صلاحية:\n\n» ✔ __اضافة مستخدمين__")
+        await m.reply_text("ليس لدي صلاحية:\n\n» ❌ __اضافة مستخدمين__")
         return False
     try:
         ubot = (await user.get_me()).id
@@ -174,7 +174,7 @@ async def _check_and_join(c, m, chat_id):
         except UserAlreadyParticipant:
             pass
         except Exception as e:
-            await m.reply_text(f"✔ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`")
+            await m.reply_text(f"❌ **فشل المساعد بالانضمام**\n\n**السبب**: `{e}`")
             return False
     return True
 
@@ -242,14 +242,14 @@ async def vplay(c: Client, m: Message):
 
     search = ytsearch(query)
     if not search or not isinstance(search, list) or len(search) != 4:
-        return await loser.edit("✔ **لم يتم العثور على نتائج**")
+        return await loser.edit("❌ **لم يتم العثور على نتائج**")
 
     songname, url, duration, thumbnail = search
     await loser.edit("📥 **جاري تنزيل الفيديو... (قد يأخذ لحظات)**")
 
     veez, filepath = await ytdl_video(url, Q)
     if veez == 0:
-        return await loser.edit(f"✔ فشل تنزيل الفيديو\n\n» `{filepath[:200]}`")
+        return await loser.edit(f"❌ فشل تنزيل الفيديو\n\n» `{filepath[:200]}`")
 
     gcname = m.chat.title
     ctitle = await CHAT_TITLE(gcname)
@@ -325,7 +325,7 @@ async def vstream(c: Client, m: Message):
         veez = 1
 
     if veez == 0:
-        return await loser.edit(f"✔ تم اكتشاف خطأ\n\n» `{livelink[:200]}`")
+        return await loser.edit(f"❌ تم اكتشاف خطأ\n\n» `{livelink[:200]}`")
 
     vq = get_video_quality(Q)
     if chat_id in QUEUE:

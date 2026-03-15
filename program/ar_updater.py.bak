@@ -60,11 +60,11 @@ async def update_repo(_, message: Message):
     msg = await message.reply("🔄 `processing update...`")
     update_avail = updater()
     if update_avail:
-        await msg.edit("✔ update finished\n\n• bot restarted, back active again in 1 minutes.")
+        await msg.edit("✅ update finished\n\n• bot restarted, back active again in 1 minutes.")
         system("git pull -f && pip3 install --no-cache-dir -r requirements.txt")
         execle(sys.executable, sys.executable, "main.py", environ)
         return
-    await msg.edit(f"bot is **up-to-date** ✔", disable_web_page_preview=True)
+    await msg.edit(f"bot is **up-to-date** ✅", disable_web_page_preview=True)
 
 @Client.on_message(command2(["ريستارت","اعاده تشغيل"]))
 @sudo_users_only
@@ -72,6 +72,6 @@ async def restart_bot(_, message: Message):
     await message.delete()
     msg = await message.reply("`restarting bot...`")
     args = [sys.executable, "main.py"]
-    await msg.edit("✔ bot restarted\n\n• now you can use this bot again.")
+    await msg.edit("✅ bot restarted\n\n• now you can use this bot again.")
     execle(sys.executable, *args, environ)
     return

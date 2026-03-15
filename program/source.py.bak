@@ -55,12 +55,12 @@ async def source_ar(client: Client, message: Message):
         dev1 = await client.get_users(1923931101)
         dev1_name = dev1.first_name
     except Exception:
-        dev1_name = "ძᥲᖇᥱძᥱ᥎Ꭵᥣ"
+        dev1_name = "المبرمج الأول"
     try:
         dev2 = await client.get_users(5340100457)
         dev2_name = dev2.first_name
     except Exception:
-        dev2_name = "𝑴𝑶𝑫𝒀 𝑩𝑨𝑺𝑯𝑨"
+        dev2_name = "المبرمج الثاني"
 
     caption_text = (
         "╭────⌁TALASHNY⌁────⟤\n"
@@ -70,7 +70,10 @@ async def source_ar(client: Client, message: Message):
         "╞╡This is the simplest thing we have \n"
         "│╰────────────╮\n"
         "│╭────────────╯\n"
-        "╞╡      Source code in Python \n"     
+        "╞╡      Source code in Python \n"
+        "╞╡ \n"
+        f"╞╡  » [{dev1_name}](tg://user?id=1923931101)\n"
+        f"╞╡  » [{dev2_name}](tg://user?id=5340100457)\n"
         "│╰───────────⟢\n"
         "╰────⌁TALASHNY⌁────⟤"
     )
@@ -100,10 +103,14 @@ async def dev_ar(client: Client, message: Message):
     dev_caption = (
         "╭────⌁TALASHNY⌁────⟤\n"
         "│╭───────────⟢\n"
-        "╞╡    Don'T Talk Too Much \n"
+        "╞╡   الـمـطـور الـرسـمـي\n"
+        "╞╡ \n"
+        f"╞╡      {owner_name}\n"
         "│╰────────────╮\n"
         "│╭────────────╯\n"
-        "╞╡  Click The Contact Button  \n"
+        "╞╡      TALASHNY BOT\n"
+        "╞╡ \n"
+        "╞╡خـش ع الـزرار وانـت هـتـعـرف\n"
         "│╰───────────⟢\n"
         "╰────⌁TALASHNY⌁────⟤"
     )
@@ -111,7 +118,7 @@ async def dev_ar(client: Client, message: Message):
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption=dev_caption,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f" {owner_name}", url="tg://user?id=1923931101")],
+            [InlineKeyboardButton(f"👑 {owner_name}", url="tg://user?id=1923931101")],
             [InlineKeyboardButton("➕ اضـف الـبـوت", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
         ])
     )

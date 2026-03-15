@@ -24,7 +24,7 @@ async def update_admin_ar(client, message):
     async for u in new_ads:
         new_admins.append(u.user.id)
     admins[message.chat.id] = new_admins
-    await message.reply_text("✔ تم إعادة تحميل البوت بشكل صحيح!\n✔ تم تحديث قائمة المسؤولين!")
+    await message.reply_text("✅ تم إعادة تحميل البوت بشكل صحيح!\n✅ تم تحديث قائمة المسؤولين!")
 
 
 @Client.on_message(command2(["تخطي"]) & other_filters)
@@ -36,9 +36,9 @@ async def skip_ar(c: Client, m: Message):
     if len(m.command) < 2:
         op = await skip_current_song(chat_id)
         if op == 0:
-            await c.send_message(chat_id, "✘ قائمة التشغيل فارغه")
+            await c.send_message(chat_id, "❌ قائمة التشغيل فارغه")
         elif op == 1:
-            await c.send_message(chat_id, "✔ قوائم الانتظار **فارغة.**\n\n• خروج المستخدم من الدردشة الصوتية")
+            await c.send_message(chat_id, "✅ قوائم الانتظار **فارغة.**\n\n• خروج المستخدم من الدردشة الصوتية")
         elif op == 2:
             await c.send_message(chat_id, "🗑️ مسح قوائم الانتظار\n\n• مغادرة المستخدم الآلي للدردشة الصوتية")
         else:
@@ -75,11 +75,11 @@ async def stop_ar(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
-            await m.reply("✔ **تم ايقاف التشغيل**")
+            await m.reply("✅ **تم ايقاف التشغيل**")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command2(["اسكت"]) & other_filters)
@@ -110,7 +110,7 @@ async def pause_ar(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command2(["كمل", "استكمال", "استكمل"]) & other_filters)
@@ -125,7 +125,7 @@ async def resume_ar(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command2(["ميوت"]) & other_filters)
@@ -140,7 +140,7 @@ async def mute_ar(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command2(["فك_ميوت", "ازاله_ميوت"]) & other_filters)
@@ -155,7 +155,7 @@ async def unmute_ar(client, m: Message):
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 @Client.on_message(command2(["تحكم", "صوت"]) & other_filters)
@@ -169,11 +169,11 @@ async def volume_ar(client, m: Message):
     if chat_id in QUEUE:
         try:
             await call_py.change_volume_call(chat_id, volume=int(vol))
-            await m.reply(f"✔ **تم ضبط الصوت على** `{vol}`%")
+            await m.reply(f"✅ **تم ضبط الصوت على** `{vol}`%")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
-        await m.reply("✘ **قائمة التشغيل فارغه**")
+        await m.reply("❌ **قائمة التشغيل فارغه**")
 
 
 # ══════════════════════════════════════════════════════════
@@ -203,7 +203,7 @@ async def silence_user(c: Client, m: Message):
             f"» لفك الكتم استخدم أمر **فك كتم** بالرد على رسالته"
         )
     except Exception as e:
-        await m.reply(f"✘ **فشل الكتم:** `{e}`")
+        await m.reply(f"❌ **فشل الكتم:** `{e}`")
 
 
 # ══════════════════════════════════════════════════════════
@@ -239,4 +239,4 @@ async def unsilence_user(c: Client, m: Message):
             f"👤 **المستخدم:** [{target.first_name}](tg://user?id={target.id})"
         )
     except Exception as e:
-        await m.reply(f"✘ **فشل فك الكتم:** `{e}`")
+        await m.reply(f"❌ **فشل فك الكتم:** `{e}`")

@@ -34,7 +34,7 @@ async def help_cmd(client: Client, message: Message):
             [
                 [
                     InlineKeyboardButton(
-                        "📣 المطور", url=f"https://t.me/FY_TF"
+                        "📣 المطور", url=f"https://t.me/WORLD_MUSIC_F"
                     ),
                     InlineKeyboardButton(
                         "📣 قناة البوت", url=f"https://t.me/{UPDATES_CHANNEL}"
