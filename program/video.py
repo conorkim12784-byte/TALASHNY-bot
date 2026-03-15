@@ -110,7 +110,7 @@ async def _run_ytdlp(cmd):
 
 async def ytdl_audio(link):
     """
-    تحميل الصوت كملف مؤقت mp3 — أكثر استقراراً من streaming مباشر.
+    تحميل الصوت كملف مؤقت — بدون تحويل ffmpeg.
     بترجع: (1, filepath) لو نجح  أو  (0, error) لو فشل
     """
     uid = uuid.uuid4().hex[:8]
@@ -128,17 +128,13 @@ async def ytdl_audio(link):
         cmd = [
             "yt-dlp", "--no-playlist",
             "--extractor-args", f"youtube:player_client={client}",
-            "-f", "bestaudio/best",
+            "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "-o", out_tpl,
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "192K",
         ]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
         _, last_err = await _run_ytdlp(cmd)
-        # ابحث عن الملف اللي اتحمل
         for ff in os.listdir(AUDIO_DIR):
             if ff.startswith(uid):
                 return 1, os.path.join(AUDIO_DIR, ff)
@@ -146,11 +142,8 @@ async def ytdl_audio(link):
     # محاولة أخيرة بدون تحديد client
     cmd = [
         "yt-dlp", "--no-playlist",
-        "-f", "bestaudio/best",
+        "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "-o", out_tpl,
-        "--extract-audio",
-        "--audio-format", "mp3",
-        "--audio-quality", "192K",
     ]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]

@@ -55,16 +55,11 @@ async def song(_, message: Message):
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "geo_bypass": True,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE
