@@ -1,5 +1,6 @@
 # Copyright (C) 2021 By Amor Music-Project
 # Fixed: song() converted to async, lyric API replaced, cleanup improved
+# FIX: أضفنا cookies لـ yt_dlp عشان YouTube بيطلب authentication
 
 from __future__ import unicode_literals
 
@@ -18,9 +19,12 @@ from config import BOT_USERNAME as bn
 from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
+# FIX: مسار الـ cookies
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
 
 # ─────────────────────────────────────────
-# /song  — تحميل أغنية كملف صوتي  [FIX: كانت sync، أصبحت async]
+# /song  — تحميل أغنية كملف صوتي
 # ─────────────────────────────────────────
 @Client.on_message(command(["song"]))
 async def song(_, message: Message):
@@ -29,7 +33,14 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {"format": "bestaudio[ext=m4a]", "outtmpl": "%(title)s.%(ext)s"}
+    # FIX: أضفنا cookiefile لو موجود
+    ydl_ops = {
+        "format": "bestaudio[ext=m4a]",
+        "outtmpl": "%(title)s.%(ext)s",
+    }
+    if os.path.exists(COOKIES_FILE):
+        ydl_ops["cookiefile"] = COOKIES_FILE
+
     audio_file = None
     thumb_name = None
 
@@ -93,6 +104,7 @@ async def song(_, message: Message):
 @Client.on_message(command(["vsong", "video"]))
 async def vsong(client, message: Message):
     await message.delete()
+    # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
         "format": "best",
         "keepvideo": True,
@@ -101,6 +113,9 @@ async def vsong(client, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
     }
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
+
     query = " ".join(message.command[1:])
     if not query:
         return await message.reply("» **أرسل اسم الفيديو بعد الأمر**")
@@ -150,7 +165,7 @@ async def vsong(client, message: Message):
 
 
 # ─────────────────────────────────────────
-# /lyric — كلمات الأغنية  [FIX: API القديمة اتوقفت، استبدلها بـ lyrics.ovh]
+# /lyric — كلمات الأغنية
 # ─────────────────────────────────────────
 @Client.on_message(command(["lyric"]))
 async def lyrics(_, message: Message):
@@ -161,8 +176,6 @@ async def lyrics(_, message: Message):
     query = message.text.split(None, 1)[1]
     rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
     try:
-        # استخدام lyrics.ovh API المجانية والشغالة
-        # الصيغة المفضلة: /lyric اسم الفنان - اسم الأغنية
         parts = query.split("-", 1)
         if len(parts) == 2:
             artist = parts[0].strip()

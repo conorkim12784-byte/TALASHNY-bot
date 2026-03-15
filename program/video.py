@@ -1,8 +1,10 @@
 # Copyright (C) 2021 By Veez Music-Project
 # Fixed: ytsearch error handling + unpacking guard
+# FIX: أضفنا --cookies لكل أوامر yt-dlp عشان YouTube بيطلب authentication
 
 import re
 import asyncio
+import os
 
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
@@ -18,17 +20,25 @@ from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import json, subprocess
 
+# FIX: مسار الـ cookies بالنسبة لمكان تشغيل البوت
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
 
 def ytsearch(query: str):
     try:
-        result = subprocess.run(
-            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist", "--no-download",
-             "--no-warnings", "--ignore-errors"],
-            capture_output=True, text=True, timeout=60
-        )
+        cmd = [
+            "yt-dlp", f"ytsearch1:{query}",
+            "--dump-json", "--no-playlist", "--no-download",
+            "--no-warnings", "--ignore-errors",
+        ]
+        # FIX: أضف الـ cookies لو الملف موجود
+        if os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if not result.stdout.strip():
             print(f"yt-dlp error: {result.stderr[:200]}")
-            return None  # FIX: رجّع None بدل string
+            return None
         data = json.loads(result.stdout.strip().split("\n")[0])
         songname = data.get("title", "Unknown")
         url = data.get("webpage_url", "")
@@ -36,15 +46,24 @@ def ytsearch(query: str):
         mins, secs = divmod(int(duration_secs), 60)
         duration = f"{mins}:{secs:02d}"
         thumbnail = data.get("thumbnail", "")
-        return [songname, url, duration, thumbnail]  # قائمة بـ 4 عناصر بالظبط
+        return [songname, url, duration, thumbnail]
     except Exception as e:
         print(e)
-        return None  # FIX: رجّع None بدل str(e)
+        return None
 
 
 async def ytdl(link):
+    cmd = [
+        "yt-dlp", "-g",
+        "-f", "best[height<=?720][width<=?1280]",
+        f"{link}",
+    ]
+    # FIX: أضف الـ cookies لو الملف موجود
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+
     proc = await asyncio.create_subprocess_exec(
-        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", f"{link}",
+        *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -178,12 +197,11 @@ async def vplay(c: Client, m: Message):
             Q = 720
             vq = VideoQuality.HD_720p
 
-            # FIX: كان بيقارن بـ 0 بس الفانكشن بترجع None أو list
             if not search or not isinstance(search, list) or len(search) != 4:
                 await loser.edit("❌ **لم يتم العثور على نتائج**")
                 return
 
-            songname, url, duration, thumbnail = search  # آمن دلوقتي
+            songname, url, duration, thumbnail = search
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
             image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
