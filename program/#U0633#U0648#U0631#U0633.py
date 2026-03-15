@@ -50,10 +50,31 @@ async def _human_time_duration(seconds):
 @Client.on_message(command2(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"]) & filters.group)
 async def source_ar(client: Client, message: Message):
     await message.delete()
+    # جلب first_name للمبرمجين من تيليجرام
+    try:
+        dev1 = await client.get_users(1923931101)
+        dev1_name = dev1.first_name
+    except Exception:
+        dev1_name = "المبرمج الأول"
+    try:
+        dev2 = await client.get_users(5340100457)
+        dev2_name = dev2.first_name
+    except Exception:
+        dev2_name = "المبرمج الثاني"
+
     await message.reply_photo(
         photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="**TALASHNY**\n\nالـمـبـرمـج [DEVELOPER](https://t.me/FY_TF)\nلـلـتـواصـل اضـغـط عـلـى الـزرار",
+        caption=(
+            "**TALASHNY**\n\n"
+            "الـسـورس مـحـمـي — الـبـوت مـبـرمـج بـواسـطـة\n\n"
+            f"» [{dev1_name}](tg://user?id=1923931101)\n"
+            f"» [{dev2_name}](tg://user?id=5340100457)"
+        ),
         reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(dev1_name, url="tg://user?id=1923931101"),
+                InlineKeyboardButton(dev2_name, url="tg://user?id=5340100457"),
+            ],
             [InlineKeyboardButton("اضـف الـبـوت الى مـجـمـوعـتـك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]
         ])
     )
@@ -62,12 +83,22 @@ async def source_ar(client: Client, message: Message):
 @Client.on_message(command2(["المطور", "مطور"]) & filters.group)
 async def dev_ar(client: Client, message: Message):
     await message.delete()
+    # جلب first_name لصاحب البوت الفعلي
+    try:
+        owner = await client.get_users(1923931101)
+        owner_name = owner.first_name
+    except Exception:
+        owner_name = "المطور"
+
     await message.reply_photo(
         photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption="**TALASHNY**\n\nمـش مـحـتـاجـيـن نـكـتـب كـلام كـتـيـر خـش ع اول زرار وانـت هـتـعـرف",
+        caption=(
+            "**TALASHNY**\n\n"
+            "مـش مـحـتـاجـيـن نـكـتـب كـلام كـتـيـر\n"
+            "خـش ع الـزرار وانـت هـتـعـرف"
+        ),
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("DEVELOPER - TALASHNY", url="https://t.me/FY_TF")],
-            [InlineKeyboardButton("ضـيـف الـبـوت لـمـجـمـوعـتـك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]
+            [InlineKeyboardButton(owner_name, url="tg://user?id=1923931101")],
         ])
     )
 
