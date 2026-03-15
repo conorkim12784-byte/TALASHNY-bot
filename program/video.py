@@ -67,10 +67,11 @@ async def ytdl_audio(link):
     android_vr بيدي audio-only URL مضمون.
     """
     clients = [
-        # client, format, cookies
-        ("android_vr", "bestaudio",      False),
-        ("ios",        "bestaudio/best", False),
-        ("web",        "bestaudio/best", True),
+        ("android_vr",  "bestaudio",      False),
+        ("ios",         "bestaudio/best", False),
+        ("mweb",        "bestaudio/best", False),
+        ("tv_embedded", "bestaudio/best", False),
+        ("web",         "bestaudio/best", True),
     ]
     last_err = ""
     for client, fmt, use_cookies in clients:
@@ -82,12 +83,22 @@ async def ytdl_audio(link):
         cmd.append(link)
         out, err = await _run_ytdlp(cmd)
         if out:
-            # تأكد إن الناتج URL وليس warning
             lines = [l for l in out.split("\n") if l.startswith("http")]
             if lines:
                 return 1, lines[0]
         last_err = err
-    return 0, last_err
+
+    # آخر محاولة بدون تحديد client
+    cmd = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio/best"]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(link)
+    out, err = await _run_ytdlp(cmd)
+    if out:
+        lines = [l for l in out.split("\n") if l.startswith("http")]
+        if lines:
+            return 1, lines[0]
+    return 0, last_err or err
 
 
 ytdl = ytdl_audio
@@ -109,9 +120,11 @@ async def ytdl_video(link, quality=720):
         fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=720]/best"
 
     clients = [
-        ("android_vr", False),
-        ("ios",        False),
-        ("web",        True),
+        ("android_vr",  False),
+        ("ios",         False),
+        ("mweb",        False),
+        ("tv_embedded", False),
+        ("web",         True),
     ]
     last_err = ""
     for client, use_cookies in clients:
@@ -122,9 +135,19 @@ async def ytdl_video(link, quality=720):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
         _, last_err = await _run_ytdlp(cmd)
-        for f in os.listdir(DL_DIR):
-            if f.startswith(uid):
-                return 1, os.path.join(DL_DIR, f)
+        for ff in os.listdir(DL_DIR):
+            if ff.startswith(uid):
+                return 1, os.path.join(DL_DIR, ff)
+
+    # آخر محاولة بدون تحديد client
+    cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(link)
+    await _run_ytdlp(cmd)
+    for ff in os.listdir(DL_DIR):
+        if ff.startswith(uid):
+            return 1, os.path.join(DL_DIR, ff)
 
     return 0, last_err
 
