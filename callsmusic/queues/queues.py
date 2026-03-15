@@ -1,8 +1,9 @@
 from typing import Dict
 from asyncio import Queue, QueueEmpty as Empty
 
-
 queues: Dict[int, Queue] = {}
+# نحتفظ بالأغنية الحالية لكل شات عشان نقدر نمسح ملفها
+current_tracks: Dict[int, dict] = {}
 
 
 async def put(chat_id: int, **kwargs) -> int:
@@ -12,12 +13,18 @@ async def put(chat_id: int, **kwargs) -> int:
     return queues[chat_id].qsize()
 
 
-def get(chat_id: int) -> Dict[str, str]:
+def get(chat_id: int):
     if chat_id in queues:
         try:
-            return queues[chat_id].get_nowait()
+            track = queues[chat_id].get_nowait()
+            current_tracks[chat_id] = track
+            return track
         except Empty:
             return None
+
+
+def get_current(chat_id: int):
+    return current_tracks.get(chat_id)
 
 
 def is_empty(chat_id: int) -> bool:
