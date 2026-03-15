@@ -5,10 +5,16 @@ RUN apt-get update \
         ffmpeg \
         git \
         curl \
-        nodejs \
-        npm \
+        xz-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# تثبيت Node.js 20 LTS مباشرة من المصدر الرسمي
+RUN curl -fsSL https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz -o /tmp/node.tar.xz \
+    && tar -xf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
+    && node --version \
+    && npm --version
 
 COPY . /app/
 WORKDIR /app/
