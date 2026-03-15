@@ -50,22 +50,6 @@ def ytsearch(query: str):
         return None
 
 
-def _base_cmd(with_cookies=False):
-    """
-    android_vr: مش محتاج JS لفك التشفير لكن مش بيدعم cookies
-    web: بيدعم cookies لكن محتاج JS
-    الحل: نجرب android_vr بدون cookies أولاً، لو فشل نجرب web مع cookies
-    """
-    cmd = [
-        "yt-dlp",
-        "--extractor-args", "youtube:player_client=android_vr",
-        "--no-playlist",
-    ]
-    if with_cookies and os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    return cmd
-
-
 async def _run_ytdlp(cmd):
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -77,56 +61,72 @@ async def _run_ytdlp(cmd):
 
 
 async def ytdl_audio(link):
-    # محاولة 1: android_vr بدون cookies (مش محتاج JS)
-    cmd = _base_cmd(with_cookies=False) + ["-g", "-f", "bestaudio/best", link]
-    out, err = await _run_ytdlp(cmd)
-    if out:
-        return 1, out.split("\n")[0]
-
-    # محاولة 2: web مع cookies (لو android_vr فشل)
-    cmd2 = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio/best"]
-    if os.path.exists(COOKIES_FILE):
-        cmd2 += ["--cookies", COOKIES_FILE]
-    cmd2.append(link)
-    out2, err2 = await _run_ytdlp(cmd2)
-    if out2:
-        return 1, out2.split("\n")[0]
-
-    return 0, err2 or err
+    """
+    جلب stream URL للصوت.
+    الأولوية: android_vr (بدون JS، بدون cookies) → ios → web+cookies
+    android_vr بيدي audio-only URL مضمون.
+    """
+    clients = [
+        # client, format, cookies
+        ("android_vr", "bestaudio",      False),
+        ("ios",        "bestaudio/best", False),
+        ("web",        "bestaudio/best", True),
+    ]
+    last_err = ""
+    for client, fmt, use_cookies in clients:
+        cmd = ["yt-dlp", "--no-playlist",
+               "--extractor-args", f"youtube:player_client={client}",
+               "-g", "-f", fmt]
+        if use_cookies and os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        cmd.append(link)
+        out, err = await _run_ytdlp(cmd)
+        if out:
+            # تأكد إن الناتج URL وليس warning
+            lines = [l for l in out.split("\n") if l.startswith("http")]
+            if lines:
+                return 1, lines[0]
+        last_err = err
+    return 0, last_err
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
+    """
+    تنزيل فيديو.
+    android_vr بيدعم audio+video معاً بدون JS.
+    """
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
     if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best[height<=480]"
+        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/bestvideo[height<=480]/best"
     elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best[height<=360]"
+        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/bestvideo[height<=360]/best"
     else:
-        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=720]/best"
 
-    # محاولة 1: android_vr بدون cookies
-    cmd = _base_cmd(with_cookies=False) + ["-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4", link]
-    await _run_ytdlp(cmd)
-    for f in os.listdir(DL_DIR):
-        if f.startswith(uid):
-            return 1, os.path.join(DL_DIR, f)
+    clients = [
+        ("android_vr", False),
+        ("ios",        False),
+        ("web",        True),
+    ]
+    last_err = ""
+    for client, use_cookies in clients:
+        cmd = ["yt-dlp", "--no-playlist",
+               "--extractor-args", f"youtube:player_client={client}",
+               "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+        if use_cookies and os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        cmd.append(link)
+        _, last_err = await _run_ytdlp(cmd)
+        for f in os.listdir(DL_DIR):
+            if f.startswith(uid):
+                return 1, os.path.join(DL_DIR, f)
 
-    # محاولة 2: web مع cookies
-    cmd2 = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
-    if os.path.exists(COOKIES_FILE):
-        cmd2 += ["--cookies", COOKIES_FILE]
-    cmd2.append(link)
-    _, err = await _run_ytdlp(cmd2)
-    for f in os.listdir(DL_DIR):
-        if f.startswith(uid):
-            return 1, os.path.join(DL_DIR, f)
-
-    return 0, err
+    return 0, last_err
 
 
 def get_video_quality(Q):
