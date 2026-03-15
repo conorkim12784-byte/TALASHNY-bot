@@ -1,10 +1,11 @@
 # Copyright (C) 2021 By Veez Music-Project
-# Fixed: ytsearch error handling + unpacking guard
-# FIX: أضفنا --cookies لكل أوامر yt-dlp عشان YouTube بيطلب authentication
+# /play  → stream URL مباشر (صوت، سريع، بدون تنزيل)
+# /vplay → تنزيل الفيديو محلياً، تشغيله، مسحه بعد الانتهاء
 
 import re
 import asyncio
 import os
+import uuid
 
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
@@ -20,8 +21,9 @@ from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import json, subprocess
 
-# FIX: مسار الـ cookies بالنسبة لمكان تشغيل البوت
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+DL_DIR = "/tmp/tgbot_vids"
+os.makedirs(DL_DIR, exist_ok=True)
 
 
 def ytsearch(query: str):
@@ -31,13 +33,11 @@ def ytsearch(query: str):
             "--dump-json", "--no-playlist", "--no-download",
             "--no-warnings", "--ignore-errors",
         ]
-        # FIX: أضف الـ cookies لو الملف موجود
         if os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
-
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if not result.stdout.strip():
-            print(f"yt-dlp error: {result.stderr[:200]}")
+            print(f"yt-dlp search error: {result.stderr[:300]}")
             return None
         data = json.loads(result.stdout.strip().split("\n")[0])
         songname = data.get("title", "Unknown")
@@ -48,36 +48,67 @@ def ytsearch(query: str):
         thumbnail = data.get("thumbnail", "")
         return [songname, url, duration, thumbnail]
     except Exception as e:
-        print(e)
+        print(f"ytsearch exception: {e}")
         return None
 
 
-async def ytdl(link):
-    # FIX: نجرب formats متعددة — لو 720 مش موجود نرجع لـ bestaudio
-    formats_to_try = [
-        "best[height<=?720][width<=?1280]",
-        "bestvideo[height<=?720]+bestaudio/best[height<=?720]",
-        "bestaudio/best",
-    ]
-
-    base_cmd = ["yt-dlp", "-g"]
+async def ytdl_audio(link):
+    """جلب stream URL للصوت فقط — بدون تنزيل"""
+    base = ["yt-dlp", "-g", "--no-playlist"]
     if os.path.exists(COOKIES_FILE):
-        base_cmd += ["--cookies", COOKIES_FILE]
+        base += ["--cookies", COOKIES_FILE]
 
-    last_err = ""
-    for fmt in formats_to_try:
-        cmd = base_cmd + ["-f", fmt, link]
+    for fmt in ["bestaudio", "bestaudio/best", "best"]:
+        cmd = base + ["-f", fmt, link]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
-        if stdout and stdout.decode().strip():
-            return 1, stdout.decode().split("\n")[0]
-        last_err = stderr.decode()
+        out = stdout.decode().strip()
+        if out:
+            return 1, out.split("\n")[0]
 
-    return 0, last_err
+    return 0, stderr.decode()
+
+
+# للتوافق مع music.py اللي بتستورد ytdl
+ytdl = ytdl_audio
+
+
+async def ytdl_video(link, quality=720):
+    """
+    تنزيل فيديو محلياً — بيرجع (1, filepath) أو (0, error)
+    الملف لازم تمسحه بعد الاستخدام
+    """
+    uid = uuid.uuid4().hex[:8]
+    out = os.path.join(DL_DIR, f"{uid}.%(ext)s")
+
+    if quality == 480:
+        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]"
+    elif quality == 360:
+        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]"
+    else:
+        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+
+    cmd = ["yt-dlp", "-f", fmt, "--no-playlist", "-o", out, "--merge-output-format", "mp4"]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(link)
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+
+    for f in os.listdir(DL_DIR):
+        if f.startswith(uid):
+            return 1, os.path.join(DL_DIR, f)
+
+    return 0, stderr.decode()
 
 
 def get_video_quality(Q):
@@ -142,6 +173,7 @@ async def vplay(c: Client, m: Message):
     if not await _check_and_join(c, m, chat_id):
         return
 
+    # ── ملف فيديو مرفق ──
     if replied and (replied.video or replied.document):
         loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
         dl = await replied.download()
@@ -149,20 +181,12 @@ async def vplay(c: Client, m: Message):
         Q = 720
         if len(m.command) >= 2:
             pq = m.text.split(None, 1)[1]
-            if pq in ("720", "480", "360"):
-                Q = int(pq)
-            else:
-                await loser.edit("» __فقط 720, 480, 360 مسموح__ \n💡 ** الان يشتغل الفيديو في 720p**")
+            Q = int(pq) if pq in ("720", "480", "360") else 720
         try:
-            if replied.video:
-                songname = (replied.video.file_name or "Video")[:70]
-                duration = replied.video.duration
-            elif replied.document:
-                songname = (replied.document.file_name or "Video")[:70]
-                duration = 0
+            songname = (replied.video.file_name or "Video")[:70] if replied.video else (replied.document.file_name or "Video")[:70]
+            duration = replied.video.duration if replied.video else 0
         except BaseException:
-            songname = "Video"
-            duration = 0
+            songname, duration = "Video", 0
 
         vq = get_video_quality(Q)
         if chat_id in QUEUE:
@@ -173,72 +197,79 @@ async def vplay(c: Client, m: Message):
             current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
-            await m.reply_photo(
-                photo=image,
-                reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-            )
+            await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
+                caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
         else:
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
             image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
-            await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
+            await loser.edit("🔄 **جاري التشغيل...**")
             await call_py.play(chat_id, MediaStream(dl, AudioQuality.HIGH, vq))
             add_to_queue(chat_id, songname, dl, link, "Video", Q)
             current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
             await loser.delete()
             buttons = stream_markup(user_id)
-            await m.reply_photo(
-                photo=image,
-                reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-            )
+            await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
+                caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
+        return
+
+    # ── بحث YouTube بالفيديو ──
+    if len(m.command) < 2:
+        return await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
+
+    loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
+    query = m.text.split(None, 1)[1]
+    Q = 720
+    vq = VideoQuality.HD_720p
+
+    search = ytsearch(query)
+    if not search or not isinstance(search, list) or len(search) != 4:
+        return await loser.edit("❌ **لم يتم العثور على نتائج**")
+
+    songname, url, duration, thumbnail = search
+    await loser.edit("📥 **جاري تنزيل الفيديو... (قد يأخذ لحظات)**")
+
+    veez, filepath = await ytdl_video(url, Q)
+    if veez == 0:
+        return await loser.edit(f"❌ فشل تنزيل الفيديو\n\n» `{filepath[:200]}`")
+
+    gcname = m.chat.title
+    ctitle = await CHAT_TITLE(gcname)
+    image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
+
+    if chat_id in QUEUE:
+        pos = add_to_queue(chat_id, songname, filepath, url, "Video", Q)
+        await loser.delete()
+        buttons = stream_markup(user_id)
+        await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
+            caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
     else:
-        if len(m.command) < 2:
-            await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
-        else:
-            loser = await c.send_message(chat_id, "🔎 **جاري البحث انتظر قليلآ...**")
-            query = m.text.split(None, 1)[1]
-            search = ytsearch(query)
-            Q = 720
-            vq = VideoQuality.HD_720p
+        try:
+            await loser.edit("▶️ **جاري التشغيل...**")
+            await call_py.play(chat_id, MediaStream(filepath, AudioQuality.HIGH, vq))
+            add_to_queue(chat_id, songname, filepath, url, "Video", Q)
+            current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
+            await loser.delete()
+            buttons = stream_markup(user_id)
+            await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
+                caption=f"🎬 **جاري تشغيل الفيديو**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
 
-            if not search or not isinstance(search, list) or len(search) != 4:
-                await loser.edit("❌ **لم يتم العثور على نتائج**")
-                return
-
-            songname, url, duration, thumbnail = search
-            gcname = m.chat.title
-            ctitle = await CHAT_TITLE(gcname)
-            image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
-            veez, ytlink = await ytdl(url)
-            if veez == 0:
-                await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{ytlink}`")
-            elif chat_id in QUEUE:
-                pos = add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
-                await loser.delete()
-                buttons = stream_markup(user_id)
-                await m.reply_photo(
-                    photo=image,
-                    reply_markup=InlineKeyboardMarkup(buttons),
-                    caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-                )
-            else:
+            # مسح الملف بعد 10 دقايق (وقت كافي للتشغيل)
+            async def cleanup():
+                await asyncio.sleep(600)
                 try:
-                    await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
-                    await call_py.play(chat_id, MediaStream(ytlink, AudioQuality.HIGH, vq))
-                    add_to_queue(chat_id, songname, ytlink, url, "Video", Q)
-                    current_requester[chat_id] = {"first_name": m.from_user.first_name, "user_id": m.from_user.id}
-                    await loser.delete()
-                    buttons = stream_markup(user_id)
-                    await m.reply_photo(
-                        photo=image,
-                        reply_markup=InlineKeyboardMarkup(buttons),
-                        caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-                    )
-                except Exception as ep:
-                    await loser.delete()
-                    await m.reply_text(f"🚫 خطأ: `{ep}`")
+                    os.remove(filepath)
+                except Exception:
+                    pass
+            asyncio.create_task(cleanup())
+
+        except Exception as ep:
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+            await loser.delete()
+            await m.reply_text(f"🚫 خطأ: `{ep}`")
 
 
 @Client.on_message(command(["vstream", "ستريم"]) & other_filters)
@@ -253,8 +284,7 @@ async def vstream(c: Client, m: Message):
         return
 
     if len(m.command) < 2:
-        await m.reply("» اعطني رابط مباشر للتشغيل")
-        return
+        return await m.reply("» اعطني رابط مباشر للتشغيل")
 
     if len(m.command) == 2:
         link = m.text.split(None, 1)[1]
@@ -265,32 +295,27 @@ async def vstream(c: Client, m: Message):
         quality = op.split(None, 1)[1]
         Q = int(quality) if quality in ("720", "480", "360") else 720
     else:
-        await m.reply("**/vstream {link} {720/480/360}**")
-        return
+        return await m.reply("**/vstream {link} {720/480/360}**")
 
     loser = await c.send_message(chat_id, "🔄 **تتم المعالجة انتظر قليلآ...**")
     regex = r"^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+"
     match = re.match(regex, link)
     if match:
-        veez, livelink = await ytdl(link)
+        veez, livelink = await ytdl_audio(link)
     else:
         livelink = link
         veez = 1
 
     if veez == 0:
-        await loser.edit(f"❌ تم اكتشاف خطأ حاول مجددآ\n\n» `{livelink}`")
-        return
+        return await loser.edit(f"❌ تم اكتشاف خطأ\n\n» `{livelink[:200]}`")
 
     vq = get_video_quality(Q)
     if chat_id in QUEUE:
         pos = add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
         await loser.delete()
         buttons = stream_markup(user_id)
-        await m.reply_photo(
-            photo=f"{IMG_1}",
-            reply_markup=InlineKeyboardMarkup(buttons),
-            caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-        )
+        await m.reply_photo(photo=f"{IMG_1}", reply_markup=InlineKeyboardMarkup(buttons),
+            caption=f"💡 **تمت إضافة المسار إلى قائمة الانتظار »** `{pos}`\n\n💭 **المجموعه:** `{chat_id}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
     else:
         try:
             await loser.edit("🔄 **جاري التشغيل انتظر قليلآ...**")
@@ -298,11 +323,8 @@ async def vstream(c: Client, m: Message):
             add_to_queue(chat_id, "Live Stream", livelink, link, "Video", Q)
             await loser.delete()
             buttons = stream_markup(user_id)
-            await m.reply_photo(
-                photo=f"{IMG_2}",
-                reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"💡 **[فيديو مباشر]({link}) بدء التشغيل**\n\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})",
-            )
+            await m.reply_photo(photo=f"{IMG_2}", reply_markup=InlineKeyboardMarkup(buttons),
+                caption=f"💡 **[فيديو مباشر]({link}) بدء التشغيل**\n\n💭 **المجموعه:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
         except Exception as ep:
             await loser.delete()
             await m.reply_text(f"🚫 خطأ: `{ep}`")
