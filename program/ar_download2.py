@@ -78,6 +78,7 @@ async def song(_, message: Message):
 
 
 @Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
+async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
         "format": "bestvideo[height<=720]+bestaudio/best",
