@@ -93,8 +93,9 @@ def ytsearch(query: str):
         return [title, url, duration, thumbnail]
 
     except Exception as e:
-        print(f"[ytsearch error] {e}")
-        return None
+        err = str(e)
+        print(f"[ytsearch error] {err}")
+        return f"ERROR: {err[:200]}"
 
 
 async def _run_ytdlp(cmd):

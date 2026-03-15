@@ -105,7 +105,7 @@ async def play_ar(c: Client, m: Message):
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             if not isinstance(search, list):
-                await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`")
+                await suhu.edit(f"**لـم يـتـم الـعـثـور عـلـى نـتـائـج**\n\n`{search}`\n\n🔍 تحقق من لوق البوت للتفاصيل")
                 return
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
