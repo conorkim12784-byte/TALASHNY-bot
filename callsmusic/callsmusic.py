@@ -1,4 +1,4 @@
-# FIX: استخدام call_py الصحيح + مسح ملفات الفيديو فور انتهاء التشغيل
+# FIX: مسح ملفات الصوت المؤقتة بعد انتهاء التشغيل
 
 import os
 from pytgcalls.types import Update, StreamEnded, MediaStream, AudioQuality
@@ -14,13 +14,15 @@ async def register_stream_end_handler(call_py):
 
         chat_id = update.chat_id
 
-        # امسح ملف الأغنية اللي خلصت لو كانت ملف محلي في /tmp
+        # امسح ملف الأغنية اللي خلصت لو كانت ملف محلي
         try:
             current = queues.get_current(chat_id)
             if current:
                 filepath = current.get("file", "")
-                if filepath and filepath.startswith("/tmp") and os.path.exists(filepath):
-                    os.remove(filepath)
+                if filepath and isinstance(filepath, str) and os.path.exists(filepath):
+                    # امسح لو في /tmp (صوت أو فيديو مؤقت)
+                    if filepath.startswith("/tmp"):
+                        os.remove(filepath)
         except Exception:
             pass
 
