@@ -179,6 +179,11 @@ async def play(c: Client, m: Message):
         else:
             try:
                 await suhu.edit("**▶️ يـتـم الـتـشـغـيـل...**")
+                # DEBUG مؤقت — يبعت الـ URL عشان نشوف إيه المشكلة
+                await m.reply_text(f"🔍 DEBUG:
+```
+{ytlink[:200]}
+```")
                 # صوت بس — بدون فيديو
                 await call_py.play(chat_id, MediaStream(
                     ytlink, AudioQuality.HIGH,
