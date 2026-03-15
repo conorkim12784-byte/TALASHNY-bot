@@ -20,6 +20,7 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import json, subprocess
+from youtube_search import YoutubeSearch
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 DL_DIR = "/tmp/tgbot_vids"
@@ -27,25 +28,22 @@ os.makedirs(DL_DIR, exist_ok=True)
 
 
 def ytsearch(query: str):
+    """
+    FIX: استبدلنا yt-dlp ytsearch بـ YoutubeSearch library
+    عشان yt-dlp كان بيفشل resulting in None بسبب غياب JS runtime
+    """
     try:
-        cmd = [
-            "yt-dlp", f"ytsearch1:{query}",
-            "--dump-json", "--no-playlist", "--no-download",
-            "--no-warnings", "--ignore-errors",
-        ]
-        if os.path.exists(COOKIES_FILE):
-            cmd += ["--cookies", COOKIES_FILE]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        if not result.stdout.strip():
-            print(f"yt-dlp search error: {result.stderr[:300]}")
+        results = YoutubeSearch(query, max_results=1).to_dict()
+        if not results:
             return None
-        data = json.loads(result.stdout.strip().split("\n")[0])
-        songname = data.get("title", "Unknown")
-        url = data.get("webpage_url", "")
-        duration_secs = data.get("duration", 0)
-        mins, secs = divmod(int(duration_secs), 60)
-        duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "")
+        r = results[0]
+        songname = r.get("title", "Unknown")[:70]
+        url = f"https://youtube.com{r['url_suffix']}"
+        duration_str = r.get("duration", "0:00")
+        # تحويل "3:45" لـ "3:45"
+        duration = duration_str if duration_str else "0:00"
+        thumbnails = r.get("thumbnails", [])
+        thumbnail = thumbnails[0] if thumbnails else ""
         return [songname, url, duration, thumbnail]
     except Exception as e:
         print(f"ytsearch exception: {e}")
