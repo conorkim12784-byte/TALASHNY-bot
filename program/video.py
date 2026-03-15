@@ -50,51 +50,46 @@ def ytsearch(query: str):
         return None
 
 
-async def ytdl_audio(link):
-    """جلب stream URL للصوت فقط — بدون تنزيل"""
-    base = ["yt-dlp", "-g", "--no-playlist"]
+def _base_cmd():
+    cmd = [
+        "yt-dlp",
+        "--extractor-args", "youtube:player_client=android_vr",
+        "--no-playlist",
+    ]
     if os.path.exists(COOKIES_FILE):
-        base += ["--cookies", COOKIES_FILE]
+        cmd += ["--cookies", COOKIES_FILE]
+    return cmd
 
-    for fmt in ["bestaudio", "bestaudio/best", "best"]:
-        cmd = base + ["-f", fmt, link]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        out = stdout.decode().strip()
-        if out:
-            return 1, out.split("\n")[0]
 
+async def ytdl_audio(link):
+    cmd = _base_cmd() + ["-g", "-f", "bestaudio/best", link]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    out = stdout.decode().strip()
+    if out:
+        return 1, out.split("\n")[0]
     return 0, stderr.decode()
 
 
-# للتوافق مع music.py اللي بتستورد ytdl
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """
-    تنزيل فيديو محلياً — بيرجع (1, filepath) أو (0, error)
-    الملف لازم تمسحه بعد الاستخدام
-    """
     uid = uuid.uuid4().hex[:8]
     out = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
     if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]"
+        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best[height<=480]"
     elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]"
+        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best[height<=360]"
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
 
-    cmd = ["yt-dlp", "-f", fmt, "--no-playlist", "-o", out, "--merge-output-format", "mp4"]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(link)
-
+    cmd = _base_cmd() + ["-f", fmt, "-o", out, "--merge-output-format", "mp4", link]
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
