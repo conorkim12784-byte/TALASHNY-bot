@@ -53,25 +53,31 @@ def ytsearch(query: str):
 
 
 async def ytdl(link):
-    cmd = [
-        "yt-dlp", "-g",
-        "-f", "best[height<=?720][width<=?1280]",
-        f"{link}",
+    # FIX: نجرب formats متعددة — لو 720 مش موجود نرجع لـ bestaudio
+    formats_to_try = [
+        "best[height<=?720][width<=?1280]",
+        "bestvideo[height<=?720]+bestaudio/best[height<=?720]",
+        "bestaudio/best",
     ]
-    # FIX: أضف الـ cookies لو الملف موجود
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
 
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return 1, stdout.decode().split("\n")[0]
-    else:
-        return 0, stderr.decode()
+    base_cmd = ["yt-dlp", "-g"]
+    if os.path.exists(COOKIES_FILE):
+        base_cmd += ["--cookies", COOKIES_FILE]
+
+    last_err = ""
+    for fmt in formats_to_try:
+        cmd = base_cmd + ["-f", fmt, link]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if stdout and stdout.decode().strip():
+            return 1, stdout.decode().split("\n")[0]
+        last_err = stderr.decode()
+
+    return 0, last_err
 
 
 def get_video_quality(Q):
