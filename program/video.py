@@ -1,5 +1,5 @@
 # Copyright (C) 2021 By Veez Music-Project
-# /play  → stream URL مباشر (صوت، سريع، بدون تنزيل)
+# /play  → تحميل صوت مؤقت وتشغيله (أكثر استقراراً من streaming مباشر)
 # /vplay → تنزيل الفيديو محلياً، تشغيله، مسحه بعد الانتهاء
 
 import re
@@ -24,24 +24,23 @@ from youtube_search import YoutubeSearch
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 DL_DIR = "/tmp/tgbot_vids"
+AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(DL_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
 def ytsearch(query: str):
     """
-    FIX: استبدلنا yt-dlp ytsearch بـ YoutubeSearch library
-    عشان yt-dlp كان بيفشل resulting in None بسبب غياب JS runtime
+    FIX: استخدام YoutubeSearch library للبحث
     """
     try:
         results = YoutubeSearch(query, max_results=1).to_dict()
-        print(f"[DEBUG ytsearch] query={query!r} results={results}")
         if not results:
             return None
         r = results[0]
         songname = r.get("title", "Unknown")[:70]
         url = f"https://youtube.com{r['url_suffix']}"
         duration_str = r.get("duration", "0:00")
-        # تحويل "3:45" لـ "3:45"
         duration = duration_str if duration_str else "0:00"
         thumbnails = r.get("thumbnails", [])
         thumbnail = thumbnails[0] if thumbnails else ""
@@ -63,52 +62,66 @@ async def _run_ytdlp(cmd):
 
 async def ytdl_audio(link):
     """
-    جلب stream URL للصوت.
-    الأولوية: android_vr (بدون JS، بدون cookies) → ios → web+cookies
-    android_vr بيدي audio-only URL مضمون.
+    تحميل الصوت كملف مؤقت mp3 — أكثر استقراراً من streaming مباشر.
+    بترجع: (1, filepath) لو نجح  أو  (0, error) لو فشل
     """
+    uid = uuid.uuid4().hex[:8]
+    out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
+
     clients = [
-        ("android_vr",  "bestaudio",      False),
-        ("ios",         "bestaudio/best", False),
-        ("mweb",        "bestaudio/best", False),
-        ("tv_embedded", "bestaudio/best", False),
-        ("web",         "bestaudio/best", True),
+        ("android",    False),
+        ("android_vr", False),
+        ("ios",        False),
+        ("mweb",       False),
+        ("web",        True),
     ]
     last_err = ""
-    for client, fmt, use_cookies in clients:
-        cmd = ["yt-dlp", "--no-playlist",
-               "--extractor-args", f"youtube:player_client={client}",
-               "-g", "-f", fmt]
+    for client, use_cookies in clients:
+        cmd = [
+            "yt-dlp", "--no-playlist",
+            "--extractor-args", f"youtube:player_client={client}",
+            "-f", "bestaudio/best",
+            "-o", out_tpl,
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "192K",
+        ]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
-        out, err = await _run_ytdlp(cmd)
-        if out:
-            lines = [l for l in out.split("\n") if l.startswith("http")]
-            if lines:
-                return 1, lines[0]
-        last_err = err
+        _, last_err = await _run_ytdlp(cmd)
+        # ابحث عن الملف اللي اتحمل
+        for ff in os.listdir(AUDIO_DIR):
+            if ff.startswith(uid):
+                return 1, os.path.join(AUDIO_DIR, ff)
 
-    # آخر محاولة بدون تحديد client
-    cmd = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio/best"]
+    # محاولة أخيرة بدون تحديد client
+    cmd = [
+        "yt-dlp", "--no-playlist",
+        "-f", "bestaudio/best",
+        "-o", out_tpl,
+        "--extract-audio",
+        "--audio-format", "mp3",
+        "--audio-quality", "192K",
+    ]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(link)
-    out, err = await _run_ytdlp(cmd)
-    if out:
-        lines = [l for l in out.split("\n") if l.startswith("http")]
-        if lines:
-            return 1, lines[0]
-    return 0, last_err or err
+    await _run_ytdlp(cmd)
+    for ff in os.listdir(AUDIO_DIR):
+        if ff.startswith(uid):
+            return 1, os.path.join(AUDIO_DIR, ff)
+
+    return 0, last_err
 
 
+# alias للـ music.py و ar_music.py
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
     """
     تنزيل فيديو.
-    android_vr بيدعم audio+video معاً بدون JS.
     """
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
@@ -121,11 +134,11 @@ async def ytdl_video(link, quality=720):
         fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=720]/best"
 
     clients = [
-        ("android_vr",  False),
-        ("ios",         False),
-        ("mweb",        False),
-        ("tv_embedded", False),
-        ("web",         True),
+        ("android",    False),
+        ("android_vr", False),
+        ("ios",        False),
+        ("mweb",       False),
+        ("web",        True),
     ]
     last_err = ""
     for client, use_cookies in clients:
@@ -140,7 +153,6 @@ async def ytdl_video(link, quality=720):
             if ff.startswith(uid):
                 return 1, os.path.join(DL_DIR, ff)
 
-    # آخر محاولة بدون تحديد client
     cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
@@ -215,7 +227,6 @@ async def vplay(c: Client, m: Message):
     if not await _check_and_join(c, m, chat_id):
         return
 
-    # ── ملف فيديو مرفق ──
     if replied and (replied.video or replied.document):
         loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
         dl = await replied.download()
@@ -255,7 +266,6 @@ async def vplay(c: Client, m: Message):
                 caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
         return
 
-    # ── بحث YouTube بالفيديو ──
     if len(m.command) < 2:
         return await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
 
@@ -296,7 +306,6 @@ async def vplay(c: Client, m: Message):
             await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
                 caption=f"🎬 **جاري تشغيل الفيديو**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
 
-            # مسح الملف بعد 10 دقايق (وقت كافي للتشغيل)
             async def cleanup():
                 await asyncio.sleep(600)
                 try:
@@ -343,6 +352,7 @@ async def vstream(c: Client, m: Message):
     regex = r"^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+"
     match = re.match(regex, link)
     if match:
+        # لو YouTube — حمّل صوت مؤقت
         veez, livelink = await ytdl_audio(link)
     else:
         livelink = link
