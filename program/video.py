@@ -19,7 +19,8 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
-import json, subprocess
+import json, subprocess, requests as _requests
+from config import YOUTUBE_API_KEY
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 DL_DIR = "/tmp/tgbot_vids"
@@ -28,32 +29,69 @@ os.makedirs(DL_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
+def _parse_iso_duration(iso: str) -> str:
+    """تحويل PT3M45S لـ 3:45"""
+    import re
+    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+    if not match:
+        return "0:00"
+    h = int(match.group(1) or 0)
+    m = int(match.group(2) or 0)
+    s = int(match.group(3) or 0)
+    total = h * 3600 + m * 60 + s
+    mins, secs = divmod(total, 60)
+    hrs, mins = divmod(mins, 60)
+    if hrs:
+        return f"{hrs}:{mins:02d}:{secs:02d}"
+    return f"{mins}:{secs:02d}"
+
+
 def ytsearch(query: str):
     """
-    بحث عبر yt-dlp مباشرة — بدل YoutubeSearch المكسورة
+    بحث عبر YouTube Data API v3 — مش بيتحجب
     بترجع: [title, url, duration, thumbnail]  أو  None لو فشل
     """
     try:
-        cmd = [
-            "yt-dlp", f"ytsearch1:{query}",
-            "--dump-json", "--no-playlist",
-            "--no-download", "--no-warnings", "--ignore-errors",
-            "--extractor-args", "youtube:player_client=android,ios,web",
-        ]
-        if os.path.exists(COOKIES_FILE):
-            cmd += ["--cookies", COOKIES_FILE]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        if not result.stdout.strip():
-            print(f"[ytsearch] no output: {result.stderr[:200]}")
+        if not YOUTUBE_API_KEY:
+            print("[ytsearch] YOUTUBE_API_KEY غير موجود في .env")
             return None
-        data = json.loads(result.stdout.strip().split("\n")[0])
-        songname = data.get("title", "Unknown")[:70]
-        url = data.get("webpage_url", "")
-        duration_secs = int(data.get("duration", 0) or 0)
-        mins, secs = divmod(duration_secs, 60)
-        duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "")
-        return [songname, url, duration, thumbnail]
+
+        # خطوة 1: ابحث عن الفيديو وجيب الـ video_id
+        search_url = "https://www.googleapis.com/youtube/v3/search"
+        search_params = {
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "maxResults": 1,
+            "key": YOUTUBE_API_KEY,
+        }
+        r = _requests.get(search_url, params=search_params, timeout=10)
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        if not items:
+            return None
+
+        item = items[0]
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"][:70]
+        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+
+        # خطوة 2: جيب مدة الفيديو
+        details_url = "https://www.googleapis.com/youtube/v3/videos"
+        details_params = {
+            "part": "contentDetails",
+            "id": video_id,
+            "key": YOUTUBE_API_KEY,
+        }
+        r2 = _requests.get(details_url, params=details_params, timeout=10)
+        r2.raise_for_status()
+        detail_items = r2.json().get("items", [])
+        iso_duration = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
+        duration = _parse_iso_duration(iso_duration)
+
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        return [title, url, duration, thumbnail]
+
     except Exception as e:
         print(f"[ytsearch error] {e}")
         return None
