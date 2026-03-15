@@ -62,20 +62,30 @@ async def source_ar(client: Client, message: Message):
     except Exception:
         dev2_name = "المبرمج الثاني"
 
+    caption_text = (
+        "╭────⌁TALASHNY⌁────⟤\n"
+        "│╭───────────⟢\n"
+        "╞╡   Date of establishment 2022\n"
+        "╞╡ \n"
+        "╞╡This is the simplest thing we have \n"
+        "│╰────────────╮\n"
+        "│╭────────────╯\n"
+        "╞╡      Source code in Python \n"
+        "╞╡ \n"
+        f"╞╡  » [{dev1_name}](tg://user?id=1923931101)\n"
+        f"╞╡  » [{dev2_name}](tg://user?id=5340100457)\n"
+        "│╰───────────⟢\n"
+        "╰────⌁TALASHNY⌁────⟤"
+    )
     await message.reply_animation(
         animation="https://l.top4top.io/m_37262j13p1.mp4",
-        caption=(
-            "**TALASHNY**\n\n"
-            "الـسـورس مـحـمـي — الـبـوت مـبـرمـج بـواسـطـة\n\n"
-            f"» [{dev1_name}](tg://user?id=1923931101)\n"
-            f"» [{dev2_name}](tg://user?id=5340100457)"
-        ),
+        caption=caption_text,
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(dev1_name, url="tg://user?id=1923931101"),
                 InlineKeyboardButton(dev2_name, url="tg://user?id=5340100457"),
             ],
-            [InlineKeyboardButton("اضـف الـبـوت الى مـجـمـوعـتـك", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]
+            [InlineKeyboardButton("➕ اضـف الـبـوت", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]
         ])
     )
 
@@ -90,15 +100,26 @@ async def dev_ar(client: Client, message: Message):
     except Exception:
         owner_name = "المطور"
 
+    dev_caption = (
+        "╭────⌁TALASHNY⌁────⟤\n"
+        "│╭───────────⟢\n"
+        "╞╡   الـمـطـور الـرسـمـي\n"
+        "╞╡ \n"
+        f"╞╡      {owner_name}\n"
+        "│╰────────────╮\n"
+        "│╭────────────╯\n"
+        "╞╡      TALASHNY BOT\n"
+        "╞╡ \n"
+        "╞╡خـش ع الـزرار وانـت هـتـعـرف\n"
+        "│╰───────────⟢\n"
+        "╰────⌁TALASHNY⌁────⟤"
+    )
     await message.reply_animation(
         animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
-        caption=(
-            "**TALASHNY**\n\n"
-            "مـش مـحـتـاجـيـن نـكـتـب كـلام كـتـيـر\n"
-            "خـش ع الـزرار وانـت هـتـعـرف"
-        ),
+        caption=dev_caption,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(owner_name, url="tg://user?id=1923931101")],
+            [InlineKeyboardButton(f"👑 {owner_name}", url="tg://user?id=1923931101")],
+            [InlineKeyboardButton("➕ اضـف الـبـوت", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
         ])
     )
 
