@@ -20,7 +20,6 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import json, subprocess
-from youtube_search import YoutubeSearch
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 DL_DIR = "/tmp/tgbot_vids"
@@ -31,22 +30,32 @@ os.makedirs(AUDIO_DIR, exist_ok=True)
 
 def ytsearch(query: str):
     """
-    FIX: استخدام YoutubeSearch library للبحث
+    بحث عبر yt-dlp مباشرة — بدل YoutubeSearch المكسورة
+    بترجع: [title, url, duration, thumbnail]  أو  None لو فشل
     """
     try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
-        if not results:
+        cmd = [
+            "yt-dlp", f"ytsearch1:{query}",
+            "--dump-json", "--no-playlist",
+            "--no-download", "--no-warnings", "--ignore-errors",
+            "--extractor-args", "youtube:player_client=android,ios,web",
+        ]
+        if os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if not result.stdout.strip():
+            print(f"[ytsearch] no output: {result.stderr[:200]}")
             return None
-        r = results[0]
-        songname = r.get("title", "Unknown")[:70]
-        url = f"https://youtube.com{r['url_suffix']}"
-        duration_str = r.get("duration", "0:00")
-        duration = duration_str if duration_str else "0:00"
-        thumbnails = r.get("thumbnails", [])
-        thumbnail = thumbnails[0] if thumbnails else ""
+        data = json.loads(result.stdout.strip().split("\n")[0])
+        songname = data.get("title", "Unknown")[:70]
+        url = data.get("webpage_url", "")
+        duration_secs = int(data.get("duration", 0) or 0)
+        mins, secs = divmod(duration_secs, 60)
+        duration = f"{mins}:{secs:02d}"
+        thumbnail = data.get("thumbnail", "")
         return [songname, url, duration, thumbnail]
     except Exception as e:
-        print(f"ytsearch exception: {e}")
+        print(f"[ytsearch error] {e}")
         return None
 
 
