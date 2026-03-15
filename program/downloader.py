@@ -35,8 +35,16 @@ async def song(_, message: Message):
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
-        "format": "bestaudio[ext=m4a]",
+        "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
+        "quiet": True,
+        "geo_bypass": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE
@@ -106,12 +114,13 @@ async def vsong(client, message: Message):
     await message.delete()
     # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
-        "format": "best",
+        "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
-        "prefer_ffmpeg": False,
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
+        "merge_output_format": "mp4",
+        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE

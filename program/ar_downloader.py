@@ -21,7 +21,18 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {"format": "bestaudio[ext=m4a]", "outtmpl": "%(title)s.%(ext)s"}
+    ydl_ops = {
+        "format": "bestaudio/best",
+        "outtmpl": "%(title)s.%(ext)s",
+        "quiet": True,
+        "geo_bypass": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
+    }
     audio_file = None
     thumb_name = None
     try:
@@ -69,8 +80,15 @@ async def song(_, message: Message):
 @Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
 async def vsong(client, message: Message):
     await message.delete()
-    ydl_opts = {"format": "best", "keepvideo": True, "geo_bypass": True,
-                "outtmpl": "%(title)s.%(ext)s", "quiet": True}
+    ydl_opts = {
+        "format": "bestvideo[height<=720]+bestaudio/best",
+        "keepvideo": True,
+        "geo_bypass": True,
+        "outtmpl": "%(title)s.%(ext)s",
+        "quiet": True,
+        "merge_output_format": "mp4",
+        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
+    }
     query = " ".join(message.command[1:])
     if not query:
         return await message.reply("» أرسل اسم الفيديو بعد الأمر")
