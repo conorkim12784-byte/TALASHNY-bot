@@ -50,29 +50,49 @@ def ytsearch(query: str):
         return None
 
 
-def _base_cmd():
+def _base_cmd(with_cookies=False):
+    """
+    android_vr: مش محتاج JS لفك التشفير لكن مش بيدعم cookies
+    web: بيدعم cookies لكن محتاج JS
+    الحل: نجرب android_vr بدون cookies أولاً، لو فشل نجرب web مع cookies
+    """
     cmd = [
         "yt-dlp",
         "--extractor-args", "youtube:player_client=android_vr",
         "--no-playlist",
     ]
-    if os.path.exists(COOKIES_FILE):
+    if with_cookies and os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     return cmd
 
 
-async def ytdl_audio(link):
-    cmd = _base_cmd() + ["-g", "-f", "bestaudio/best", link]
+async def _run_ytdlp(cmd):
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
-    out = stdout.decode().strip()
+    return stdout.decode().strip(), stderr.decode()
+
+
+async def ytdl_audio(link):
+    # محاولة 1: android_vr بدون cookies (مش محتاج JS)
+    cmd = _base_cmd(with_cookies=False) + ["-g", "-f", "bestaudio/best", link]
+    out, err = await _run_ytdlp(cmd)
     if out:
         return 1, out.split("\n")[0]
-    return 0, stderr.decode()
+
+    # محاولة 2: web مع cookies (لو android_vr فشل)
+    cmd2 = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio/best"]
+    if os.path.exists(COOKIES_FILE):
+        cmd2 += ["--cookies", COOKIES_FILE]
+    cmd2.append(link)
+    out2, err2 = await _run_ytdlp(cmd2)
+    if out2:
+        return 1, out2.split("\n")[0]
+
+    return 0, err2 or err
 
 
 ytdl = ytdl_audio
@@ -80,7 +100,7 @@ ytdl = ytdl_audio
 
 async def ytdl_video(link, quality=720):
     uid = uuid.uuid4().hex[:8]
-    out = os.path.join(DL_DIR, f"{uid}.%(ext)s")
+    out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best[height<=480]"
@@ -89,19 +109,24 @@ async def ytdl_video(link, quality=720):
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
 
-    cmd = _base_cmd() + ["-f", fmt, "-o", out, "--merge-output-format", "mp4", link]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-
+    # محاولة 1: android_vr بدون cookies
+    cmd = _base_cmd(with_cookies=False) + ["-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4", link]
+    await _run_ytdlp(cmd)
     for f in os.listdir(DL_DIR):
         if f.startswith(uid):
             return 1, os.path.join(DL_DIR, f)
 
-    return 0, stderr.decode()
+    # محاولة 2: web مع cookies
+    cmd2 = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+    if os.path.exists(COOKIES_FILE):
+        cmd2 += ["--cookies", COOKIES_FILE]
+    cmd2.append(link)
+    _, err = await _run_ytdlp(cmd2)
+    for f in os.listdir(DL_DIR):
+        if f.startswith(uid):
+            return 1, os.path.join(DL_DIR, f)
+
+    return 0, err
 
 
 def get_video_quality(Q):
