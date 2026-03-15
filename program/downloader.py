@@ -1,26 +1,47 @@
 # Copyright (C) 2021 By Amor Music-Project
-# Fixed: song() converted to async, lyric API replaced, cleanup improved
-# FIX: أضفنا cookies لـ yt_dlp عشان YouTube بيطلب authentication
+# Fixed: YoutubeSearch استبدلناها بـ yt-dlp مباشرة عشان youtube_search بايظة
 
 from __future__ import unicode_literals
-
 import asyncio
+import json
 import os
-
+import subprocess
 import requests
 import wget
 import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
-from youtube_search import YoutubeSearch
 from yt_dlp import YoutubeDL
-
 from config import BOT_USERNAME as bn
 from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
-# FIX: مسار الـ cookies
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
+
+def _ytsearch(query: str):
+    """بحث عبر yt-dlp بدل youtube_search المكسورة"""
+    try:
+        cmd = [
+            "yt-dlp", f"ytsearch1:{query}",
+            "--dump-json", "--no-playlist",
+            "--no-download", "--no-warnings", "--ignore-errors",
+            "--extractor-args", "youtube:player_client=android,ios,web",
+        ]
+        if os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if not result.stdout.strip():
+            return None
+        data = json.loads(result.stdout.strip().split("\n")[0])
+        title = data.get("title", "Unknown")[:40]
+        url = data.get("webpage_url", "")
+        duration_secs = int(data.get("duration", 0) or 0)
+        thumbnail = data.get("thumbnail", "")
+        return title, url, duration_secs, thumbnail
+    except Exception as e:
+        print(f"[ytsearch error] {e}")
+        return None
 
 
 # ─────────────────────────────────────────
@@ -33,7 +54,6 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
         "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
@@ -53,19 +73,15 @@ async def song(_, message: Message):
     thumb_name = None
 
     try:
-        results = await asyncio.to_thread(
-            lambda: YoutubeSearch(query, max_results=1).to_dict()
-        )
-        link = f"https://youtube.com{results[0]['url_suffix']}"
-        title = results[0]["title"][:40]
-        thumbnail = results[0]["thumbnails"][0]
-        thumb_name = f"{title}.jpg"
-        thumb_data = await asyncio.to_thread(
-            requests.get, thumbnail, allow_redirects=True
-        )
-        with open(thumb_name, "wb") as f:
-            f.write(thumb_data.content)
-        duration = results[0]["duration"]
+        search = await asyncio.to_thread(_ytsearch, query)
+        if not search:
+            return await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+        title, link, duration_secs, thumbnail = search
+        if thumbnail:
+            thumb_name = f"{title}.jpg"
+            thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
+            with open(thumb_name, "wb") as f:
+                f.write(thumb_data.content)
     except Exception as e:
         await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
@@ -79,20 +95,13 @@ async def song(_, message: Message):
                 return ydl.prepare_filename(info_dict)
 
         audio_file = await asyncio.to_thread(download_audio)
+        if audio_file and not os.path.exists(audio_file):
+            base = os.path.splitext(audio_file)[0]
+            audio_file = base + ".mp3"
         rep = f"**🎧 الرافع @{bn}**"
-        secmul, dur, dur_arr = 1, 0, duration.split(":")
-        for i in range(len(dur_arr) - 1, -1, -1):
-            dur += int(float(dur_arr[i])) * secmul
-            secmul *= 60
         await m.edit("📤 جاري رفع الملف...")
-        await message.reply_audio(
-            audio_file,
-            caption=rep,
-            thumb=thumb_name,
-            parse_mode="md",
-            title=title,
-            duration=dur,
-        )
+        await message.reply_audio(audio_file, caption=rep, thumb=thumb_name,
+                                   parse_mode="md", title=title, duration=duration_secs)
         await m.delete()
     except Exception as e:
         await m.edit(f"❌ خطأ: {e}")
@@ -112,7 +121,6 @@ async def song(_, message: Message):
 @Client.on_message(command(["vsong", "video"]))
 async def vsong(client, message: Message):
     await message.delete()
-    # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
         "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
@@ -132,11 +140,10 @@ async def vsong(client, message: Message):
     file_name = None
     preview = None
     try:
-        results = await asyncio.to_thread(
-            lambda: YoutubeSearch(query, max_results=1).to_dict()
-        )
-        link = f"https://youtube.com{results[0]['url_suffix']}"
-        thumbnail = results[0]["thumbnails"][0]
+        search = await asyncio.to_thread(_ytsearch, query)
+        if not search:
+            return await message.reply("❌ لم يتم العثور على الفيديو")
+        title, link, duration_secs, thumbnail = search
     except Exception as e:
         return await message.reply(f"❌ **خطأ في البحث:** {e}")
 
@@ -153,14 +160,11 @@ async def vsong(client, message: Message):
         return await msg.edit(f"🚫 **خطأ:** {e}")
 
     try:
-        preview = await asyncio.to_thread(wget.download, thumbnail)
+        if thumbnail:
+            preview = await asyncio.to_thread(wget.download, thumbnail)
         await msg.edit("📤 **جاري رفع الفيديو...**")
-        await message.reply_video(
-            file_name,
-            duration=int(ytdl_data["duration"]),
-            thumb=preview,
-            caption=ytdl_data["title"],
-        )
+        await message.reply_video(file_name, duration=duration_secs,
+                                   thumb=preview, caption=title)
         await msg.delete()
     except Exception as e:
         print(e)
