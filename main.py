@@ -2,9 +2,9 @@ import asyncio
 import subprocess
 import os
 from pytgcalls import idle
+from pyrogram.errors import FloodWait
 from driver.veez import call_py, bot, user
 
-# تثبيت Node.js عشان yt-dlp يقدر يفك تشفير YouTube
 def install_nodejs():
     try:
         result = subprocess.run(["node", "--version"], capture_output=True)
@@ -25,31 +25,61 @@ def install_nodejs():
 
 install_nodejs()
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
-# FIX: نستورد register_stream_end_handler ونمرر call_py الصحيح ليه
 from callsmusic import register_stream_end_handler
 
 
 async def start_bot():
-    await bot.start()
-    print("[INFO]: BOT & UBOT CLIENT STARTED !!")
-    await user.start()
+    # معالجة FloodWait عند تشغيل البوت
+    while True:
+        try:
+            await bot.start()
+            break
+        except FloodWait as e:
+            print(f"[WARN]: FloodWait on bot.start() — waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+
+    print("[INFO]: BOT CLIENT STARTED !!")
+
+    while True:
+        try:
+            await user.start()
+            break
+        except FloodWait as e:
+            print(f"[WARN]: FloodWait on user.start() — waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+
     await call_py.start()
     print("[INFO]: PY-TGCALLS CLIENT STARTED !!")
 
-    # FIX: نسجل handler الـ stream_end على call_py الصحيح
     await register_stream_end_handler(call_py)
     print("[INFO]: STREAM END HANDLER REGISTERED !!")
 
     if GROUP_SUPPORT:
         try:
             await user.join_chat(GROUP_SUPPORT)
+        except FloodWait as e:
+            print(f"[WARN]: FloodWait joining GROUP_SUPPORT — waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+            try:
+                await user.join_chat(GROUP_SUPPORT)
+            except Exception as e:
+                print(f"[WARN]: Could not join GROUP_SUPPORT: {e}")
         except Exception as e:
             print(f"[WARN]: Could not join GROUP_SUPPORT: {e}")
+
     if UPDATES_CHANNEL:
         try:
             await user.join_chat(UPDATES_CHANNEL)
+        except FloodWait as e:
+            print(f"[WARN]: FloodWait joining UPDATES_CHANNEL — waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+            try:
+                await user.join_chat(UPDATES_CHANNEL)
+            except Exception as e:
+                print(f"[WARN]: Could not join UPDATES_CHANNEL: {e}")
         except Exception as e:
             print(f"[WARN]: Could not join UPDATES_CHANNEL: {e}")
+
     await idle()
     print("[INFO]: STOPPING BOT & USERBOT")
     await bot.stop()
