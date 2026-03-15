@@ -25,6 +25,7 @@ SUDO_USERS = list(map(int, getenv("SUDO_USERS", "1491415522 1419419100 211205923
 COMMAND_PREFIXES = list(getenv("COMMAND_PREFIXES", "/ ! . ت م ا غ س ش ك S").split())
 ALIVE_IMG = getenv("ALIVE_IMG", "https://telegra.ph/file/a6c96cdbd066ca2388d06.jpg")
 DURATION_LIMIT = int(getenv("DURATION_LIMIT", "900"))
+YOUTUBE_API_KEY = getenv("YOUTUBE_API_KEY", "")
 IMG_1 = getenv("IMG_1", "https://telegra.ph/file/d6f92c979ad96b2031cba.png")
 IMG_2 = getenv("IMG_2", "https://telegra.ph/file/6213d2673486beca02967.png")
 IMG_3 = getenv("IMG_3", "https://telegra.ph/file/f02efde766160d3ff52d6.png")
