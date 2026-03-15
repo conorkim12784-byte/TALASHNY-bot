@@ -11,7 +11,7 @@ from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
-from pyrogram.types import InlineKeyboardMarkup, Message
+from pyrogram.types import InlineKeyboardMarkup, Message, ChatPermissions
 
 
 @Client.on_message(command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
@@ -180,7 +180,7 @@ async def volume_ar(client, m: Message):
 # أمر: كتم مستخدم (منع الكتابة) — رد على رسالته
 # ══════════════════════════════════════════════════════════
 @Client.on_message(command2(["كتم", "اسكت_المستخدم", "كتم_مستخدم"]) & other_filters)
-@bot_admin_check("restrict")
+@authorized_users_only
 async def silence_user(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -210,7 +210,7 @@ async def silence_user(c: Client, m: Message):
 # أمر: فك كتم مستخدم
 # ══════════════════════════════════════════════════════════
 @Client.on_message(command2(["فك_كتم", "فك كتم", "رفع_كتم", "رفع كتم"]) & other_filters)
-@bot_admin_check("restrict")
+@authorized_users_only
 async def unsilence_user(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
