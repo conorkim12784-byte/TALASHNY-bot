@@ -14,12 +14,12 @@ def stream_markup(user_id):
   bot_username = BOT_USERNAME or "WorldMusicly_Bot"
   buttons = [
     [
-      InlineKeyboardButton(text="• الـقـائـمـه♪", callback_data=f'cbmenu | {user_id}'),
-      InlineKeyboardButton(text="• الـتـحـديـثـات♪", url=channel_url),
+      InlineKeyboardButton(text="الـقـائـمـه", callback_data=f'cbmenu | {user_id}'),
+      InlineKeyboardButton(text="الـتـحـديـثـات", url=channel_url),
     ],
     [
     InlineKeyboardButton(
-                        "♡اضـف الـبـوت لـمـجـمـوعـتـك♡",
+                        "اضـف الـبـوت لـمـجـمـوعـتـك",
                         url=f'https://t.me/{bot_username}?startgroup=true'),
     ],
   ]
@@ -38,7 +38,7 @@ def menu_markup(user_id):
       InlineKeyboardButton(text="🔊", callback_data=f'cbunmute | {user_id}'),
     ],
     [
-      InlineKeyboardButton(text="🗑 اغلاق", callback_data='cls'),
+      InlineKeyboardButton(text="اغلاق", callback_data='cls'),
     ]
   ]
   return buttons
@@ -48,7 +48,7 @@ close_mark = InlineKeyboardMarkup(
   [
     [
       InlineKeyboardButton(
-        "🔙 رجوع", callback_data="cbmenu"
+        "رجوع", callback_data="cbmenu"
       )
     ]
   ]
@@ -59,7 +59,7 @@ back_mark = InlineKeyboardMarkup(
   [
     [
       InlineKeyboardButton(
-        "🔙 رجوع", callback_data="cbmenu"
+        "رجوع", callback_data="cbmenu"
       )
     ]
   ]
