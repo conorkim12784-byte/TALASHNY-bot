@@ -99,8 +99,8 @@ async def start_(client: Client, message: Message):
 @Client.on_message(command(["source"]) & filters.group)
 async def source_cmd(client: Client, message: Message):
     await message.delete()
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption="**TALASHNY**\nتـواصـل مـعـنـا عـبـر الـازرار بـالـاسـفـل",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -118,8 +118,8 @@ async def source_cmd(client: Client, message: Message):
 @Client.on_message(command(["developer", "dev"]) & filters.group)
 async def dev_cmd(client: Client, message: Message):
     await message.delete()
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption="مـش مـحـتـاجـيـن نـكـتـب كـلـام كـتـيـر خـش ع اول زرار وانـت هـتـعـرف",
         reply_markup=InlineKeyboardMarkup(
             [

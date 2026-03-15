@@ -11,7 +11,7 @@ from driver.nowplaying import current_requester
 # ─────────────────────────────────────────
 # أمر: مين في الكول
 # ─────────────────────────────────────────
-@Client.on_message((command(["incall"]) | command2(["في_الكول", "الكول"])) & other_filters)
+@Client.on_message((command(["incall"]) | command2(["في_الكول", "الكول", "كول", "في الكول", "مين_في_الكول", "مين في الكول"])) & other_filters)
 async def who_in_call(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -56,7 +56,7 @@ async def who_in_call(c: Client, m: Message):
 # ─────────────────────────────────────────
 # أمر: مين مشغّل
 # ─────────────────────────────────────────
-@Client.on_message((command(["nowplaying", "np"]) | command2(["مشغّل", "مشغل", "الان"])) & other_filters)
+@Client.on_message((command(["nowplaying", "np"]) | command2(["مشغّل", "مشغل", "الان", "مين_مشغل", "مين مشغل"])) & other_filters)
 async def now_playing(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

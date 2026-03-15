@@ -53,7 +53,7 @@ def _extract_perms(markup) -> set:
 # ═══════════════════════════════════════
 # رفع بوت ادمن
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmin"]) | command2(["رفع بوت", "بوت ادمن"])) & other_filters)
+@Client.on_message((command(["botadmin"]) | command2(["رفع بوت", "بوت ادمن", "رفع مدير", "رفع_مدير"])) & other_filters)
 async def promote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id

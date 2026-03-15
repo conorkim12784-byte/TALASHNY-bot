@@ -174,3 +174,69 @@ async def volume_ar(client, m: Message):
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:
         await m.reply("❌ **قائمة التشغيل فارغه**")
+
+
+# ══════════════════════════════════════════════════════════
+# أمر: كتم مستخدم (منع الكتابة) — رد على رسالته
+# ══════════════════════════════════════════════════════════
+@Client.on_message(command2(["كتم", "اسكت_المستخدم", "كتم_مستخدم"]) & other_filters)
+@bot_admin_check("restrict")
+async def silence_user(c: Client, m: Message):
+    await m.delete()
+    replied = m.reply_to_message
+    if not replied or not replied.from_user:
+        return await m.reply("» **رد على رسالة المستخدم الذي تريد كتمه**")
+
+    target = replied.from_user
+    chat_id = m.chat.id
+
+    try:
+        await c.restrict_chat_member(
+            chat_id,
+            target.id,
+            ChatPermissions(can_send_messages=False)
+        )
+        await m.reply(
+            f"🔇 **تم كتم المستخدم**\n\n"
+            f"👤 **المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
+            f"📋 **السبب:** كتم من قِبل الإدارة\n\n"
+            f"» لفك الكتم استخدم أمر **فك كتم** بالرد على رسالته"
+        )
+    except Exception as e:
+        await m.reply(f"❌ **فشل الكتم:** `{e}`")
+
+
+# ══════════════════════════════════════════════════════════
+# أمر: فك كتم مستخدم
+# ══════════════════════════════════════════════════════════
+@Client.on_message(command2(["فك_كتم", "فك كتم", "رفع_كتم", "رفع كتم"]) & other_filters)
+@bot_admin_check("restrict")
+async def unsilence_user(c: Client, m: Message):
+    await m.delete()
+    replied = m.reply_to_message
+    if not replied or not replied.from_user:
+        return await m.reply("» **رد على رسالة المستخدم الذي تريد فك كتمه**")
+
+    target = replied.from_user
+    chat_id = m.chat.id
+
+    try:
+        await c.restrict_chat_member(
+            chat_id,
+            target.id,
+            ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_add_web_page_previews=True,
+                can_send_polls=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False,
+            )
+        )
+        await m.reply(
+            f"🔊 **تم فك كتم المستخدم**\n\n"
+            f"👤 **المستخدم:** [{target.first_name}](tg://user?id={target.id})"
+        )
+    except Exception as e:
+        await m.reply(f"❌ **فشل فك الكتم:** `{e}`")

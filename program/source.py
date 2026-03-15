@@ -62,8 +62,8 @@ async def source_ar(client: Client, message: Message):
     except Exception:
         dev2_name = "المبرمج الثاني"
 
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+    await message.reply_animation(
+        animation="https://l.top4top.io/m_37262j13p1.mp4",
         caption=(
             "**TALASHNY**\n\n"
             "الـسـورس مـحـمـي — الـبـوت مـبـرمـج بـواسـطـة\n\n"
@@ -90,8 +90,8 @@ async def dev_ar(client: Client, message: Message):
     except Exception:
         owner_name = "المطور"
 
-    await message.reply_photo(
-        photo="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
+    await message.reply_animation(
+        animation="https://i.postimg.cc/wxV3PspQ/1756574872401.gif",
         caption=(
             "**TALASHNY**\n\n"
             "مـش مـحـتـاجـيـن نـكـتـب كـلام كـتـيـر\n"
