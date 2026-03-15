@@ -1,6 +1,29 @@
 import asyncio
+import subprocess
+import os
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
+
+# تثبيت Node.js عشان yt-dlp يقدر يفك تشفير YouTube
+def install_nodejs():
+    try:
+        result = subprocess.run(["node", "--version"], capture_output=True)
+        if result.returncode == 0:
+            print(f"[INFO]: Node.js already installed: {result.stdout.decode().strip()}")
+            return
+    except FileNotFoundError:
+        pass
+    print("[INFO]: Installing Node.js...")
+    try:
+        subprocess.run(
+            "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs",
+            shell=True, check=True
+        )
+        print("[INFO]: Node.js installed successfully")
+    except Exception as e:
+        print(f"[WARN]: Could not install Node.js: {e}")
+
+install_nodejs()
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
 # FIX: نستورد register_stream_end_handler ونمرر call_py الصحيح ليه
 from callsmusic import register_stream_end_handler
