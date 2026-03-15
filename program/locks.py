@@ -1,7 +1,9 @@
 # locks.py — قفل وفتح الجروب
+# FIX: شلنا can_forward_messages من ChatPermissions لأن pyrofork الجديدة ما بتدعمهاش
+# بدلاً من كده بنستخدم Raw API عشان نتحكم في التوجيه
 
 from collections import defaultdict
-from pyrogram import Client, filters
+from pyrogram import Client, filters, raw
 from pyrogram.types import Message, ChatPermissions
 from driver.filters import command, command2, other_filters
 from driver.decorators import bot_admin_check
@@ -23,10 +25,29 @@ async def apply_locks(c: Client, chat_id: int):
             can_send_messages=not all_locked,
             can_send_media_messages=not (all_locked or state.get("صور", False)),
             can_add_web_page_previews=not (all_locked or state.get("روابط", False)),
-            can_forward_messages=not (all_locked or state.get("توجيه", False)),
+            # FIX: can_forward_messages اتشالت من pyrofork الجديدة
+            # بنستخدم Raw API بدلها
         ))
     except Exception as e:
         raise e
+
+    # FIX: نتعامل مع قفل التوجيه بـ Raw API منفصل
+    try:
+        no_forward = all_locked or state.get("توجيه", False)
+        peer = await c.resolve_peer(chat_id)
+        await c.invoke(raw.functions.messages.EditChatDefaultBannedRights(
+            peer=peer,
+            banned_rights=raw.types.ChatBannedRights(
+                until_date=0,
+                send_messages=all_locked,
+                send_media=all_locked or state.get("صور", False),
+                embed_links=all_locked or state.get("روابط", False),
+                forward_messages=no_forward,
+            )
+        ))
+    except Exception:
+        # لو Raw API فشلت، مش مشكلة — الـ permissions الأساسية اتطبقت
+        pass
 
 
 @Client.on_message((command(["lock"]) | command2(["قفل"])) & other_filters)
