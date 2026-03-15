@@ -34,6 +34,7 @@ def ytsearch(query: str):
     """
     try:
         results = YoutubeSearch(query, max_results=1).to_dict()
+        print(f"[DEBUG ytsearch] query={query!r} results={results}")
         if not results:
             return None
         r = results[0]
