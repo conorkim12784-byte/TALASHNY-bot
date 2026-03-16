@@ -1,240 +1,164 @@
 import os
 import random
-import aiofiles
 import aiohttp
-from urllib.parse import unquote
+import aiofiles
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-
-FONT_REGULAR = "driver/source/regular.ttf"
-FONT_MEDIUM = "driver/source/medium.ttf"
 
 W, H = 1280, 720
 
+FONT = "driver/source/regular.ttf"
+FONT_BOLD = "driver/source/medium.ttf"
 
-def _get_fonts():
+
+def fonts():
     try:
-        f_big = ImageFont.truetype(FONT_MEDIUM, 60)
-        f_med = ImageFont.truetype(FONT_REGULAR, 36)
-        f_small = ImageFont.truetype(FONT_REGULAR, 26)
+        big = ImageFont.truetype(FONT_BOLD, 48)
+        med = ImageFont.truetype(FONT, 30)
+        small = ImageFont.truetype(FONT, 22)
     except:
-        f_big = f_med = f_small = ImageFont.load_default()
-    return f_big, f_med, f_small
+        big = med = small = ImageFont.load_default()
+    return big, med, small
 
 
-def _clean_url(url):
-    if not url:
-        return ""
-    if "%" in url:
-        url = unquote(url)
-    return url if url.startswith("http") else ""
-
-
-def _gradient_bg():
-    base = Image.new("RGBA", (W, H))
-    draw = ImageDraw.Draw(base)
-
-    for y in range(H):
-        r = int(15 + y * 0.03)
-        g = int(15 + y * 0.02)
-        b = int(35 + y * 0.05)
-        draw.line([(0, y), (W, y)], fill=(r, g, b))
-
-    return base
-
-
-def _draw_particles(draw):
-    for _ in range(120):
-        x = random.randint(0, W)
-        y = random.randint(0, H)
-        size = random.choice([1, 2, 3])
-
-        draw.ellipse(
-            [x, y, x + size, y + size],
-            fill=(255, 255, 255, random.randint(80, 200))
-        )
-
-
-def make_circle(img, size):
+def circle(img, size):
     img = img.resize((size, size)).convert("RGBA")
 
     mask = Image.new("L", (size, size), 0)
     d = ImageDraw.Draw(mask)
     d.ellipse((0, 0, size, size), fill=255)
 
-    circle = Image.new("RGBA", (size, size))
-    circle.paste(img, (0, 0), mask)
+    out = Image.new("RGBA", (size, size))
+    out.paste(img, (0, 0), mask)
 
-    return circle
-
-
-def _cover_glow(img, cx, cy):
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-
-    gd.ellipse(
-        [cx - 170, cy - 170, cx + 170, cy + 170],
-        fill=(108, 92, 231, 90)
-    )
-
-    glow = glow.filter(ImageFilter.GaussianBlur(80))
-    img.alpha_composite(glow)
+    return out
 
 
-def _draw_vinyl(draw, cx, cy):
-    r_out = 220
+def waveform(draw):
+    base = H - 120
+    for i in range(70):
 
-    draw.ellipse(
-        [cx - r_out, cy - r_out, cx + r_out, cy + r_out],
-        fill=(20, 20, 40),
-        outline=(255, 255, 255, 30),
-        width=2
-    )
+        x = 250 + i * 12
+        h = random.randint(10, 50)
 
-    for r in [200, 180, 160, 140]:
-        draw.ellipse(
-            [cx - r, cy - r, cx + r, cy + r],
-            outline=(255, 255, 255, 15)
+        draw.rectangle(
+            [x, base - h, x + 6, base],
+            fill=(255, 255, 255, 120)
         )
 
 
-def _shadow_text(draw, pos, text, font):
-    x, y = pos
-    draw.text((x + 3, y + 3), text, font=font, fill=(0, 0, 0, 160))
-    draw.text((x, y), text, font=font, fill=(255, 255, 255, 240))
+def watermark(draw):
 
+    try:
+        font = ImageFont.truetype(FONT_BOLD, 32)
+    except:
+        font = ImageFont.load_default()
 
-def _draw_waveform(draw):
-    base_y = H - 120
-    bar_w = 6
-    gap = 4
-
-    for i in range(120):
-        x = 60 + i * (bar_w + gap)
-        h = random.randint(10, 60)
-
-        draw.rounded_rectangle(
-            [x, base_y - h, x + bar_w, base_y],
-            radius=3,
-            fill=(108, 92, 231, random.randint(120, 200))
-        )
-
-
-def _draw_progress(draw, progress=0.4):
-    bar_x = 60
-    bar_y = H - 60
-    bar_w = W - 120
-    bar_h = 6
-
-    draw.rounded_rectangle(
-        [bar_x, bar_y, bar_x + bar_w, bar_y + bar_h],
-        radius=4,
+    draw.text(
+        (W - 220, H - 40),
+        "TALASHNY",
+        font=font,
         fill=(255, 255, 255, 40)
-    )
-
-    prog_w = int(bar_w * progress)
-
-    draw.rounded_rectangle(
-        [bar_x, bar_y, bar_x + prog_w, bar_y + bar_h],
-        radius=4,
-        fill=(108, 92, 231, 230)
-    )
-
-    px = bar_x + prog_w
-
-    draw.ellipse(
-        [px - 8, bar_y - 5, px + 8, bar_y + bar_h + 5],
-        fill=(139, 124, 246)
     )
 
 
 async def thumb(thumbnail, title, userid, ctitle):
 
-    thumbnail = _clean_url(thumbnail)
     os.makedirs("search", exist_ok=True)
 
     thumb_path = f"search/thumb{userid}.png"
 
-    cover_img = None
+    cover = None
 
     if thumbnail:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(thumbnail) as resp:
-                    if resp.status == 200:
-                        async with aiofiles.open(thumb_path, "wb") as f:
-                            await f.write(await resp.read())
+            async with aiohttp.ClientSession() as s:
+                async with s.get(thumbnail) as r:
+                    if r.status == 200:
 
-                        cover_img = Image.open(thumb_path).convert("RGBA")
+                        async with aiofiles.open(thumb_path, "wb") as f:
+                            await f.write(await r.read())
+
+                        cover = Image.open(thumb_path).convert("RGBA")
         except:
             pass
 
-    img = _gradient_bg()
-    draw = ImageDraw.Draw(img, "RGBA")
+    if cover:
 
-    _draw_particles(draw)
+        bg = cover.resize((W, H))
+        bg = bg.filter(ImageFilter.GaussianBlur(25))
 
-    cx, cy = 360, 330
+    else:
 
-    _cover_glow(img, cx, cy)
+        bg = Image.new("RGBA", (W, H), (20, 20, 35))
 
-    draw = ImageDraw.Draw(img, "RGBA")
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 150))
+    bg.alpha_composite(overlay)
 
-    _draw_vinyl(draw, cx, cy)
+    draw = ImageDraw.Draw(bg)
 
-    if cover_img:
-        size = 240
-        circle = make_circle(cover_img, size)
+    card_w = 520
+    card_h = 340
 
-        img.paste(
-            circle,
-            (cx - size // 2, cy - size // 2),
-            circle
-        )
+    card_x = (W - card_w) // 2
+    card_y = (H - card_h) // 2
 
-        draw.ellipse(
-            [cx - size // 2 - 6, cy - size // 2 - 6,
-             cx + size // 2 + 6, cy + size // 2 + 6],
-            outline=(108, 92, 231, 200),
-            width=5
-        )
+    card = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 40))
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ov = ImageDraw.Draw(overlay)
+    card = card.filter(ImageFilter.GaussianBlur(1))
 
-    ov.rectangle(
-        [0, H - 180, W, H],
-        fill=(10, 10, 20, 210)
-    )
+    bg.paste(card, (card_x, card_y), card)
 
-    img.alpha_composite(overlay)
+    draw = ImageDraw.Draw(bg)
 
-    draw = ImageDraw.Draw(img, "RGBA")
+    big, med, small = fonts()
 
-    f_big, f_med, f_small = _get_fonts()
+    if cover:
 
-    title = title[:30] + ("..." if len(title) > 30 else "")
-    group = ctitle[:20]
+        cover_circle = circle(cover, 160)
 
-    _shadow_text(draw, (650, H - 150), title, f_big)
+        cx = W // 2 - 80
+        cy = card_y + 30
+
+        bg.paste(cover_circle, (cx, cy), cover_circle)
+
+    title = title[:28]
 
     draw.text(
-        (650, H - 80),
-        f"Playing on: {group}",
-        font=f_med,
-        fill=(180, 170, 240, 220)
+        (W // 2 - 200, card_y + 210),
+        title,
+        font=big,
+        fill=(255, 255, 255)
     )
 
-    _draw_waveform(draw)
+    draw.text(
+        (W // 2 - 200, card_y + 270),
+        f"Playing on: {ctitle}",
+        font=med,
+        fill=(200, 200, 200)
+    )
 
-    _draw_progress(draw)
+    bar_x = W // 2 - 200
+    bar_y = card_y + 310
+    bar_w = 400
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
+        fill=(255, 255, 255, 80)
+    )
+
+    prog = int(bar_w * 0.45)
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + prog, bar_y + 6],
+        fill=(255, 255, 255, 200)
+    )
+
+    waveform(draw)
+
+    watermark(draw)
 
     out = f"search/final{userid}.png"
 
-    img.convert("RGB").save(out, quality=95)
-
-    try:
-        os.remove(thumb_path)
-    except:
-        pass
+    bg.convert("RGB").save(out, quality=95)
 
     return out
