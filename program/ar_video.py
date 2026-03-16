@@ -110,7 +110,8 @@ async def vplay_ar(c: Client, m: Message):
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)
         _thumb_url = IMG_5 if IMG_5 and str(IMG_5).startswith(("http://", "https://")) else None
-        image = await thumb(_thumb_url, songname, m.from_user.id, ctitle)
+        requester_name = m.from_user.first_name or ""
+        image = await thumb(_thumb_url, songname, m.from_user.id, ctitle, requester=requester_name, duration=duration)
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, dl, link, "Video", Q)
             await loser.delete()
@@ -144,7 +145,8 @@ async def vplay_ar(c: Client, m: Message):
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
-            image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
+            requester_name = m.from_user.first_name or ""
+            image = await thumb(thumbnail, songname, m.from_user.id, ctitle, requester=requester_name, duration=0)
             veez, ytlink = await _ytdl_video(url)
             if veez == 0:
                 await loser.edit(f"✘ تم اكتشاف خطأ حاول مجددآ\n\n» `{ytlink}`")

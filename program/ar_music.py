@@ -75,7 +75,8 @@ async def play_ar(c: Client, m: Message):
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)
         _thumb_url = IMG_5 if IMG_5 and str(IMG_5).startswith(("http://", "https://")) else None
-        image = await thumb(_thumb_url, songname, m.from_user.id, ctitle)
+        requester_name = m.from_user.first_name or ""
+        image = await thumb(_thumb_url, songname, m.from_user.id, ctitle, requester=requester_name, duration=duration)
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, dl, link, "Audio", 0)
             buttons = stream_markup(user_id)
@@ -111,7 +112,8 @@ async def play_ar(c: Client, m: Message):
             songname, url, duration, thumbnail = search
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
-            image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
+            requester_name = m.from_user.first_name or ""
+            image = await thumb(thumbnail, songname, m.from_user.id, ctitle, requester=requester_name, duration=int(duration.split(":")[0])*60+int(duration.split(":")[-1]) if ":" in str(duration) else int(duration) if str(duration).isdigit() else 0)
             veez, ytlink = await ytdl(url)
             if veez == 0:
                 await suhu.edit(f"مـشـكـلـة في تـحـمـيـل الاغـنـيـة\n\n» `{ytlink}`")
