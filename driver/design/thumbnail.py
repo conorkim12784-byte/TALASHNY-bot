@@ -2,108 +2,198 @@ import os
 import aiohttp
 import aiofiles
 import random
-import asyncio
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from collections import Counter
 
-# الإعدادات الثابتة
 W, H = 1280, 720
-FONT_REGULAR = "driver/source/regular.ttf"
+
+FONT = "driver/source/regular.ttf"
 FONT_BOLD = "driver/source/medium.ttf"
 
-# وظيفة لتحميل الخطوط مع معالجة الأخطاء
-def get_font(font_path, size):
+
+def load_fonts():
     try:
-        return ImageFont.truetype(font_path, size)
+        title = ImageFont.truetype(FONT_BOLD, 55)
+        text = ImageFont.truetype(FONT, 30)
     except:
-        return ImageFont.load_default()
+        title = text = ImageFont.load_default()
+    return title, text
+
 
 def circle(img, size):
-    img = img.resize((size, size), Image.LANCZOS).convert("RGBA")
+
+    img = img.resize((size, size)).convert("RGBA")
+
     mask = Image.new("L", (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, size, size), fill=255)
-    
-    # إضافة حافة بيضاء حول الدائرة
-    output = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    output.paste(img, (0, 0), mask)
-    return output
+    d = ImageDraw.Draw(mask)
+    d.ellipse((0, 0, size, size), fill=255)
 
-def get_dominant_color(img):
-    img = img.copy()
-    img.thumbnail((100, 100))
+    out = Image.new("RGBA", (size, size))
+    out.paste(img, (0, 0), mask)
+
+    return out
+
+
+def dominant_color(img):
+
+    img = img.resize((100, 100))
     pixels = list(img.getdata())
-    # استبعاد الألوان القريبة جداً من الأسود أو الأبيض تماماً
-    valid_pixels = [p for p in pixels if sum(p[:3]) > 100 and sum(p[:3]) < 650]
-    if not valid_pixels: return (120, 120, 255)
-    return Counter(valid_pixels).most_common(1)[0][0][:3]
 
-async def thumb(thumbnail_url, title, userid, ctitle):
+    r, g, b = Counter(pixels).most_common(1)[0][0]
+
+    return (r, g, b)
+
+
+def glow(base, color):
+
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(glow)
+
+    d.ellipse(
+        [50, 150, 450, 550],
+        fill=(*color, 120)
+    )
+
+    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    base.alpha_composite(glow)
+
+
+def spectrum(draw, color):
+
+    start = 250
+    base = 560
+
+    for i in range(70):
+
+        x = start + i * 12
+        h = random.randint(20, 90)
+
+        draw.rectangle(
+            [x, base - h, x + 7, base],
+            fill=(*color, 200)
+        )
+
+
+def progress(draw, color):
+
+    bar_x = 250
+    bar_y = 620
+    bar_w = 780
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
+        fill=(255,255,255,60)
+    )
+
+    p = int(bar_w * 0.45)
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + p, bar_y + 6],
+        fill=color
+    )
+
+    draw.ellipse(
+        [bar_x+p-6, bar_y-5, bar_x+p+6, bar_y+11],
+        fill=color
+    )
+
+
+def watermark(draw):
+
+    try:
+        font = ImageFont.truetype(FONT_BOLD, 42)
+    except:
+        font = ImageFont.load_default()
+
+    draw.text(
+        (1060, 680),
+        "TALASHNY",
+        font=font,
+        fill=(255,255,255,60)
+    )
+
+
+async def thumb(thumbnail, title, userid, ctitle):
+
     os.makedirs("search", exist_ok=True)
-    path = f"search/raw_{userid}.png"
-    final_path = f"search/final_{userid}.png"
 
-    # 1. تحميل الصورة بذكاء
-    async with aiohttp.ClientSession() as session:
-        async with session.get(thumbnail_url) as resp:
-            if resp.status == 200:
-                content = await resp.read()
-                async with aiofiles.open(path, mode="wb") as f:
-                    await f.write(content)
-                cover = Image.open(path).convert("RGBA")
-            else:
-                cover = Image.new("RGBA", (500, 500), (30, 30, 30))
+    path = f"search/{userid}.png"
 
-    # 2. إنشاء الخلفية (Blur + Overlay)
-    bg = cover.resize((W, H), Image.LANCZOS)
-    bg = bg.filter(ImageFilter.GaussianBlur(50))
-    
-    # طبقة تعتيم متدرجة (Gradient Overlay)
-    dark_overlay = Image.new("RGBA", (W, H), (0, 0, 0, 140))
-    bg.alpha_composite(dark_overlay)
+    cover = None
 
-    # 3. استخراج اللون المسيطر للإضاءة
-    main_color = get_dominant_color(cover)
+    # التحقق من صحة الـ URL قبل الطلب
+    is_valid_url = (
+        thumbnail
+        and isinstance(thumbnail, str)
+        and thumbnail.startswith(("http://", "https://"))
+    )
 
-    # 4. إضافة تأثير الزجاج (Glass Panel)
+    try:
+
+        if not is_valid_url:
+            raise ValueError(f"Invalid thumbnail URL: {thumbnail!r}")
+
+        async with aiohttp.ClientSession() as s:
+            async with s.get(thumbnail) as r:
+
+                if r.status == 200:
+
+                    async with aiofiles.open(path, "wb") as f:
+                        await f.write(await r.read())
+
+                    cover = Image.open(path).convert("RGBA")
+
+    except:
+        pass
+
+    if cover:
+
+        bg = cover.resize((W, H))
+        bg = bg.filter(ImageFilter.GaussianBlur(40))
+
+        color = dominant_color(cover)
+
+    else:
+
+        bg = Image.new("RGBA", (W, H), (20,20,40))
+        color = (120,120,255)
+
+    overlay = Image.new("RGBA", (W, H), (0,0,0,180))
+    bg.alpha_composite(overlay)
+
+    glow(bg, color)
+
     draw = ImageDraw.Draw(bg)
-    panel_shape = [50, 150, 1230, 570]
-    # رسم مستطيل شفاف بخلفية ضبابية خفيفة
-    draw.rounded_rectangle(panel_shape, radius=30, fill=(255, 255, 255, 20))
-    draw.rounded_rectangle(panel_shape, radius=30, outline=(*main_color, 50), width=3)
 
-    # 5. وضع الغلاف الدائري مع ظل
-    cover_circ = circle(cover, 340)
-    bg.paste(cover_circ, (120, 190), cover_circ)
+    title_font, text_font = load_fonts()
 
-    # 6. كتابة النصوص
-    title_font = get_font(FONT_BOLD, 60)
-    tag_font = get_font(FONT_REGULAR, 35)
-    
-    # كتابة العنوان (قص النص لو طويل جداً)
-    clean_title = title[:30] + "..." if len(title) > 30 else title
-    draw.text((500, 240), clean_title, font=title_font, fill=(255, 255, 255))
-    
-    # كتابة مكان التشغيل
-    draw.text((500, 320), f"📍 On: {ctitle}", font=tag_font, fill=(*main_color, 255))
+    if cover:
 
-    # 7. شريط التقدم (Progress Bar) احترافي
-    bar_x, bar_y, bar_w = 500, 480, 650
-    # الخلفية للشريط
-    draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + 8], radius=4, fill=(255, 255, 255, 50))
-    # التقدم (عشوائي للعرض أو يمكن تمريره كـ Parameter)
-    p_width = int(bar_w * 0.6) 
-    draw.rounded_rectangle([bar_x, bar_y, bar_x + p_width, bar_y + 8], radius=4, fill=main_color)
-    draw.ellipse([bar_x + p_width - 8, bar_y - 4, bar_x + p_width + 8, bar_y + 12], fill=(255, 255, 255))
+        cover_circle = circle(cover, 300)
+        bg.paste(cover_circle, (80, 200), cover_circle)
 
-    # 8. إضافة العلامة المائية
-    watermark_font = get_font(FONT_BOLD, 30)
-    draw.text((1100, 660), "TALASHNY", font=watermark_font, fill=(255, 255, 255, 80))
+    draw.text(
+        (450,260),
+        title[:32],
+        font=title_font,
+        fill=(255,255,255)
+    )
 
-    # 9. الحفظ النهائي
-    bg.convert("RGB").save(final_path, "JPEG", quality=90, optimize=True)
-    
-    # تنظيف الملف المؤقت
-    if os.path.exists(path): os.remove(path)
-    
-    return final_path
+    draw.text(
+        (450,340),
+        f"Playing on: {ctitle}",
+        font=text_font,
+        fill=(220,220,220)
+    )
+
+    spectrum(draw, color)
+
+    progress(draw, color)
+
+    watermark(draw)
+
+    out = f"search/final{userid}.png"
+
+    bg.convert("RGB").save(out, quality=95)
+
+    return out
