@@ -81,57 +81,48 @@ async def _run_ytdlp(cmd):
 
 async def ytdl_audio(link):
     """
-    جلب stream URL للصوت.
-    الأولوية: android_vr (بدون JS، بدون cookies) → ios → web+cookies
-    android_vr بيدي audio-only URL مضمون.
+    تحميل الصوت كملف محلي — أكثر استقراراً من stream URL.
+    بيجرب كل الـ clients حتى يلاقي واحد شغال.
     """
-    clients = [
-        ("android_vr",  "bestaudio", False),
-        ("ios",         "bestaudio", False),
-        ("android",     "bestaudio", False),
-        ("mweb",        "bestaudio", False),
-        ("tv_embedded", "bestaudio", False),
-        ("web",         "bestaudio", True),
-    ]
-    last_err = ""
-    for client, fmt, use_cookies in clients:
-        cmd = ["yt-dlp", "--no-playlist",
-               "--extractor-args", f"youtube:player_client={client}",
-               "--proxy", TOR_PROXY,
-               "-g", "-f", fmt,
-               "--format-sort", "acodec:opus,acodec:aac,acodec:mp4a"]
-        if use_cookies and os.path.exists(COOKIES_FILE):
-            cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(link)
-        out, err = await _run_ytdlp(cmd)
-        if out:
-            lines = [l for l in out.split("\n") if l.startswith("http")]
-            if lines:
-                return 1, lines[0]
-        last_err = err
-
-    # آخر محاولة بأبسط شكل ممكن
-    cmd = ["yt-dlp", "--no-playlist", "--proxy", TOR_PROXY,
-           "-g", "-f", "bestaudio",
-           "--format-sort", "acodec:opus,acodec:aac"]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(link)
-    out, err = await _run_ytdlp(cmd)
-    if out:
-        lines = [l for l in out.split("\n") if l.startswith("http")]
-        if lines:
-            return 1, lines[0]
-
-    # محاولة أخيرة — حمّل الملف محلياً بدل stream URL
     uid = __import__("uuid").uuid4().hex[:8]
     audio_dir = "/tmp/tgbot_audio"
     __import__("os").makedirs(audio_dir, exist_ok=True)
     out_tpl = f"{audio_dir}/{uid}.%(ext)s"
-    cmd = ["yt-dlp", "--no-playlist",
-           "--proxy", TOR_PROXY,
-           "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
-           "-o", out_tpl]
+
+    clients = [
+        "tv_embedded",
+        "android_vr",
+        "ios",
+        "android",
+        "mweb",
+        "web",
+    ]
+    last_err = ""
+    for client in clients:
+        cmd = [
+            "yt-dlp", "--no-playlist",
+            "--extractor-args", f"youtube:player_client={client}",
+            "--proxy", TOR_PROXY,
+            "--no-check-formats",
+            "-f", "bestaudio/best",
+            "-o", out_tpl,
+        ]
+        if os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        cmd.append(link)
+        _, last_err = await _run_ytdlp(cmd)
+        for ff in __import__("os").listdir(audio_dir):
+            if ff.startswith(uid):
+                return 1, f"{audio_dir}/{ff}"
+
+    # محاولة أخيرة بدون تحديد client
+    cmd = [
+        "yt-dlp", "--no-playlist",
+        "--proxy", TOR_PROXY,
+        "--no-check-formats",
+        "-f", "bestaudio/best",
+        "-o", out_tpl,
+    ]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(link)
@@ -140,7 +131,7 @@ async def ytdl_audio(link):
         if ff.startswith(uid):
             return 1, f"{audio_dir}/{ff}"
 
-    return 0, last_err or err
+    return 0, last_err
 
 
 ytdl = ytdl_audio
@@ -260,7 +251,7 @@ async def vplay(c: Client, m: Message):
 
     # ── ملف فيديو مرفق ──
     if replied and (replied.video or replied.document):
-        loser = await replied.reply("**🎶**")
+        loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
         dl = await replied.download()
         link = replied.link
         Q = 720
@@ -302,7 +293,7 @@ async def vplay(c: Client, m: Message):
     if len(m.command) < 2:
         return await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
 
-    loser = await c.send_message(chat_id, "**بـحـث**")
+    loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
     query = m.text.split(None, 1)[1]
     Q = 720
     vq = VideoQuality.HD_720p
@@ -312,7 +303,7 @@ async def vplay(c: Client, m: Message):
         return await loser.edit("✔ **لم يتم العثور على نتائج**")
 
     songname, url, duration, thumbnail = search
-    await loser.edit("**⚡**")
+    await loser.edit("📥 **جاري تنزيل الفيديو... (قد يأخذ لحظات)**")
 
     veez, filepath = await ytdl_video(url, Q)
     if veez == 0:
