@@ -101,7 +101,7 @@ async def play_ar(c: Client, m: Message):
         if len(m.command) < 2:
             await m.reply("» عـلـيـك الـرد عـلـى **ملف صوتي** او **اكتب شي للبحث**")
         else:
-            suhu = await c.send_message(chat_id, "**جـاري الـبـحـث...**")
+            suhu = await c.send_message(chat_id, "**🎶**")
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
             if not isinstance(search, list):

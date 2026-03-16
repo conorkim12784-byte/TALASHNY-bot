@@ -22,7 +22,7 @@ async def who_in_call(c: Client, m: Message):
         participants = await call_py.get_participants(chat_id)
 
         if not participants:
-            return await m.reply("🎙 **الدردشة الصوتية فارغة حالياً**")
+            return await m.reply("🎙 **الكول فارغة حالياً**")
 
         call_members = []
         for p in participants:
@@ -36,11 +36,11 @@ async def who_in_call(c: Client, m: Message):
                 continue
 
         if not call_members:
-            return await m.reply("🎙 **الدردشة الصوتية فارغة حالياً**")
+            return await m.reply("🎙 **الكول فارغة حالياً**")
 
         members_text = "\n".join(f"  {i+1}. {u}" for i, u in enumerate(call_members))
         await m.reply(
-            f"🎙 **المتواجدون في الدردشة الصوتية**\n"
+            f"🎙 **المتواجدون في الكول**\n"
             f"**العدد:** `{len(call_members)}`\n\n"
             f"{members_text}"
         )
@@ -62,7 +62,7 @@ async def now_playing(c: Client, m: Message):
     chat_id = m.chat.id
 
     if chat_id not in QUEUE or not QUEUE[chat_id]:
-        return await m.reply("🎵 **لا يوجد شيء يعزف الآن**")
+        return await m.reply("**مـفـيش حـاجه شـغاله**")
 
     current = QUEUE[chat_id][0]
     songname = current[0]
@@ -75,7 +75,7 @@ async def now_playing(c: Client, m: Message):
     else:
         req_text = "**طُلبت بواسطة:** `غير معروف`"
 
-    type_icon = "🎬" if media_type == "Video" else "🎵"
+    type_icon = "🎬" if media_type == "Video" else "🎶"
     type_text = "فيديو" if media_type == "Video" else "صوت"
 
     # قايمة الانتظار
@@ -83,7 +83,7 @@ async def now_playing(c: Client, m: Message):
     queue_text = f"\n📋 **في الانتظار:** `{queue_size - 1}` مقطع" if queue_size > 1 else ""
 
     await m.reply(
-        f"{type_icon} **يعزف الآن**\n\n"
+        f"{type_icon} **شغال  الآن**\n\n"
         f"**الاسم:** `{songname}`\n"
         f"**النوع:** `{type_text}`\n"
         f"{req_text}"

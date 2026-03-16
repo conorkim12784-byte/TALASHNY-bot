@@ -148,21 +148,32 @@ async def cbmenu(_, query: CallbackQuery):
             )
     except Exception:
         return await query.answer("✘ تعذر التحقق من صلاحياتك", show_alert=True)
+
     user_id = query.from_user.id
     buttons = menu_markup(user_id)
+
     if chat_id in QUEUE:
+
+        text = (
+            f"╭────⌁ 𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦 ⌁────⟤\n"
+            f"│ 🎵 {query.message.chat.title}\n"
+            f"│╭────────────⟢\n"
+            f"╞╡ ⏸ ايقاف التشغيل مؤقتاً\n"
+            f"╞╡ ▶️ استئناف التشغيل\n"
+            f"╞╡ 🔇 كتم الصوت\n"
+            f"╞╡ 🔊 الغاء كتم الصوت\n"
+            f"╞╡ ⏹ ايقاف التشغيل\n"
+            f"│╰────────────⟢\n"
+            f"╰────⌁ 𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦 ⌁────⟤"
+        )
+
         await query.edit_message_text(
-            f" **الإعدادات** {query.message.chat.title}\n\n"
-            "⏸  ايقاف التشغيل موقتآ\n"
-            "▶️   استئناف التشغيل\n"
-            "🔇   كتم الصوت\n"
-            "🔊   الغاء كتم الصوت\n"
-            "⏹   ايقاف التشغيل",
+            text,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
+
     else:
         await query.answer("✘ قائمة التشغيل فارغه", show_alert=True)
-
 
 @Client.on_callback_query(filters.regex("cls"))
 async def close(_, query: CallbackQuery):

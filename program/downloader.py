@@ -72,7 +72,7 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
-    m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
+    m = await message.reply("🎶")
     # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
         "format": "bestaudio[ext=m4a]",
@@ -87,7 +87,7 @@ async def song(_, message: Message):
     try:
         res = await _yt_api_search(query)
         if not res:
-            await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+            await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
             return
         title, link, duration, thumbnail = res
         if thumbnail:
@@ -96,7 +96,7 @@ async def song(_, message: Message):
             with open(thumb_name, "wb") as f:
                 f.write(thumb_data.content)
     except Exception as e:
-        await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+        await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
         return
 
@@ -124,7 +124,7 @@ async def song(_, message: Message):
         )
         await m.delete()
     except Exception as e:
-        await m.edit(f"❌ خطأ: {e}")
+        await m.edit(f"✘ خطأ: {e}")
         print(e)
     finally:
         for f in [audio_file, thumb_name]:
@@ -162,10 +162,10 @@ async def vsong(client, message: Message):
     try:
         res = await _yt_api_search(query)
         if not res:
-            return await message.reply("❌ **لم يتم العثور على الفيديو**")
+            return await message.reply("✘ **لم يتم العثور على الفيديو**")
         title_v, link, duration_v, thumbnail = res
     except Exception as e:
-        return await message.reply(f"❌ **خطأ في البحث:** {e}")
+        return await message.reply(f"✘ **خطأ في البحث:** {e}")
 
     try:
         msg = await message.reply("📥 **جاري تحميل الفيديو...**")
@@ -210,7 +210,7 @@ async def lyrics(_, message: Message):
             "» **قم بإرسال اسم الأغنية بعد الأمر**\nمثال: /lyric Fairuz - Ya Ana Ya Ana"
         )
     query = message.text.split(None, 1)[1]
-    rep = await message.reply_text("🔎 **جاري البحث عن كلمات...**")
+    rep = await message.reply_text("**🎶**")
     try:
         parts = query.split("-", 1)
         if len(parts) == 2:
@@ -231,12 +231,12 @@ async def lyrics(_, message: Message):
             await rep.edit(f"🎵 **{query}**\n\n{lyric_text}")
         else:
             await rep.edit(
-                "❌ **لم يتم العثور على كلمات**\n\n"
+                "✘ **لم يتم العثور على كلمات**\n\n"
                 "» جرب الصيغة: /lyric اسم الفنان - اسم الأغنية"
             )
     except Exception as e:
         await rep.edit(
-            "❌ **لم يتم العثور على نتائج كلمات غنائية**\n\n"
+            "✘ **لم يتم العثور على نتائج كلمات غنائية**\n\n"
             "» **يرجى إعطاء اسم أغنية صالح**\n"
             "» مثال: /lyric Fairuz - Nassam Alayna"
         )

@@ -91,7 +91,7 @@ async def skt_ar(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
-            await m.reply("حاضر هسكت اهو 🥲")
+            await m.reply("هـسكت بس اوعا تـضرب")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
     else:

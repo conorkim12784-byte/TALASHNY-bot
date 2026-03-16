@@ -50,12 +50,14 @@ async def _human_time_duration(seconds):
 @Client.on_message(command2(["مبرمج_السورس", "مبرمج السورس", "السورس", "سورس"]) & filters.group)
 async def source_ar(client: Client, message: Message):
     await message.delete()
+
     # جلب first_name للمبرمجين من تيليجرام
     try:
         dev1 = await client.get_users(1923931101)
         dev1_name = dev1.first_name
     except Exception:
         dev1_name = "ძᥲᖇᥱძᥱ᥎Ꭵᥣ"
+
     try:
         dev2 = await client.get_users(5340100457)
         dev2_name = dev2.first_name
@@ -67,25 +69,22 @@ async def source_ar(client: Client, message: Message):
         "│╭───────────⟢\n"
         "╞╡   Date of establishment 2022\n"
         "╞╡ \n"
-        "╞╡This is the simplest thing we have \n"
+        "╞╡This is the simplest thing we have\n"
         "│╰────────────╮\n"
         "│╭────────────╯\n"
-        "╞╡      Source code in Python \n"     
+        "╞╡      Source code in Python\n"
         "│╰───────────⟢\n"
         "╰────⌁TALASHNY⌁────⟤"
     )
+
     await message.reply_animation(
         animation="https://l.top4top.io/m_37262j13p1.mp4",
         caption=caption_text,
         reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(dev1_name, url="tg://user?id=1923931101"),
-                InlineKeyboardButton(dev2_name, url="tg://user?id=5340100457"),
-            ],
-            [InlineKeyboardButton("➕ اضـف الـبـوت", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]
+            [InlineKeyboardButton(dev1_name, url="tg://user?id=1923931101")],
+            [InlineKeyboardButton(dev2_name, url="tg://user?id=5340100457")]
         ])
     )
-
 
 @Client.on_message(command2(["المطور", "مطور"]) & filters.group)
 async def dev_ar(client: Client, message: Message):

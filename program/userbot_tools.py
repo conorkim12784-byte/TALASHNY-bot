@@ -26,7 +26,7 @@ async def join_chat(c: Client, m: Message):
             await user.join_chat(invitelink)
             return await user.send_message(chat_id, "انا جيت اهو يارب مكونش اتٲخرت")
     except UserAlreadyParticipant:
-        return await user.send_message(chat_id, "انا موجود هنا😐")
+        return await user.send_message(chat_id, "تـلاشاني هـنا من بـدري🎶")
 
 @Client.on_message(
     command(["userbotleave"]) & other_filters
@@ -39,12 +39,12 @@ async def leave_chat(_, m: Message):
         await user.leave_chat(chat_id)
         return await _.send_message(
             chat_id,
-            "✅ غادر الحساب المساعد المجموعه بنجاح",
+            "✔ غادر الحساب المساعد المجموعه بنجاح",
         )
     except UserNotParticipant:
         return await _.send_message(
             chat_id,
-            "❌ غادر الحساب المساعد المجموعه بالفعل",
+            "✘ غادر الحساب المساعد المجموعه بالفعل",
         )
         
 @Client.on_message(command(["leaveall"]))
@@ -73,7 +73,7 @@ async def leave_all(client, message):
         await asyncio.sleep(0.7)
     await msg.delete()
     await client.send_message(
-        message.chat.id, f"✅ Left from: {left} chats.\n❌ Failed in: {failed} chats."
+        message.chat.id, f"✔ Left from: {left} chats.\n✘ Failed in: {failed} chats."
     )
     
 @Client.on_message(filters.left_chat_member)

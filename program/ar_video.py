@@ -112,7 +112,7 @@ async def vplay_ar(c: Client, m: Message):
         return
 
     if replied and (replied.video or replied.document):
-        loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
+        loser = await replied.reply("**بـحـث..**")
         dl = await replied.download()
         link = replied.link
         Q = 720

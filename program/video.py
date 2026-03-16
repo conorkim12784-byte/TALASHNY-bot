@@ -260,7 +260,7 @@ async def vplay(c: Client, m: Message):
 
     # ── ملف فيديو مرفق ──
     if replied and (replied.video or replied.document):
-        loser = await replied.reply("📥 **جاري تحميل الفيديو...**")
+        loser = await replied.reply("**🎶**")
         dl = await replied.download()
         link = replied.link
         Q = 720
@@ -302,7 +302,7 @@ async def vplay(c: Client, m: Message):
     if len(m.command) < 2:
         return await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
 
-    loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
+    loser = await c.send_message(chat_id, "**بـحـث**")
     query = m.text.split(None, 1)[1]
     Q = 720
     vq = VideoQuality.HD_720p
@@ -312,7 +312,7 @@ async def vplay(c: Client, m: Message):
         return await loser.edit("✔ **لم يتم العثور على نتائج**")
 
     songname, url, duration, thumbnail = search
-    await loser.edit("📥 **جاري تنزيل الفيديو... (قد يأخذ لحظات)**")
+    await loser.edit("**⚡**")
 
     veez, filepath = await ytdl_video(url, Q)
     if veez == 0:

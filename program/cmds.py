@@ -103,12 +103,34 @@ async def show_commands(c: Client, m: Message):
 async def cmds_back_main(c: Client, query: CallbackQuery):
     try:
         await query.edit_message_caption(
-            "**اختار تصنيف الأوامر اللي عايزه 👇**",
+            "**
+╭────⌁TALASHNY⌁────⟤
+│╭───────────⟢
+╞╡          Command List 
+╞╡ 
+╞╡ Select A Button To Learn More 
+│╰────────────╮
+│╭────────────╯
+╞╡   Enjoy A Unique Experience 
+│╰───────────⟢
+╰────⌁TALASHNY⌁────⟤
+**",
             reply_markup=main_keyboard()
         )
     except Exception:
         await query.edit_message_text(
-            "**اختار تصنيف الأوامر اللي عايزه 👇**",
+            "**
+╭────⌁TALASHNY⌁────⟤
+│╭───────────⟢
+╞╡          Command List 
+╞╡ 
+╞╡ Select A Button To Learn More 
+│╰────────────╮
+│╭────────────╯
+╞╡   Enjoy A Unique Experience 
+│╰───────────⟢
+╰────⌁TALASHNY⌁────⟤
+**",
             reply_markup=main_keyboard()
         )
     await query.answer()

@@ -66,9 +66,8 @@ async def start_(client: Client, message: Message):
 اهـلـا يـبـنـي {message.from_user.mention()} !
 مـرحـبـا بـك انا بـوت اقـوم بـتـشـغـيـل الـاغـانـي فـي الـمـكـالـمـه الـصـوتـيـه.
 يـمـكـنـنـي الـتـشـغـيـل بـصـوت رائـع وبـدون اي مـشـاكـل او تـقـطـيـع فـي الـاغـنـيـه
- + اضـفـنـي الـى مـجـمـوعـتـك وارفـعـنـي رول بـشـكـل مـع كـامـل الـصـلـاحـيـات
+ + اضـفـنـي الـى مـجـمـوعـتـك وارفـعـنـي رول  مـع كـامـل الـصـلـاحـيـات
  الـبـوت يـشـتـغـل بـالـاوامـر عـربـي وانـجـلـيـزي
- لـانـضـمـام الـحـسـاب الـمـسـاعـد لـتـشـغـيـل الـبـوت اكـتـب الاوامر
 ━━━━━━━━━━━━━━━━━━**""",
         reply_markup=InlineKeyboardMarkup(
             [
@@ -130,7 +129,7 @@ async def dev_cmd(client: Client, message: Message):
     )
 
 
-@Client.on_message(command(["شاني", "تلا", "تلاشاني"]) & filters.private)
+@Client.on_message(command(["شاني", "تلا", "تلا"]) & filters.private)
 @sudo_users_only
 async def shadow(c: Client, message: Message):
     start = time()
