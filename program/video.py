@@ -33,12 +33,10 @@ def _parse_duration(seconds) -> str:
 
 
 def ytsearch(query: str):
-    """بحث على SoundCloud عبر yt-dlp — مجاني بدون API"""
+    """بحث على SoundCloud — للأغاني"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -49,45 +47,71 @@ def ytsearch(query: str):
             item = entries[0]
             title = (item.get("title") or query)[:70]
             url = item.get("url") or item.get("webpage_url") or ""
-            duration = _parse_duration(item.get("duration", 0))
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
             thumbnail = item.get("thumbnail") or ""
-            if not url:
-                return None
-            return [title, url, duration, thumbnail]
+            return [title, url, duration, thumbnail] if url else None
     except Exception as e:
         print(f"[scsearch error] {e}")
         return None
 
 
-def _sc_get_url(link: str):
+def ytsearch_yt(query: str):
+    """بحث على YouTube — للفيديو"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio/best",
-        "skip_download": True,
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(link, download=False)
-            url = info.get("url")
-            if not url:
-                fmts = info.get("formats") or []
-                for f in reversed(fmts):
-                    if f.get("url", "").startswith("http"):
-                        url = f["url"]
-                        break
-            return url if url and url.startswith("http") else None
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            thumbnail = item.get("thumbnail") or ""
+            return [title, url, duration, thumbnail] if url else None
     except Exception as e:
-        print(f"[sc_get_url error] {e}")
+        print(f"[ytsearch_yt error] {e}")
+        return None
+
+
+def _dm_search(query: str):
+    """بحث على Dailymotion — مجاني بدون API"""
+    ydl_opts = {
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"dmsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            thumbnail = item.get("thumbnail") or ""
+            return [title, url, duration, thumbnail] if url else None
+    except Exception as e:
+        print(f"[dmsearch error] {e}")
         return None
 
 
 def _sc_download(link: str, out_tpl: str):
+    """تحميل صوت من SoundCloud"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio/best",
-        "outtmpl": out_tpl,
+        "quiet": True, "no_warnings": True,
+        "format": "bestaudio/best", "outtmpl": out_tpl,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -99,14 +123,12 @@ def _sc_download(link: str, out_tpl: str):
 
 
 def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو من YouTube — بيجرب كل الـ clients تلقائياً"""
+    """تحميل فيديو — يجرب YouTube أولاً ثم Dailymotion"""
     clients = ["tv_embedded", "web_creator", "ios", "web", "android"]
     for client in clients:
         ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "format": fmt,
-            "outtmpl": out_tpl,
+            "quiet": True, "no_warnings": True,
+            "format": fmt, "outtmpl": out_tpl,
             "merge_output_format": "mp4",
             "extractor_args": {"youtube": {"player_client": [client]}},
         }
@@ -119,62 +141,94 @@ def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
     return "all clients failed"
 
 
+def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
+    """تحميل فيديو من Dailymotion"""
+    ydl_opts = {
+        "quiet": True, "no_warnings": True,
+        "format": fmt, "outtmpl": out_tpl,
+        "merge_output_format": "mp4",
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+        return None
+    except Exception as e:
+        print(f"[dm_dl_video error] {e}")
+        return str(e)
+
+
 async def ytdl_audio(link):
-    """دايماً يحمّل ملف محلي عشان pytgcalls يشتغل صح"""
+    """تحميل صوت من SoundCloud"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
+    await asyncio.to_thread(_sc_download, link, out_tpl)
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
             return 1, os.path.join(AUDIO_DIR, ff)
-    return 0, last_err
+    return 0, "download failed"
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
+    """
+    تحميل فيديو — يجرب YouTube أولاً ثم Dailymotion تلقائياً
+    وبيمسح الملف بعد 10 دقائق
+    """
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
         fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best"
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
+
+    # محاولة 1: YouTube
     await asyncio.to_thread(_yt_download_video, link, out_tpl, fmt)
     for ff in os.listdir(DL_DIR):
         if ff.startswith(uid):
-            return 1, os.path.join(DL_DIR, ff)
+            filepath = os.path.join(DL_DIR, ff)
+            asyncio.create_task(_auto_delete(filepath))
+            return 1, filepath
+
+    # محاولة 2: Dailymotion لو YouTube فشل
+    dm = await asyncio.to_thread(_dm_search, link)
+    if dm:
+        dm_uid = uuid.uuid4().hex[:8]
+        dm_tpl = os.path.join(DL_DIR, f"{dm_uid}.%(ext)s")
+        await asyncio.to_thread(_dm_download_video, dm[1], dm_tpl, fmt)
+        for ff in os.listdir(DL_DIR):
+            if ff.startswith(dm_uid):
+                filepath = os.path.join(DL_DIR, ff)
+                asyncio.create_task(_auto_delete(filepath))
+                return 1, filepath
+
     return 0, "failed"
 
-def ytsearch_yt(query: str):
-    """بحث على YouTube عبر yt-dlp بدون API key"""
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
-        "default_search": "ytsearch1",
-    }
+
+async def _auto_delete(filepath: str, delay: int = 600):
+    """حذف الملف تلقائياً بعد 10 دقائق"""
+    await asyncio.sleep(delay)
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if not entries:
-                return None
-            item = entries[0]
-            title = (item.get("title") or query)[:70]
-            url = item.get("url") or item.get("webpage_url") or ""
-            secs = int(item.get("duration") or 0)
-            mins, s = divmod(secs, 60)
-            h, m = divmod(mins, 60)
-            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-            thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail] if url else None
-    except Exception as e:
-        print(f"[ytsearch_yt error] {e}")
-        return None
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception:
+        pass
+
+def multisearch_video(query: str):
+    """بحث متعدد المصادر: YouTube أولاً ثم Dailymotion"""
+    # YouTube
+    result = ytsearch_yt(query)
+    if result and isinstance(result, list) and len(result) == 4:
+        return result
+    # Dailymotion fallback
+    result = dmsearch(query)
+    if result and isinstance(result, list) and len(result) == 4:
+        return result
+    return None
 
 
 def get_video_quality(Q):
@@ -281,14 +335,14 @@ async def vplay(c: Client, m: Message):
     query = m.text.split(None, 1)[1]
     Q = 720
     vq = VideoQuality.HD_720p
-    search = ytsearch_yt(query)
+    search = multisearch_video(query)
     if not search or not isinstance(search, list) or len(search) != 4:
-        return await loser.edit(f"✔ **لم يتم العثور على نتائج**\n`{search}`")
+        return await loser.edit("✘ **لم يتم العثور على نتائج على YouTube أو Dailymotion**")
     songname, url, duration, thumbnail = search
-    await loser.edit("📥 **جاري تنزيل الفيديو...**")
+    await loser.edit("⏳ **جاري التحميل...**")
     veez, filepath = await ytdl_video(url, Q)
     if veez == 0:
-        return await loser.edit(f"✔ فشل تنزيل الفيديو\n\n» `{filepath[:200]}`")
+        return await loser.edit(f"✘ **فشل التحميل**\n\n» `{filepath[:200]}`")
     gcname = m.chat.title
     ctitle = await CHAT_TITLE(gcname)
     image = await thumb(thumbnail, songname, m.from_user.id, ctitle)

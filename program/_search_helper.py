@@ -1,7 +1,6 @@
-# _search_helper.py — بحث وتحميل عبر SoundCloud (مجاني بدون API key)
+# _search_helper.py — بحث وتحميل عبر SoundCloud و Dailymotion
 
 import asyncio
-import re as _re
 import os
 import uuid
 import yt_dlp
@@ -14,23 +13,20 @@ def _parse_duration(seconds) -> str:
     if not seconds:
         return "0:00"
     seconds = int(seconds)
-    mins, secs = divmod(seconds, 60)
-    hrs, mins = divmod(mins, 60)
-    return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
+    mins, s = divmod(seconds, 60)
+    h, m = divmod(mins, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-def ytsearch(query: str):
-    """بحث على SoundCloud عبر yt-dlp — مجاني بدون API"""
+def _search(query: str, source: str = "scsearch1"):
+    """بحث عام — SoundCloud أو Dailymotion"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "default_search": "scsearch1",
-        "skip_download": True,
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch1:{query}", download=False)
+            info = ydl.extract_info(f"{source}:{query}", download=False)
             entries = info.get("entries") or []
             if not entries:
                 return None
@@ -39,45 +35,25 @@ def ytsearch(query: str):
             url = item.get("url") or item.get("webpage_url") or ""
             duration = _parse_duration(item.get("duration", 0))
             thumbnail = item.get("thumbnail") or ""
-            if not url:
-                return None
-            return [title, url, duration, thumbnail]
+            return [title, url, duration, thumbnail] if url else None
     except Exception as e:
-        print(f"[scsearch error] {e}")
+        print(f"[{source} search error] {e}")
         return None
 
 
-def _sc_get_url(link: str):
-    """جلب stream URL من SoundCloud"""
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio/best",
-        "skip_download": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(link, download=False)
-            url = info.get("url")
-            if not url:
-                fmts = info.get("formats") or []
-                for f in reversed(fmts):
-                    if f.get("url", "").startswith("http"):
-                        url = f["url"]
-                        break
-            return url if url and url.startswith("http") else None
-    except Exception as e:
-        print(f"[sc_get_url error] {e}")
-        return None
+def ytsearch(query: str):
+    """بحث على SoundCloud أولاً، لو مفيش نتيجة يجرب Dailymotion"""
+    result = _search(query, "scsearch1")
+    if not result:
+        result = _search(query, "dmsearch1")
+    return result
 
 
 def _sc_download(link: str, out_tpl: str):
-    """تحميل ملف صوتي من SoundCloud"""
+    """تحميل صوت من SoundCloud"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio/best",
-        "outtmpl": out_tpl,
+        "quiet": True, "no_warnings": True,
+        "format": "bestaudio/best", "outtmpl": out_tpl,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -85,15 +61,16 @@ def _sc_download(link: str, out_tpl: str):
         return None
     except Exception as e:
         print(f"[sc_download error] {e}")
+        # جرب Dailymotion كـ fallback
         return str(e)
 
 
 async def ytdl_audio(link: str):
-    """تحميل ملف صوتي محلي من SoundCloud — pytgcalls محتاج ملف مش URL"""
+    """تحميل صوت محلي"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
+    await asyncio.to_thread(_sc_download, link, out_tpl)
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
             return 1, os.path.join(AUDIO_DIR, ff)
-    return 0, last_err
+    return 0, "download failed"

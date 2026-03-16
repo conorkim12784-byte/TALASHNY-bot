@@ -13,7 +13,7 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import os as _os
-from program.video import ytsearch_yt as _ytsearch_sync
+from program.video import multisearch_video as _ytsearch_sync
 
 TOR_PROXY = "socks5://127.0.0.1:9050"
 

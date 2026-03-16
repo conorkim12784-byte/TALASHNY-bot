@@ -1,25 +1,40 @@
-# ar_youtube.py - بحث عبر yt-dlp (SoundCloud + YouTube)
+# ar_youtube.py - بحث عبر SoundCloud و Dailymotion
 import asyncio
 import yt_dlp
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from driver.filters import command2, other_filters
 from pyrogram import Client
 
-def _search_results(query: str):
-    """بحث على SoundCloud بـ 5 نتائج"""
+
+def _multi_search(query: str, count: int = 5):
+    """بحث على SoundCloud وDailymotion مع بعض"""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
     }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch5:{query}", download=False)
-            return info.get("entries") or []
-    except Exception as e:
-        print(f"[ar_youtube search error] {e}")
-        return []
+    results = []
+    for source in [f"scsearch{count}", f"dmsearch{count}"]:
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"{source}:{query}", download=False)
+                entries = info.get("entries") or []
+                for item in entries:
+                    title = (item.get("title") or "")[:55]
+                    url = item.get("url") or item.get("webpage_url") or ""
+                    secs = int(item.get("duration") or 0)
+                    mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+                    duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                    uploader = item.get("uploader") or item.get("channel") or "—"
+                    src_name = "SoundCloud" if "scsearch" in source else "Dailymotion"
+                    if url:
+                        results.append({
+                            "title": title, "url": url,
+                            "duration": duration, "uploader": uploader,
+                            "source": src_name
+                        })
+        except Exception as e:
+            print(f"[{source} error] {e}")
+    return results[:count]
 
 
 @Client.on_message(command2(["يوت"]))
@@ -30,23 +45,16 @@ async def ytsearch_cmd(_, message: Message):
     query = message.text.split(None, 1)[1]
     m = await message.reply_text("🔎 جاري البحث انتظر قليلآ...")
     try:
-        items = await asyncio.to_thread(_search_results, query)
+        items = await asyncio.to_thread(_multi_search, query)
         if not items:
             return await m.edit("✘ لم يتم العثور على نتائج")
 
         text = ""
         for item in items:
-            title = (item.get("title") or "")[:60]
-            url = item.get("url") or item.get("webpage_url") or ""
-            secs = int(item.get("duration") or 0)
-            mins, s = divmod(secs, 60)
-            h, mn = divmod(mins, 60)
-            duration = f"{h}:{mn:02d}:{s:02d}" if h else f"{mn}:{s:02d}"
-            uploader = item.get("uploader") or item.get("channel") or ""
-            text += f"🏷 **الاسم:** __{title}__\n"
-            text += f"⏱ **المده:** `{duration}`\n"
-            text += f"📣 **الفنان:** {uploader}\n"
-            text += f"🔗 **الرابط:** {url}\n\n"
+            src_icon = "🎵" if item["source"] == "SoundCloud" else "🎬"
+            text += f"{src_icon} **{item['title']}**\n"
+            text += f"⏱ `{item['duration']}` | 📣 {item['uploader']} | __{item['source']}__\n"
+            text += f"🔗 {item['url']}\n\n"
 
         await m.edit(
             text,
