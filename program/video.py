@@ -82,20 +82,29 @@ async def _run_ytdlp(cmd):
 
 async def ytdl_audio(link):
     """
-    تحميل الصوت — بيجرب stream URL أولاً، لو فشل بيحمّل محلياً
+    تحميل الصوت — بيجرب stream URL أولاً بعدة clients، لو فشل بيحمّل محلياً
     """
-    # محاولة 1: stream URL مع extractor_args
-    clients = [
-        ("android_vr", "bestaudio"),
-        ("ios",        "bestaudio"),
-        ("android",    "bestaudio"),
-        ("tv_embedded","bestaudio"),
+    has_cookies = os.path.exists(COOKIES_FILE)
+
+    # ── الـ clients المرتبة من الأقوى للأضعف في تجاوز الـ challenges ──
+    # web_creator و mweb بيشتغلوا بدون Node.js لأن YouTube مش بيطبق n-challenge عليهم
+    stream_attempts = [
+        # (player_client, format, use_cookies)
+        ("mediaconnect",  "bestaudio",                         False),
+        ("web_creator",   "bestaudio",                         has_cookies),
+        ("mweb",          "bestaudio",                         has_cookies),
+        ("web",           "bestaudio",                         has_cookies),
+        ("ios",           "bestaudio[ext=m4a]/bestaudio",       has_cookies),
+        ("android",       "bestaudio",                         has_cookies),
     ]
-    for client, fmt in clients:
-        cmd = ["yt-dlp", "--no-playlist",
-               "--extractor-args", f"youtube:player_client={client}",
-               "-g", "-f", fmt]
-        if os.path.exists(COOKIES_FILE):
+
+    for client, fmt, use_cookies in stream_attempts:
+        cmd = [
+            "yt-dlp", "--no-playlist", "--no-warnings",
+            "--extractor-args", f"youtube:player_client={client}",
+            "-g", "-f", fmt,
+        ]
+        if use_cookies:
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
         out, err = await _run_ytdlp(cmd)
@@ -104,19 +113,23 @@ async def ytdl_audio(link):
             if lines:
                 return 1, lines[0]
 
-    # محاولة 2: تحميل ملف محلي
+    # ── محاولة أخيرة: تحميل ملف محلي ──
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    cmd = ["yt-dlp", "--no-playlist",
-           "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-           "-o", out_tpl]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(link)
-    _, last_err = await _run_ytdlp(cmd)
-    for ff in os.listdir(AUDIO_DIR):
-        if ff.startswith(uid):
-            return 1, os.path.join(AUDIO_DIR, ff)
+    for client in ["mediaconnect", "web_creator", "mweb", "web", "ios", "android"]:
+        cmd = [
+            "yt-dlp", "--no-playlist", "--no-warnings",
+            "--extractor-args", f"youtube:player_client={client}",
+            "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+            "-o", out_tpl,
+        ]
+        if has_cookies:
+            cmd += ["--cookies", COOKIES_FILE]
+        cmd.append(link)
+        _, last_err = await _run_ytdlp(cmd)
+        for ff in os.listdir(AUDIO_DIR):
+            if ff.startswith(uid):
+                return 1, os.path.join(AUDIO_DIR, ff)
 
     return 0, last_err
 
@@ -127,6 +140,7 @@ ytdl = ytdl_audio
 async def ytdl_video(link, quality=720):
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
+    has_cookies = os.path.exists(COOKIES_FILE)
 
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best"
@@ -135,26 +149,19 @@ async def ytdl_video(link, quality=720):
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best"
 
-    for client in ["android_vr", "ios", "android", "tv_embedded"]:
-        cmd = ["yt-dlp", "--no-playlist",
-               "--extractor-args", f"youtube:player_client={client}",
-               "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
-        if os.path.exists(COOKIES_FILE):
+    for client in ["mediaconnect", "web_creator", "mweb", "web", "ios", "android"]:
+        cmd = [
+            "yt-dlp", "--no-playlist", "--no-warnings",
+            "--extractor-args", f"youtube:player_client={client}",
+            "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4",
+        ]
+        if has_cookies:
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
         await _run_ytdlp(cmd)
         for ff in os.listdir(DL_DIR):
             if ff.startswith(uid):
                 return 1, os.path.join(DL_DIR, ff)
-
-    cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(link)
-    await _run_ytdlp(cmd)
-    for ff in os.listdir(DL_DIR):
-        if ff.startswith(uid):
-            return 1, os.path.join(DL_DIR, ff)
 
     return 0, "failed"
 
