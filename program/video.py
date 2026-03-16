@@ -33,28 +33,60 @@ def _parse_duration(seconds) -> str:
 
 
 def ytsearch(query: str):
-    """بحث على SoundCloud — للأغاني"""
+    """بحث الصوت — يبدأ بيوتيوب، لو فشل SoundCloud، لو فشل Dailymotion"""
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
+
+    # محاولة 1: YouTube
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if entries:
+                item = entries[0]
+                title = (item.get("title") or query)[:70]
+                url = item.get("url") or item.get("webpage_url") or ""
+                secs = int(item.get("duration") or 0)
+                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                thumbnail = item.get("thumbnail") or ""
+                if url:
+                    print(f"[ytsearch] YouTube: {title}")
+                    return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ytsearch YT] {e}")
+
+    # محاولة 2: SoundCloud
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"scsearch1:{query}", download=False)
             entries = info.get("entries") or []
-            if not entries:
-                return None
-            item = entries[0]
-            title = (item.get("title") or query)[:70]
-            url = item.get("url") or item.get("webpage_url") or ""
-            secs = int(item.get("duration") or 0)
-            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-            thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail] if url else None
+            if entries:
+                item = entries[0]
+                title = (item.get("title") or query)[:70]
+                url = item.get("url") or item.get("webpage_url") or ""
+                secs = int(item.get("duration") or 0)
+                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                thumbnail = item.get("thumbnail") or ""
+                if url:
+                    print(f"[ytsearch] SoundCloud: {title}")
+                    return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[scsearch error] {e}")
-        return None
+        print(f"[ytsearch SC] {e}")
+
+    # محاولة 3: Dailymotion
+    try:
+        result = _dm_search(query)
+        if result:
+            print(f"[ytsearch] Dailymotion: {result[0]}")
+            return result
+    except Exception as e:
+        print(f"[ytsearch DM] {e}")
+
+    return None
 
 
 def ytsearch_yt(query: str):
@@ -157,14 +189,46 @@ def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
         return str(e)
 
 
+def _yt_download_audio(link: str, out_tpl: str) -> str | None:
+    """تحميل صوت من يوتيوب — بدون فيديو خالص"""
+    clients = ["tv_embedded", "web_creator", "ios", "web", "android"]
+    for client in clients:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "format": "bestaudio/best",
+            "outtmpl": out_tpl,
+            "extractor_args": {"youtube": {"player_client": [client]}},
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+            return None
+        except Exception as e:
+            print(f"[yt_audio {client}] {e}")
+    return "all clients failed"
+
+
 async def ytdl_audio(link):
-    """تحميل صوت من SoundCloud"""
+    """تحميل صوت — يبدأ بيوتيوب، لو فشل يجرب SoundCloud"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    await asyncio.to_thread(_sc_download, link, out_tpl)
+
+    # محاولة 1: YouTube صوت فقط
+    err = await asyncio.to_thread(_yt_download_audio, link, out_tpl)
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
+            print(f"[ytdl_audio] downloaded from YouTube")
             return 1, os.path.join(AUDIO_DIR, ff)
+
+    # محاولة 2: SoundCloud كـ fallback
+    sc_uid = uuid.uuid4().hex[:8]
+    sc_tpl = os.path.join(AUDIO_DIR, f"{sc_uid}.%(ext)s")
+    await asyncio.to_thread(_sc_download, link, sc_tpl)
+    for ff in os.listdir(AUDIO_DIR):
+        if ff.startswith(sc_uid):
+            print(f"[ytdl_audio] downloaded from SoundCloud fallback")
+            return 1, os.path.join(AUDIO_DIR, ff)
+
     return 0, "download failed"
 
 
