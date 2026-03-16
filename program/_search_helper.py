@@ -89,18 +89,11 @@ def _sc_download(link: str, out_tpl: str):
 
 
 async def ytdl_audio(link: str):
-    """جلب stream URL أو تحميل ملف من SoundCloud"""
-    # محاولة 1: stream URL مباشر
-    url = await asyncio.to_thread(_sc_get_url, link)
-    if url:
-        return 1, url
-
-    # محاولة 2: تحميل ملف محلي
+    """تحميل ملف صوتي محلي من SoundCloud — pytgcalls محتاج ملف مش URL"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
     last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
             return 1, os.path.join(AUDIO_DIR, ff)
-
     return 0, last_err

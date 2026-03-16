@@ -116,9 +116,7 @@ def _sc_download_video(link: str, out_tpl: str, fmt: str):
 
 
 async def ytdl_audio(link):
-    url = await asyncio.to_thread(_sc_get_url, link)
-    if url:
-        return 1, url
+    """دايماً يحمّل ملف محلي عشان pytgcalls يشتغل صح"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
     last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
