@@ -30,6 +30,23 @@ def install_nodejs():
         print(f"[WARN]: Could not install Node.js: {e}")
 
 install_nodejs()
+
+# ── تأكد إن Node.js في الـ PATH عشان yt-dlp يلاقيه ──
+import shutil
+_node = shutil.which("node")
+if _node:
+    _node_dir = os.path.dirname(_node)
+    if _node_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = _node_dir + ":" + os.environ.get("PATH", "")
+    print(f"[INFO]: Node.js path confirmed: {_node}")
+else:
+    # جرب المسارات الشائعة
+    for _p in ["/usr/local/bin", "/usr/bin", "/app/.nvm/versions/node/v20.11.0/bin"]:
+        if os.path.exists(os.path.join(_p, "node")):
+            os.environ["PATH"] = _p + ":" + os.environ.get("PATH", "")
+            print(f"[INFO]: Node.js found at {_p}")
+            break
+
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
 from callsmusic import register_stream_end_handler
 
