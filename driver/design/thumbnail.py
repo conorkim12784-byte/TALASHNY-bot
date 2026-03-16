@@ -1,189 +1,158 @@
 import os
 import aiohttp
 import aiofiles
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps, ImageStat
 import random
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from collections import Counter
+import asyncio
 
+# ─── Config ────────────────────────────────────────
 W, H = 1280, 720
+OUT_DIR = Path("premium_thumbs")
+FONT_DIR = Path("fonts")  # حط فيه Poppins أو Montserrat أو SF Pro (أفضل للـ premium look)
 
-FONT = "driver/source/regular.ttf"
-FONT_BOLD = "driver/source/medium.ttf"
+OUT_DIR.mkdir(exist_ok=True)
 
+FONT_BOLD   = str(FONT_DIR / "Montserrat-SemiBold.ttf")
+FONT_MEDIUM = str(FONT_DIR / "Montserrat-Medium.ttf")
+FONT_REG    = str(FONT_DIR / "Montserrat-Regular.ttf")
 
-def load_fonts():
-    try:
-        title = ImageFont.truetype(FONT_BOLD, 55)
-        text = ImageFont.truetype(FONT, 30)
-    except:
-        title = text = ImageFont.load_default()
-    return title, text
+# ─── Helpers ────────────────────────────────────────
+def get_font(path: str, size: int):
+    try: return ImageFont.truetype(path, size)
+    except: return ImageFont.load_default()
 
-
-def circle(img, size):
-
-    img = img.resize((size, size)).convert("RGBA")
-
-    mask = Image.new("L", (size, size), 0)
-    d = ImageDraw.Draw(mask)
-    d.ellipse((0, 0, size, size), fill=255)
-
-    out = Image.new("RGBA", (size, size))
-    out.paste(img, (0, 0), mask)
-
-    return out
-
-
-def dominant_color(img):
-
-    img = img.resize((100, 100))
-    pixels = list(img.getdata())
-
-    r, g, b = Counter(pixels).most_common(1)[0][0]
-
+def dominant_vibrant_color(img: Image.Image):
+    img = img.convert("RGB").resize((80, 80), Image.Resampling.LANCZOS)
+    stat = ImageStat.Stat(img)
+    r, g, b = [int(x) for x in stat.median]
+    # نضمن إن اللون مش رمادي أوي ويكون vibrant
+    if max(r,g,b) - min(r,g,b) < 40:
+        return (90, 140, 255)  # fallback أزرق premium
     return (r, g, b)
 
+def glass_effect(base: Image.Image, blur_radius=25, opacity=110):
+    """ Simulate glassmorphism: blur + dark overlay + border """
+    blurred = base.filter(ImageFilter.GaussianBlur(blur_radius))
+    overlay = Image.new("RGBA", base.size, (20, 20, 40, opacity))
+    glass = Image.alpha_composite(blurred.convert("RGBA"), overlay)
+    
+    # subtle border glow
+    border = Image.new("RGBA", base.size, (0,0,0,0))
+    d = ImageDraw.Draw(border)
+    d.rectangle((2,2, W-3, H-3), outline=(255,255,255,40), width=2)
+    glass.alpha_composite(border)
+    return glass
 
-def glow(base, color):
-
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(glow)
-
-    d.ellipse(
-        [50, 150, 450, 550],
-        fill=(*color, 120)
-    )
-
-    glow = glow.filter(ImageFilter.GaussianBlur(120))
-    base.alpha_composite(glow)
-
-
-def spectrum(draw, color):
-
-    start = 250
-    base = 560
-
-    for i in range(70):
-
-        x = start + i * 12
-        h = random.randint(20, 90)
-
-        draw.rectangle(
-            [x, base - h, x + 7, base],
-            fill=(*color, 200)
-        )
-
-
-def progress(draw, color):
-
-    bar_x = 250
-    bar_y = 620
-    bar_w = 780
-
-    draw.rectangle(
-        [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
-        fill=(255,255,255,60)
-    )
-
-    p = int(bar_w * 0.45)
-
-    draw.rectangle(
-        [bar_x, bar_y, bar_x + p, bar_y + 6],
-        fill=color
-    )
-
-    draw.ellipse(
-        [bar_x+p-6, bar_y-5, bar_x+p+6, bar_y+11],
-        fill=color
-    )
-
-
-def watermark(draw):
-
+async def download(url: str, path: Path):
     try:
-        font = ImageFont.truetype(FONT_BOLD, 42)
-    except:
-        font = ImageFont.load_default()
-
-    draw.text(
-        (1060, 680),
-        "TALASHNY",
-        font=font,
-        fill=(255,255,255,60)
-    )
-
-
-async def thumb(thumbnail, title, userid, ctitle):
-
-    os.makedirs("search", exist_ok=True)
-
-    path = f"search/{userid}.png"
-
-    cover = None
-
-    try:
-
         async with aiohttp.ClientSession() as s:
-            async with s.get(thumbnail) as r:
-
+            async with s.get(url, timeout=10) as r:
                 if r.status == 200:
-
                     async with aiofiles.open(path, "wb") as f:
                         await f.write(await r.read())
-
-                    cover = Image.open(path).convert("RGBA")
-
+                    return True
     except:
-        pass
+        return False
 
-    if cover:
+# ─── Premium Generator ────────────────────────────────────────
+async def generate_premium_thumbnail(
+    thumbnail_url: str,
+    song_title: str,
+    artist_or_channel: str,
+    user_id: str,
+    progress: float = 0.68,          # 0.0 → 1.0
+    style: str = "glass_dark"        # "glass_dark", "glass_light", "neon_premium"
+) -> Path:
+    user_id = str(user_id)
+    tmp = OUT_DIR / f"tmp_{user_id}.jpg"
+    out = OUT_DIR / f"premium_{user_id}.png"
 
-        bg = cover.resize((W, H))
-        bg = bg.filter(ImageFilter.GaussianBlur(40))
-
-        color = dominant_color(cover)
-
+    downloaded = await download(thumbnail_url, tmp)
+    
+    if downloaded:
+        cover = Image.open(tmp).convert("RGB")
+        bg = cover.resize((W, H), Image.Resampling.LANCZOS)
+        accent = dominant_vibrant_color(cover)
     else:
+        bg = Image.new("RGB", (W, H), (8, 8, 25))
+        accent = (100, 180, 255)
 
-        bg = Image.new("RGBA", (W, H), (20,20,40))
-        color = (120,120,255)
+    # Glassmorphism base
+    bg = glass_effect(bg, blur_radius=30, opacity=125 if "dark" in style else 80)
 
-    overlay = Image.new("RGBA", (W, H), (0,0,0,180))
-    bg.alpha_composite(overlay)
+    draw = ImageDraw.Draw(bg, "RGBA")
 
-    glow(bg, color)
+    # ─── Big Circular Art with shine ────────────────────────────────
+    if downloaded:
+        cover = Image.open(tmp).convert("RGBA")
+        cover = cover.resize((420, 420), Image.Resampling.LANCZOS)
+        
+        mask = Image.new("L", (420, 420), 0)
+        ImageDraw.Draw(mask).ellipse((0,0,420,420), fill=255)
+        
+        # subtle shine / bevel effect
+        shine = Image.new("RGBA", (420,420), (0,0,0,0))
+        sd = ImageDraw.Draw(shine)
+        sd.ellipse((40,40,380,200), fill=(255,255,255,80))
+        shine = shine.filter(ImageFilter.GaussianBlur(60))
+        
+        pos = (70, 150)
+        bg.paste(cover, pos, mask)
+        bg.alpha_composite(shine, pos)
 
-    draw = ImageDraw.Draw(bg)
+        # thin glossy border
+        draw.arc((68,148,492,572), 0, 360, fill=(255,255,255,90), width=3)
 
-    title_font, text_font = load_fonts()
+    # ─── Texts ────────────────────────────────────────────────
+    title_f = get_font(FONT_BOLD, 72)
+    artist_f = get_font(FONT_MEDIUM, 42)
+    small_f = get_font(FONT_REG, 28)
 
-    if cover:
+    song_title = song_title.strip()[:48]
+    # shadow + accent glow
+    x, y = 540, 220
+    draw.text((x+3, y+3), song_title, font=title_f, fill=(0,0,0,180))
+    draw.text((x, y), song_title, font=title_f, fill=(255,255,255))
 
-        cover_circle = circle(cover, 300)
-        bg.paste(cover_circle, (80, 200), cover_circle)
+    artist_text = f" {artist_or_channel[:45]}"
+    draw.text((x, y+110), artist_text, font=artist_f, fill=(220,220,255,230))
 
-    draw.text(
-        (450,260),
-        title[:32],
-        font=title_font,
-        fill=(255,255,255)
-    )
+    # ─── Premium Progress Bar ────────────────────────────────────
+    bar_x, bar_y, bar_w = 540, 420, 680
+    fill_w = int(bar_w * progress)
 
-    draw.text(
-        (450,340),
-        f"Playing on: {ctitle}",
-        font=text_font,
-        fill=(220,220,220)
-    )
+    # background glass bar
+    draw.rounded_rectangle((bar_x, bar_y, bar_x+bar_w, bar_y+16), radius=8, fill=(255,255,255,35))
 
-    spectrum(draw, color)
+    # filled gradient bar
+    if fill_w > 15:
+        grad = Image.new("RGBA", (fill_w, 16), (0,0,0,0))
+        gd = ImageDraw.Draw(grad)
+        gd.rectangle((0,0,fill_w,16), fill=accent)
+        # inner glow
+        glow = grad.filter(ImageFilter.GaussianBlur(8))
+        bg.alpha_composite(glow, (bar_x, bar_y))
+        bg.alpha_composite(grad, (bar_x, bar_y))
 
-    progress(draw, color)
+    # knob / dot
+    if fill_w > 20:
+        draw.ellipse((bar_x+fill_w-24, bar_y-8, bar_x+fill_w+24, bar_y+24), fill=accent)
+        draw.ellipse((bar_x+fill_w-16, bar_y-4, bar_x+fill_w+16, bar_y+20), fill=(255,255,255,160))
 
-    watermark(draw)
+    # ─── Subtle flair ────────────────────────────────────────────
+    if "neon" in style:
+        for i in range(5):
+            alpha = 50 - i*10
+            draw.line((W-80-i*30, H-60, W-50, H-60-i*30), fill=(*accent, alpha), width=3)
 
-    out = f"search/final{userid}.png"
+    # watermark premium style
+    draw.text((W-280, H-60), "PREMIUM • TALASHNY", font=small_f, fill=(255,255,255,100))
 
-    bg.convert("RGB").save(out, quality=95)
+    bg.convert("RGB").save(out, quality=96, optimize=True)
+    
+    if tmp.exists():
+        try: tmp.unlink()
+        except: pass
 
     return out
