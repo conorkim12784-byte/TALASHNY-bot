@@ -90,7 +90,7 @@ async def play(c: Client, m: Message):
         if chat_id in QUEUE:
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
-            image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
+            image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle, requester=m.from_user.first_name)
             pos = add_to_queue(chat_id, songname, dl, link, "Audio", 0)
             buttons = stream_markup(user_id)
             await suhu.delete()
@@ -109,7 +109,7 @@ async def play(c: Client, m: Message):
             try:
                 gcname = m.chat.title
                 ctitle = await CHAT_TITLE(gcname)
-                image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
+                image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle, requester=m.from_user.first_name)
                 await suhu.edit("**⚡**")
                 # صوت بس — بدون فيديو
                 await call_py.play(chat_id, MediaStream(
@@ -161,7 +161,7 @@ async def play(c: Client, m: Message):
 
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)
-        image = await thumb(thumbnail, songname, m.from_user.id, ctitle)
+        image = await thumb(thumbnail, songname, m.from_user.id, ctitle, requester=m.from_user.first_name)
 
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
