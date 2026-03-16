@@ -65,22 +65,36 @@ def _ytsearch_sync(query: str):
 
 
 async def _ytdl_video(link):
-    for client in ["tv_embedded", "ios", "android"]:
-        proc = await asyncio.create_subprocess_exec(
-            "yt-dlp", "--no-playlist",
-            "--extractor-args", f"youtube:player_client={client}",
-            "-g", "-f", "best[height<=?720][width<=?1280]",
-            link,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if stdout:
-            lines = [l for l in stdout.decode().strip().split("\n") if l.startswith("http")]
-            if lines:
-                return 1, lines[0]
-        last_err = stderr.decode()
-    return 0, last_err
+    import yt_dlp, uuid
+    clients = ["tv_embedded", "ios", "android", "web"]
+    COOKIES_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "cookies.txt")
+
+    # محاولة 1: stream URL
+    for client in clients:
+        ydl_opts = {
+            "quiet": True,
+            "format": "best[height<=?720][width<=?1280]/best",
+            "extractor_args": {"youtube": {"player_client": [client]}},
+            "skip_download": True,
+        }
+        if _os.path.exists(COOKIES_FILE):
+            ydl_opts["cookiefile"] = COOKIES_FILE
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(link, download=False)
+                url = info.get("url")
+                if not url:
+                    fmts = info.get("formats") or []
+                    for f in reversed(fmts):
+                        if f.get("url","").startswith("http"):
+                            url = f["url"]
+                            break
+                if url and url.startswith("http"):
+                    return 1, url
+        except Exception as e:
+            print(f"[ar_ytdl_video {client}] {e}")
+
+    return 0, "all clients failed"
 
 
 def _get_vq(Q):

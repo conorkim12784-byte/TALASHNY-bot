@@ -1,12 +1,20 @@
-# _search_helper.py - بيستخدم YouTube API للبحث و yt-dlp مع Tor للتحميل
+# _search_helper.py
 
 import asyncio
 import re as _re
 import requests as _req
 import os
+import yt_dlp
 
-TOR_PROXY = "socks5://127.0.0.1:9050"
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
+
+def _clean_env() -> dict:
+    env = os.environ.copy()
+    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY", "GLOBAL_AGENT_HTTPS_PROXY"]:
+        env.pop(key, None)
+    return env
 
 
 def _parse_iso(iso: str) -> str:
@@ -31,7 +39,6 @@ def ytsearch(query: str):
             params={"part": "snippet", "q": query, "type": "video",
                     "maxResults": 1, "key": YOUTUBE_API_KEY},
             timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
         )
         r.raise_for_status()
         items = r.json().get("items", [])
@@ -45,7 +52,6 @@ def ytsearch(query: str):
             "https://www.googleapis.com/youtube/v3/videos",
             params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
             timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
         )
         r2.raise_for_status()
         detail_items = r2.json().get("items", [])
@@ -59,29 +65,31 @@ def ytsearch(query: str):
 
 
 async def ytdl_audio(link: str):
-    """جلب stream URL للصوت عبر yt-dlp مع Tor proxy"""
-    clients = ["tv_embedded", "ios", "android"]
-    last_err = ""
-    for client in clients:
-        cmd = [
-            "yt-dlp", "--no-playlist",
-            "--extractor-args", f"youtube:player_client={client}",
-            "-g", "-f", "bestaudio",
-            "--format-sort", "acodec:opus,acodec:aac,acodec:mp4a",
-        ]
+    """جلب stream URL للصوت عبر yt-dlp Python API"""
+    clients = ["tv_embedded", "ios", "android", "web"]
+    last_err = "all clients failed"
+
+    def _get_url(client):
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": False,
+            "format": "bestaudio/best",
+            "extractor_args": {"youtube": {"player_client": [client]}},
+            "skip_download": True,
+        }
         if os.path.exists(COOKIES_FILE):
-            cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(link)
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if stdout:
-            lines = [l for l in stdout.decode().strip().split("\n") if l.startswith("http")]
-            if lines:
-                return 1, lines[0]
-        last_err = stderr.decode()
+            ydl_opts["cookiefile"] = COOKIES_FILE
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(link, download=False)
+                url = info.get("url") or (info.get("formats") or [{}])[-1].get("url", "")
+                return url if url and url.startswith("http") else None
+        except Exception as e:
+            return None
+
+    for client in clients:
+        url = await asyncio.to_thread(_get_url, client)
+        if url:
+            return 1, url
 
     return 0, last_err

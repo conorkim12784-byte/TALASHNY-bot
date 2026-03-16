@@ -93,54 +93,99 @@ def _clean_env() -> dict:
     return env
 
 
-async def _run_ytdlp(cmd):
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=_clean_env(),
-    )
-    stdout, stderr = await proc.communicate()
-    return stdout.decode().strip(), stderr.decode()
+
+def _clean_env() -> dict:
+    env = os.environ.copy()
+    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY", "GLOBAL_AGENT_HTTPS_PROXY"]:
+        env.pop(key, None)
+    return env
 
 
-def _build_cmd(client: str) -> list:
-    """يبني base command لـ yt-dlp مع cookies لو موجودة."""
-    cmd = ["yt-dlp", "--no-playlist", "--no-warnings"]
+def _ydl_get_audio_url(link: str, client: str) -> str | None:
+    """yt-dlp Python API - جلب stream URL للصوت"""
+    ydl_opts = {
+        "quiet": True,
+        "format": "bestaudio/best",
+        "extractor_args": {"youtube": {"player_client": [client]}},
+        "skip_download": True,
+        "no_warnings": False,
+    }
     if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd += ["--extractor-args", f"youtube:player_client={client}"]
-    return cmd
+        ydl_opts["cookiefile"] = COOKIES_FILE
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(link, download=False)
+            url = info.get("url")
+            if not url:
+                fmts = info.get("formats") or []
+                for f in reversed(fmts):
+                    if f.get("url", "").startswith("http"):
+                        url = f["url"]
+                        break
+            return url if url and url.startswith("http") else None
+    except Exception as e:
+        print(f"[ydl_audio {client}] {e}")
+        return None
+
+
+def _ydl_download_audio(link: str, client: str, out_tpl: str) -> str | None:
+    """yt-dlp Python API - تحميل ملف صوتي"""
+    ydl_opts = {
+        "quiet": True,
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "extractor_args": {"youtube": {"player_client": [client]}},
+        "outtmpl": out_tpl,
+    }
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+        return None
+    except Exception as e:
+        print(f"[ydl_dl_audio {client}] {e}")
+        return str(e)
+
+
+def _ydl_download_video(link: str, client: str, out_tpl: str, fmt: str) -> str | None:
+    """yt-dlp Python API - تحميل فيديو"""
+    ydl_opts = {
+        "quiet": True,
+        "format": fmt,
+        "extractor_args": {"youtube": {"player_client": [client]}},
+        "outtmpl": out_tpl,
+        "merge_output_format": "mp4",
+    }
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+        return None
+    except Exception as e:
+        print(f"[ydl_dl_video {client}] {e}")
+        return str(e)
 
 
 async def ytdl_audio(link):
-    """
-    تحميل الصوت — بيجرب stream URL أولاً بعدة clients، لو فشل بيحمّل محلياً.
-    """
-    clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
-    # format string فيه fallbacks كتير عشان يشتغل حتى لو format معين مش متاح
-    audio_fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=144]/best"
+    clients = ["tv_embedded", "ios", "android", "web"]
 
-    # محاولة 1: stream URL مباشر (-g)
+    # محاولة 1: stream URL مباشر
     for client in clients:
-        cmd = _build_cmd(client) + ["-g", "-f", audio_fmt, "--format-sort", "abr", link]
-        out, err = await _run_ytdlp(cmd)
-        if out:
-            lines = [l for l in out.split("\n") if l.startswith("http")]
-            if lines:
-                return 1, lines[0]
+        url = await asyncio.to_thread(_ydl_get_audio_url, link, client)
+        if url:
+            return 1, url
 
     # محاولة 2: تحميل ملف محلي
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
     last_err = "all clients failed"
     for client in clients:
-        cmd = _build_cmd(client) + [
-            "-f", audio_fmt,
-            "--format-sort", "abr",
-            "-o", out_tpl, link
-        ]
-        _, last_err = await _run_ytdlp(cmd)
+        last_err = await asyncio.to_thread(_ydl_download_audio, link, client, out_tpl) or "unknown"
         for ff in os.listdir(AUDIO_DIR):
             if ff.startswith(uid):
                 return 1, os.path.join(AUDIO_DIR, ff)
@@ -152,29 +197,24 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
+    if quality == 480:
+        fmt = "bestvideo[height<=480]+bestaudio/best"
+    elif quality == 360:
+        fmt = "bestvideo[height<=360]+bestaudio/best"
+    else:
+        fmt = "bestvideo[height<=720]+bestaudio/best"
+
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-
-    if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
-    elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best"
-    else:
-        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
-
-    clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
+    clients = ["tv_embedded", "ios", "android", "web"]
     for client in clients:
-        cmd = _build_cmd(client) + [
-            "-f", fmt,
-            "--format-sort", "res,vbr",
-            "-o", out_tpl, "--merge-output-format", "mp4", link
-        ]
-        await _run_ytdlp(cmd)
+        await asyncio.to_thread(_ydl_download_video, link, client, out_tpl, fmt)
         for ff in os.listdir(DL_DIR):
             if ff.startswith(uid):
                 return 1, os.path.join(DL_DIR, ff)
 
     return 0, "failed"
+
 
 def get_video_quality(Q):
     if Q == 480:
