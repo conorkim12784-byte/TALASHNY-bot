@@ -6,6 +6,7 @@ RUN apt-get update \
         git \
         curl \
         xz-utils \
+        tor \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -20,4 +21,6 @@ COPY . /app/
 WORKDIR /app/
 RUN pip3 install --no-cache-dir --upgrade pip \
     && pip3 install --no-cache-dir -r requirements.txt
-CMD ["python3", "main.py"]
+
+# تشغيل Tor قبل البوت
+CMD tor --RunAsDaemon 1 --SocksPort 9050 && sleep 3 && python3 main.py
