@@ -98,21 +98,25 @@ def _sc_download(link: str, out_tpl: str):
         return str(e)
 
 
-def _sc_download_video(link: str, out_tpl: str, fmt: str):
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": fmt,
-        "outtmpl": out_tpl,
-        "merge_output_format": "mp4",
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-        return None
-    except Exception as e:
-        print(f"[sc_dl_video error] {e}")
-        return str(e)
+def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
+    """تحميل فيديو من YouTube — بيجرب كل الـ clients تلقائياً"""
+    clients = ["tv_embedded", "web_creator", "ios", "web", "android"]
+    for client in clients:
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "format": fmt,
+            "outtmpl": out_tpl,
+            "merge_output_format": "mp4",
+            "extractor_args": {"youtube": {"player_client": [client]}},
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+            return None
+        except Exception as e:
+            print(f"[yt_dl_video {client}] {e}")
+    return "all clients failed"
 
 
 async def ytdl_audio(link):
@@ -131,18 +135,47 @@ ytdl = ytdl_audio
 
 async def ytdl_video(link, quality=720):
     if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best"
+        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best"
+        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best"
     else:
-        fmt = "bestvideo[height<=720]+bestaudio/best"
+        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-    await asyncio.to_thread(_sc_download_video, link, out_tpl, fmt)
+    await asyncio.to_thread(_yt_download_video, link, out_tpl, fmt)
     for ff in os.listdir(DL_DIR):
         if ff.startswith(uid):
             return 1, os.path.join(DL_DIR, ff)
     return 0, "failed"
+
+def ytsearch_yt(query: str):
+    """بحث على YouTube عبر yt-dlp بدون API key"""
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "skip_download": True,
+        "default_search": "ytsearch1",
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60)
+            h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            thumbnail = item.get("thumbnail") or ""
+            return [title, url, duration, thumbnail] if url else None
+    except Exception as e:
+        print(f"[ytsearch_yt error] {e}")
+        return None
+
 
 def get_video_quality(Q):
     if Q == 480:
@@ -248,7 +281,7 @@ async def vplay(c: Client, m: Message):
     query = m.text.split(None, 1)[1]
     Q = 720
     vq = VideoQuality.HD_720p
-    search = ytsearch(query)
+    search = ytsearch_yt(query)
     if not search or not isinstance(search, list) or len(search) != 4:
         return await loser.edit(f"✔ **لم يتم العثور على نتائج**\n`{search}`")
     songname, url, duration, thumbnail = search
