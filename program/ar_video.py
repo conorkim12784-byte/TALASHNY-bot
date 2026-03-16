@@ -109,7 +109,8 @@ async def vplay_ar(c: Client, m: Message):
         vq = _get_vq(Q)
         gcname = m.chat.title
         ctitle = await CHAT_TITLE(gcname)
-        image = await thumb(f"{IMG_5}", songname, m.from_user.id, ctitle)
+        _thumb_url = IMG_5 if IMG_5 and str(IMG_5).startswith(("http://", "https://")) else None
+        image = await thumb(_thumb_url, songname, m.from_user.id, ctitle)
         if chat_id in QUEUE:
             pos = add_to_queue(chat_id, songname, dl, link, "Video", Q)
             await loser.delete()
