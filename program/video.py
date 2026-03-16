@@ -1,9 +1,8 @@
-# Copyright (C) 2021 By Veez Music-Project
-
 import re
 import asyncio
 import os
 import uuid
+import socket
 
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5, YOUTUBE_API_KEY
 from program.utils.inline import stream_markup
@@ -28,17 +27,28 @@ os.makedirs(DL_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
+def _is_tor_alive() -> bool:
+    """تشيك لو Tor شغال على البورت 9050"""
+    try:
+        s = socket.create_connection(("127.0.0.1", 9050), timeout=2)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
 def ytsearch(query: str):
     """بحث عبر YouTube Data API v3"""
     try:
         if not YOUTUBE_API_KEY:
             return None
+        proxies = {"http": TOR_PROXY, "https": TOR_PROXY} if _is_tor_alive() else None
         r = _requests.get(
             "https://www.googleapis.com/youtube/v3/search",
             params={"part": "snippet", "q": query, "type": "video",
                     "maxResults": 1, "key": YOUTUBE_API_KEY},
             timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+            proxies=proxies,
         )
         r.raise_for_status()
         items = r.json().get("items", [])
@@ -52,7 +62,7 @@ def ytsearch(query: str):
             "https://www.googleapis.com/youtube/v3/videos",
             params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
             timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+            proxies=proxies,
         )
         r2.raise_for_status()
         detail_items = r2.json().get("items", [])
@@ -80,52 +90,51 @@ async def _run_ytdlp(cmd):
     return stdout.decode().strip(), stderr.decode()
 
 
+def _build_cmd(client: str) -> list:
+    """
+    يبني base command لـ yt-dlp:
+    - يضيف Tor proxy لو شغال فعلاً
+    - يضيف cookies لو الملف موجود
+    - يحدد player_client
+    """
+    cmd = ["yt-dlp", "--no-playlist", "--no-warnings"]
+
+    if _is_tor_alive():
+        cmd += ["--proxy", TOR_PROXY]
+
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+
+    cmd += ["--extractor-args", f"youtube:player_client={client}"]
+    return cmd
+
+
 async def ytdl_audio(link):
     """
-    تحميل الصوت — بيجرب stream URL أولاً بعدة clients، لو فشل بيحمّل محلياً
+    تحميل الصوت — بيجرب stream URL أولاً بعدة clients، لو فشل بيحمّل محلياً.
+    tv_embedded: مش بيحتاج Node.js لأن YouTube مش بيطبق عليه n-challenge
+    ios/android: fallback موثوق
     """
-    has_cookies = os.path.exists(COOKIES_FILE)
+    clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
 
-    # ── الـ clients المرتبة من الأقوى للأضعف في تجاوز الـ challenges ──
-    # web_creator و mweb بيشتغلوا بدون Node.js لأن YouTube مش بيطبق n-challenge عليهم
-    stream_attempts = [
-        # (player_client, format, use_cookies)
-        ("mediaconnect",  "bestaudio",                         False),
-        ("web_creator",   "bestaudio",                         has_cookies),
-        ("mweb",          "bestaudio",                         has_cookies),
-        ("web",           "bestaudio",                         has_cookies),
-        ("ios",           "bestaudio[ext=m4a]/bestaudio",       has_cookies),
-        ("android",       "bestaudio",                         has_cookies),
-    ]
-
-    for client, fmt, use_cookies in stream_attempts:
-        cmd = [
-            "yt-dlp", "--no-playlist", "--no-warnings",
-            "--extractor-args", f"youtube:player_client={client}",
-            "-g", "-f", fmt,
-        ]
-        if use_cookies:
-            cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(link)
+    # محاولة 1: stream URL مباشر (-g)
+    for client in clients:
+        cmd = _build_cmd(client) + ["-g", "-f", "bestaudio", link]
         out, err = await _run_ytdlp(cmd)
         if out:
             lines = [l for l in out.split("\n") if l.startswith("http")]
             if lines:
                 return 1, lines[0]
 
-    # ── محاولة أخيرة: تحميل ملف محلي ──
+    # محاولة 2: تحميل ملف محلي
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    for client in ["mediaconnect", "web_creator", "mweb", "web", "ios", "android"]:
-        cmd = [
-            "yt-dlp", "--no-playlist", "--no-warnings",
-            "--extractor-args", f"youtube:player_client={client}",
+    last_err = "all clients failed"
+    for client in clients:
+        cmd = _build_cmd(client) + [
             "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-            "-o", out_tpl,
+            "-o", out_tpl, link
         ]
-        if has_cookies:
-            cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(link)
         _, last_err = await _run_ytdlp(cmd)
         for ff in os.listdir(AUDIO_DIR):
             if ff.startswith(uid):
@@ -140,7 +149,6 @@ ytdl = ytdl_audio
 async def ytdl_video(link, quality=720):
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-    has_cookies = os.path.exists(COOKIES_FILE)
 
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best"
@@ -149,22 +157,17 @@ async def ytdl_video(link, quality=720):
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best"
 
-    for client in ["mediaconnect", "web_creator", "mweb", "web", "ios", "android"]:
-        cmd = [
-            "yt-dlp", "--no-playlist", "--no-warnings",
-            "--extractor-args", f"youtube:player_client={client}",
-            "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4",
+    clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
+    for client in clients:
+        cmd = _build_cmd(client) + [
+            "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4", link
         ]
-        if has_cookies:
-            cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(link)
         await _run_ytdlp(cmd)
         for ff in os.listdir(DL_DIR):
             if ff.startswith(uid):
                 return 1, os.path.join(DL_DIR, ff)
 
     return 0, "failed"
-
 
 def get_video_quality(Q):
     if Q == 480:
