@@ -60,13 +60,12 @@ def ytsearch(query: str):
 
 async def ytdl_audio(link: str):
     """جلب stream URL للصوت عبر yt-dlp مع Tor proxy"""
-    clients = ["android_vr", "ios", "android", "mweb"]
+    clients = ["tv_embedded", "ios", "android"]
     last_err = ""
     for client in clients:
         cmd = [
             "yt-dlp", "--no-playlist",
             "--extractor-args", f"youtube:player_client={client}",
-            "--proxy", TOR_PROXY,
             "-g", "-f", "bestaudio",
             "--format-sort", "acodec:opus,acodec:aac,acodec:mp4a",
         ]

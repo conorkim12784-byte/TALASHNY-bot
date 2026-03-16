@@ -80,8 +80,8 @@ async def song(_, message: Message):
     ydl_ops = {
         "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
+        
+        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE
@@ -154,8 +154,8 @@ async def vsong(client, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
+        
+        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE

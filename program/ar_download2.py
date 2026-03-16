@@ -23,8 +23,8 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("⚡")
     ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
-        "proxy": "socks5://127.0.0.1:9050",
-        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}}}
+        
+        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}}}
     audio_file = None
     thumb_name = None
     try:
@@ -109,8 +109,8 @@ async def vsong(client, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        "proxy": "socks5://127.0.0.1:9050",
-        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
+        
+        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
     }
     query = " ".join(message.command[1:])
     if not query:
@@ -125,7 +125,7 @@ async def vsong(client, message: Message):
                 params={"part": "snippet", "q": query, "type": "video",
                         "maxResults": 1, "key": YOUTUBE_API_KEY},
                 timeout=10,
-                proxies={"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"},
+                
             )
         )
         r.raise_for_status()

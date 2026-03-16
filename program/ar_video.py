@@ -65,11 +65,10 @@ def _ytsearch_sync(query: str):
 
 
 async def _ytdl_video(link):
-    for client in ["android_vr", "ios", "android", "mweb"]:
+    for client in ["tv_embedded", "ios", "android"]:
         proc = await asyncio.create_subprocess_exec(
             "yt-dlp", "--no-playlist",
             "--extractor-args", f"youtube:player_client={client}",
-            "--proxy", TOR_PROXY,
             "-g", "-f", "best[height<=?720][width<=?1280]",
             link,
             stdout=asyncio.subprocess.PIPE,
