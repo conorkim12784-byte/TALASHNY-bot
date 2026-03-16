@@ -116,14 +116,14 @@ def _build_cmd(client: str) -> list:
 async def ytdl_audio(link):
     """
     تحميل الصوت — بيجرب stream URL أولاً بعدة clients، لو فشل بيحمّل محلياً.
-    tv_embedded: مش بيحتاج Node.js لأن YouTube مش بيطبق عليه n-challenge
-    ios/android: fallback موثوق
     """
     clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
+    # format string فيه fallbacks كتير عشان يشتغل حتى لو format معين مش متاح
+    audio_fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=144]/best"
 
     # محاولة 1: stream URL مباشر (-g)
     for client in clients:
-        cmd = _build_cmd(client) + ["-g", "-f", "bestaudio", link]
+        cmd = _build_cmd(client) + ["-g", "-f", audio_fmt, "--format-sort", "abr", link]
         out, err = await _run_ytdlp(cmd)
         if out:
             lines = [l for l in out.split("\n") if l.startswith("http")]
@@ -136,7 +136,8 @@ async def ytdl_audio(link):
     last_err = "all clients failed"
     for client in clients:
         cmd = _build_cmd(client) + [
-            "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+            "-f", audio_fmt,
+            "--format-sort", "abr",
             "-o", out_tpl, link
         ]
         _, last_err = await _run_ytdlp(cmd)
@@ -155,16 +156,18 @@ async def ytdl_video(link, quality=720):
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
     if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best"
+        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best"
+        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best"
     else:
-        fmt = "bestvideo[height<=720]+bestaudio/best"
+        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
 
     clients = ["tv_embedded", "ios", "android", "web_creator", "web"]
     for client in clients:
         cmd = _build_cmd(client) + [
-            "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4", link
+            "-f", fmt,
+            "--format-sort", "res,vbr",
+            "-o", out_tpl, "--merge-output-format", "mp4", link
         ]
         await _run_ytdlp(cmd)
         for ff in os.listdir(DL_DIR):
