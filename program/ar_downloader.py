@@ -1,67 +1,19 @@
 # Copyright (C) 2021 By Amor Music-Project
-# Fixed: YoutubeSearch استبدلناها بـ yt-dlp مباشرة عشان youtube_search بايظة
+# Fixed: song() converted to async + await everywhere
 
 from __future__ import unicode_literals
 import asyncio
-import json
 import os
-import subprocess
 import requests
 import wget
 import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
+import requests as _ytrequests
+import re as _ytre
 from yt_dlp import YoutubeDL
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
-
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
-TOR_PROXY = "socks5://127.0.0.1:9050"
-
-
-def _parse_iso_duration(iso: str) -> int:
-    import re as _re
-    match = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-    if not match:
-        return 0
-    h = int(match.group(1) or 0)
-    m = int(match.group(2) or 0)
-    s = int(match.group(3) or 0)
-    return h * 3600 + m * 60 + s
-
-
-def _ytsearch(query: str):
-    """بحث عبر YouTube Data API v3 — مش بيتحجب"""
-    try:
-        from config import YOUTUBE_API_KEY
-        if not YOUTUBE_API_KEY:
-            print("[ytsearch] YOUTUBE_API_KEY غير موجود في .env")
-            return None
-        search_url = "https://www.googleapis.com/youtube/v3/search"
-        r = requests.get(search_url, params={
-            "part": "snippet", "q": query, "type": "video",
-            "maxResults": 1, "key": YOUTUBE_API_KEY,
-        }, timeout=10, proxies={"http": TOR_PROXY, "https": TOR_PROXY})
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:40]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = requests.get("https://www.googleapis.com/youtube/v3/videos", params={
-            "part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY,
-        }, timeout=10, proxies={"http": TOR_PROXY, "https": TOR_PROXY})
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        duration_secs = _parse_iso_duration(iso)
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        return title, url, duration_secs, thumbnail
-    except Exception as e:
-        print(f"[ytsearch error] {e}")
-        return None
 
 
 @Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))
@@ -70,28 +22,45 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {
-        "format": "bestaudio/best",
-        "outtmpl": "%(id)s.%(ext)s",
-        "quiet": True,
-        "no_warnings": True,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {
-            "player_client": ["android_vr", "ios", "android"],
-        }},
-    }
-    if os.path.exists(COOKIES_FILE):
-        ydl_ops["cookiefile"] = COOKIES_FILE
-
+    ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
+        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}}}
     audio_file = None
     thumb_name = None
     try:
-        search = await asyncio.to_thread(_ytsearch, query)
-        if not search:
-            return await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
-        title, link, duration_secs, thumbnail = search
+        from config import YOUTUBE_API_KEY
+        r = await asyncio.to_thread(
+            lambda: _ytrequests.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": query, "type": "video", "maxResults": 1, "key": YOUTUBE_API_KEY},
+                timeout=10,
+            )
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        if not items:
+            await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+            return
+        item = items[0]
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"][:40]
+        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+        link = f"https://www.youtube.com/watch?v={video_id}"
+        r2 = await asyncio.to_thread(
+            lambda: _ytrequests.get(
+                "https://www.googleapis.com/youtube/v3/videos",
+                params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+                timeout=10,
+            )
+        )
+        r2.raise_for_status()
+        detail_items = r2.json().get("items", [])
+        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
+        mt = _ytre.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+        total_s = h * 3600 + mn * 60 + s
+        _m, _s = divmod(total_s, 60)
+        _h, _m = divmod(_m, 60)
+        duration = f"{_h}:{_m:02d}:{_s:02d}" if _h else f"{_m}:{_s:02d}"
         if thumbnail:
             thumb_name = f"{title}.jpg"
             thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
@@ -101,7 +70,6 @@ async def song(_, message: Message):
         await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
         return
-
     await m.edit("📥 جاري تحميل الملف...")
     try:
         def download_audio():
@@ -109,13 +77,14 @@ async def song(_, message: Message):
                 info_dict = ydl.extract_info(link, download=True)
                 return ydl.prepare_filename(info_dict)
         audio_file = await asyncio.to_thread(download_audio)
-        if audio_file and not os.path.exists(audio_file):
-            base = os.path.splitext(audio_file)[0]
-            audio_file = base + ".mp3"
         rep = f"**🎧 الرافع @{bn}**"
+        secmul, dur, dur_arr = 1, 0, duration.split(":")
+        for i in range(len(dur_arr) - 1, -1, -1):
+            dur += int(float(dur_arr[i])) * secmul
+            secmul *= 60
         await m.edit("📤 جاري رفع الملف...")
         await message.reply_audio(audio_file, caption=rep, thumb=thumb_name,
-                                   parse_mode="md", title=title, duration=duration_secs)
+                                   parse_mode="md", title=title, duration=dur)
         await m.delete()
     except Exception as e:
         await m.edit(f"✘ خطأ: {e}")
@@ -132,29 +101,17 @@ async def song(_, message: Message):
 @Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
 async def vsong(client, message: Message):
     await message.delete()
-    ydl_opts = {
-        "format": "bestvideo[height<=720]+bestaudio/best",
-        "keepvideo": True,
-        "geo_bypass": True,
-        "outtmpl": "%(title)s.%(ext)s",
-        "quiet": True,
-        "merge_output_format": "mp4",
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
-    }
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
-
+    ydl_opts = {"format": "best", "keepvideo": True, "geo_bypass": True,
+                "outtmpl": "%(title)s.%(ext)s", "quiet": True}
     query = " ".join(message.command[1:])
     if not query:
         return await message.reply("» أرسل اسم الفيديو بعد الأمر")
     file_name = None
     preview = None
     try:
-        search = await asyncio.to_thread(_ytsearch, query)
-        if not search:
-            return await message.reply("✘ لم يتم العثور على الفيديو")
-        title, link, duration_secs, thumbnail = search
+        results = await asyncio.to_thread(lambda: YoutubeSearch(query, max_results=1).to_dict())
+        link = f"https://youtube.com{results[0]['url_suffix']}"
+        thumbnail = results[0]["thumbnails"][0]
     except Exception as e:
         return await message.reply(f"✘ خطأ في البحث: {e}")
     try:
@@ -167,11 +124,10 @@ async def vsong(client, message: Message):
     except Exception as e:
         return await msg.edit(f"🚫 **خطأ:** {e}")
     try:
-        if thumbnail:
-            preview = await asyncio.to_thread(wget.download, thumbnail)
+        preview = await asyncio.to_thread(wget.download, thumbnail)
         await msg.edit("📤 **جاري رفع الفيديو...**")
-        await message.reply_video(file_name, duration=duration_secs,
-                                   thumb=preview, caption=title)
+        await message.reply_video(file_name, duration=int(ytdl_data["duration"]),
+                                   thumb=preview, caption=ytdl_data["title"])
         await msg.delete()
     except Exception as e:
         print(e)

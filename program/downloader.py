@@ -1,54 +1,71 @@
 # Copyright (C) 2021 By Amor Music-Project
-# Fixed: YoutubeSearch استبدلناها بـ yt-dlp مباشرة عشان youtube_search بايظة
+# Fixed: song() converted to async, lyric API replaced, cleanup improved
+# FIX: أضفنا cookies لـ yt_dlp عشان YouTube بيطلب authentication
 
 from __future__ import unicode_literals
+
 import asyncio
-import json
 import os
-import subprocess
+
 import requests
 import wget
 import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
+import requests as _ytrequests
+import re as _ytre
 from yt_dlp import YoutubeDL
+
 from config import BOT_USERNAME as bn
 from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
+# FIX: مسار الـ cookies
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
-TOR_PROXY = "socks5://127.0.0.1:9050"
-
-
-def _ytsearch(query: str):
-    """بحث عبر yt-dlp بدل youtube_search المكسورة"""
-    try:
-        cmd = [
-            "yt-dlp", f"ytsearch1:{query}",
-            "--dump-json", "--no-playlist",
-            "--no-download", "--no-warnings", "--ignore-errors",
-            "--extractor-args", "youtube:player_client=android,ios,web",
-            "--proxy", TOR_PROXY,
-        ]
-        if os.path.exists(COOKIES_FILE):
-            cmd += ["--cookies", COOKIES_FILE]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        if not result.stdout.strip():
-            return None
-        data = json.loads(result.stdout.strip().split("\n")[0])
-        title = data.get("title", "Unknown")[:40]
-        url = data.get("webpage_url", "")
-        duration_secs = int(data.get("duration", 0) or 0)
-        thumbnail = data.get("thumbnail", "")
-        return title, url, duration_secs, thumbnail
-    except Exception as e:
-        print(f"[ytsearch error] {e}")
-        return None
 
 
 # ─────────────────────────────────────────
 # /song  — تحميل أغنية كملف صوتي
 # ─────────────────────────────────────────
+
+async def _yt_api_search(query):
+    """بحث عبر YouTube Data API v3"""
+    from config import YOUTUBE_API_KEY
+    import asyncio
+    r = await asyncio.to_thread(
+        lambda: _ytrequests.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={"part": "snippet", "q": query, "type": "video", "maxResults": 1, "key": YOUTUBE_API_KEY},
+            timeout=10,
+        )
+    )
+    r.raise_for_status()
+    items = r.json().get("items", [])
+    if not items:
+        return None
+    item = items[0]
+    video_id = item["id"]["videoId"]
+    title = item["snippet"]["title"][:40]
+    thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+    r2 = await asyncio.to_thread(
+        lambda: _ytrequests.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+            timeout=10,
+        )
+    )
+    r2.raise_for_status()
+    detail_items = r2.json().get("items", [])
+    iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
+    mt = _ytre.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+    h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+    total_s = h * 3600 + mn * 60 + s
+    _m, _s = divmod(total_s, 60)
+    _h, _m = divmod(_m, 60)
+    duration = f"{_h}:{_m:02d}:{_s:02d}" if _h else f"{_m}:{_s:02d}"
+    link = f"https://www.youtube.com/watch?v={video_id}"
+    return title, link, duration, thumbnail
+
 @Client.on_message(command(["song"]))
 async def song(_, message: Message):
     query = " ".join(message.command[1:])
@@ -56,17 +73,10 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
+    # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
-        "format": "bestaudio/best",
-        "outtmpl": "%(id)s.%(ext)s",
-        "quiet": True,
-        "no_warnings": True,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {
-            "player_client": ["android_vr", "ios", "android"],
-        }},
+        "format": "bestaudio[ext=m4a]",
+        "outtmpl": "%(title)s.%(ext)s",
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE
@@ -75,10 +85,11 @@ async def song(_, message: Message):
     thumb_name = None
 
     try:
-        search = await asyncio.to_thread(_ytsearch, query)
-        if not search:
-            return await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
-        title, link, duration_secs, thumbnail = search
+        res = await _yt_api_search(query)
+        if not res:
+            await m.edit("❌ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
+            return
+        title, link, duration, thumbnail = res
         if thumbnail:
             thumb_name = f"{title}.jpg"
             thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
@@ -97,13 +108,20 @@ async def song(_, message: Message):
                 return ydl.prepare_filename(info_dict)
 
         audio_file = await asyncio.to_thread(download_audio)
-        if audio_file and not os.path.exists(audio_file):
-            base = os.path.splitext(audio_file)[0]
-            audio_file = base + ".mp3"
         rep = f"**🎧 الرافع @{bn}**"
+        secmul, dur, dur_arr = 1, 0, duration.split(":")
+        for i in range(len(dur_arr) - 1, -1, -1):
+            dur += int(float(dur_arr[i])) * secmul
+            secmul *= 60
         await m.edit("📤 جاري رفع الملف...")
-        await message.reply_audio(audio_file, caption=rep, thumb=thumb_name,
-                                   parse_mode="md", title=title, duration=duration_secs)
+        await message.reply_audio(
+            audio_file,
+            caption=rep,
+            thumb=thumb_name,
+            parse_mode="md",
+            title=title,
+            duration=dur,
+        )
         await m.delete()
     except Exception as e:
         await m.edit(f"❌ خطأ: {e}")
@@ -123,15 +141,14 @@ async def song(_, message: Message):
 @Client.on_message(command(["vsong", "video"]))
 async def vsong(client, message: Message):
     await message.delete()
+    # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
-        "format": "bestvideo[height<=720]+bestaudio/best",
+        "format": "best",
         "keepvideo": True,
+        "prefer_ffmpeg": False,
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
-        "merge_output_format": "mp4",
-        "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
@@ -143,10 +160,10 @@ async def vsong(client, message: Message):
     file_name = None
     preview = None
     try:
-        search = await asyncio.to_thread(_ytsearch, query)
-        if not search:
-            return await message.reply("❌ لم يتم العثور على الفيديو")
-        title, link, duration_secs, thumbnail = search
+        res = await _yt_api_search(query)
+        if not res:
+            return await message.reply("❌ **لم يتم العثور على الفيديو**")
+        title_v, link, duration_v, thumbnail = res
     except Exception as e:
         return await message.reply(f"❌ **خطأ في البحث:** {e}")
 
@@ -163,11 +180,14 @@ async def vsong(client, message: Message):
         return await msg.edit(f"🚫 **خطأ:** {e}")
 
     try:
-        if thumbnail:
-            preview = await asyncio.to_thread(wget.download, thumbnail)
+        preview = await asyncio.to_thread(wget.download, thumbnail)
         await msg.edit("📤 **جاري رفع الفيديو...**")
-        await message.reply_video(file_name, duration=duration_secs,
-                                   thumb=preview, caption=title)
+        await message.reply_video(
+            file_name,
+            duration=int(ytdl_data["duration"]),
+            thumb=preview,
+            caption=ytdl_data["title"],
+        )
         await msg.delete()
     except Exception as e:
         print(e)
