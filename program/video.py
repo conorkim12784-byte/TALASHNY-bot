@@ -85,17 +85,19 @@ async def ytdl_audio(link):
     android_vr بيدي audio-only URL مضمون.
     """
     clients = [
-        ("android_vr",  "bestaudio",      False),
-        ("ios",         "bestaudio/best", False),
-        ("mweb",        "bestaudio/best", False),
-        ("tv_embedded", "bestaudio/best", False),
-        ("web",         "bestaudio/best", True),
+        ("android_vr",  "bestaudio", False),
+        ("ios",         "bestaudio", False),
+        ("android",     "bestaudio", False),
+        ("mweb",        "bestaudio", False),
+        ("tv_embedded", "bestaudio", False),
+        ("web",         "bestaudio", True),
     ]
     last_err = ""
     for client, fmt, use_cookies in clients:
         cmd = ["yt-dlp", "--no-playlist",
                "--extractor-args", f"youtube:player_client={client}",
-               "-g", "-f", fmt]
+               "-g", "-f", fmt,
+               "--format-sort", "acodec:opus,acodec:aac,acodec:mp4a"]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
@@ -106,8 +108,9 @@ async def ytdl_audio(link):
                 return 1, lines[0]
         last_err = err
 
-    # آخر محاولة بدون تحديد client
-    cmd = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio/best"]
+    # آخر محاولة بأبسط شكل ممكن
+    cmd = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio",
+           "--format-sort", "acodec:opus,acodec:aac"]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(link)
@@ -116,6 +119,23 @@ async def ytdl_audio(link):
         lines = [l for l in out.split("\n") if l.startswith("http")]
         if lines:
             return 1, lines[0]
+
+    # محاولة أخيرة — حمّل الملف محلياً بدل stream URL
+    uid = __import__("uuid").uuid4().hex[:8]
+    audio_dir = "/tmp/tgbot_audio"
+    __import__("os").makedirs(audio_dir, exist_ok=True)
+    out_tpl = f"{audio_dir}/{uid}.%(ext)s"
+    cmd = ["yt-dlp", "--no-playlist",
+           "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+           "-o", out_tpl]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(link)
+    await _run_ytdlp(cmd)
+    for ff in __import__("os").listdir(audio_dir):
+        if ff.startswith(uid):
+            return 1, f"{audio_dir}/{ff}"
+
     return 0, last_err or err
 
 
