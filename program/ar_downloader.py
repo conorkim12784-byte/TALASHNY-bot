@@ -16,6 +16,7 @@ from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
 def _parse_iso_duration(iso: str) -> int:
@@ -40,7 +41,7 @@ def _ytsearch(query: str):
         r = requests.get(search_url, params={
             "part": "snippet", "q": query, "type": "video",
             "maxResults": 1, "key": YOUTUBE_API_KEY,
-        }, timeout=10)
+        }, timeout=10, proxies={"http": TOR_PROXY, "https": TOR_PROXY})
         r.raise_for_status()
         items = r.json().get("items", [])
         if not items:
@@ -51,7 +52,7 @@ def _ytsearch(query: str):
         thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
         r2 = requests.get("https://www.googleapis.com/youtube/v3/videos", params={
             "part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY,
-        }, timeout=10)
+        }, timeout=10, proxies={"http": TOR_PROXY, "https": TOR_PROXY})
         r2.raise_for_status()
         detail_items = r2.json().get("items", [])
         iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
@@ -74,6 +75,7 @@ async def song(_, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "geo_bypass": True,
+        "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):
@@ -133,6 +135,7 @@ async def vsong(client, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
+        "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):

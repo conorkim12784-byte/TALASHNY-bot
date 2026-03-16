@@ -23,6 +23,7 @@ import json, subprocess, requests as _requests
 from config import YOUTUBE_API_KEY
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+TOR_PROXY = "socks5://127.0.0.1:9050"
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(DL_DIR, exist_ok=True)
@@ -65,7 +66,8 @@ def ytsearch(query: str):
             "maxResults": 1,
             "key": YOUTUBE_API_KEY,
         }
-        r = _requests.get(search_url, params=search_params, timeout=10)
+        r = _requests.get(search_url, params=search_params, timeout=10,
+                          proxies={"http": TOR_PROXY, "https": TOR_PROXY})
         r.raise_for_status()
         items = r.json().get("items", [])
         if not items:
@@ -83,7 +85,8 @@ def ytsearch(query: str):
             "id": video_id,
             "key": YOUTUBE_API_KEY,
         }
-        r2 = _requests.get(details_url, params=details_params, timeout=10)
+        r2 = _requests.get(details_url, params=details_params, timeout=10,
+                           proxies={"http": TOR_PROXY, "https": TOR_PROXY})
         r2.raise_for_status()
         detail_items = r2.json().get("items", [])
         iso_duration = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
@@ -129,6 +132,7 @@ async def ytdl_audio(link):
             "yt-dlp", "--no-playlist",
             "--extractor-args", f"youtube:player_client={client}",
             "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+            "--proxy", TOR_PROXY,
             "-o", out_tpl,
         ]
         if use_cookies and os.path.exists(COOKIES_FILE):
@@ -143,6 +147,7 @@ async def ytdl_audio(link):
     cmd = [
         "yt-dlp", "--no-playlist",
         "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "--proxy", TOR_PROXY,
         "-o", out_tpl,
     ]
     if os.path.exists(COOKIES_FILE):
@@ -185,7 +190,8 @@ async def ytdl_video(link, quality=720):
     for client, use_cookies in clients:
         cmd = ["yt-dlp", "--no-playlist",
                "--extractor-args", f"youtube:player_client={client}",
-               "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+               "-f", fmt, "--proxy", TOR_PROXY,
+               "-o", out_tpl, "--merge-output-format", "mp4"]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(link)
@@ -194,7 +200,8 @@ async def ytdl_video(link, quality=720):
             if ff.startswith(uid):
                 return 1, os.path.join(DL_DIR, ff)
 
-    cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+    cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "--proxy", TOR_PROXY,
+           "-o", out_tpl, "--merge-output-format", "mp4"]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(link)

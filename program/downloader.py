@@ -17,6 +17,7 @@ from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
 def _ytsearch(query: str):
@@ -27,6 +28,7 @@ def _ytsearch(query: str):
             "--dump-json", "--no-playlist",
             "--no-download", "--no-warnings", "--ignore-errors",
             "--extractor-args", "youtube:player_client=android,ios,web",
+            "--proxy", TOR_PROXY,
         ]
         if os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
@@ -59,6 +61,7 @@ async def song(_, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "geo_bypass": True,
+        "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):
@@ -123,6 +126,7 @@ async def vsong(client, message: Message):
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
+        "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
     }
     if os.path.exists(COOKIES_FILE):
