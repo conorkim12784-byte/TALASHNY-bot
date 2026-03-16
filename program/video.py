@@ -19,7 +19,6 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import re as _re
 import requests as _requests
 
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 TOR_PROXY = "socks5://127.0.0.1:9050"
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
@@ -111,8 +110,6 @@ def _ydl_get_audio_url(link: str, client: str) -> str | None:
         "skip_download": True,
         "no_warnings": False,
     }
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
     try:
         import yt_dlp
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -138,8 +135,6 @@ def _ydl_download_audio(link: str, client: str, out_tpl: str) -> str | None:
         "extractor_args": {"youtube": {"player_client": [client]}},
         "outtmpl": out_tpl,
     }
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
     try:
         import yt_dlp
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -159,8 +154,6 @@ def _ydl_download_video(link: str, client: str, out_tpl: str, fmt: str) -> str |
         "outtmpl": out_tpl,
         "merge_output_format": "mp4",
     }
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
     try:
         import yt_dlp
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

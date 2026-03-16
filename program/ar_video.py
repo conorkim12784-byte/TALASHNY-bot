@@ -15,7 +15,6 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import os as _os
 
 TOR_PROXY = "socks5://127.0.0.1:9050"
-COOKIES_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "cookies.txt")
 
 
 import requests as _req
@@ -67,7 +66,6 @@ def _ytsearch_sync(query: str):
 async def _ytdl_video(link):
     import yt_dlp, uuid
     clients = ["tv_embedded", "ios", "android", "web"]
-    COOKIES_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "cookies.txt")
 
     # محاولة 1: stream URL
     for client in clients:
@@ -77,8 +75,6 @@ async def _ytdl_video(link):
             "extractor_args": {"youtube": {"player_client": [client]}},
             "skip_download": True,
         }
-        if _os.path.exists(COOKIES_FILE):
-            ydl_opts["cookiefile"] = COOKIES_FILE
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(link, download=False)

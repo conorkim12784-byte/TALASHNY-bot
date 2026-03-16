@@ -6,7 +6,6 @@ import requests as _req
 import os
 import yt_dlp
 
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 
 
 def _clean_env() -> dict:
@@ -77,8 +76,6 @@ async def ytdl_audio(link: str):
             "extractor_args": {"youtube": {"player_client": [client]}},
             "skip_download": True,
         }
-        if os.path.exists(COOKIES_FILE):
-            ydl_opts["cookiefile"] = COOKIES_FILE
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(link, download=False)

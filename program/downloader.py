@@ -21,7 +21,6 @@ from driver.decorators import humanbytes
 from driver.filters import command, other_filters
 
 # FIX: مسار الـ cookies
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
@@ -76,15 +75,12 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🎶")
-    # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
         "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
         
         "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
     }
-    if os.path.exists(COOKIES_FILE):
-        ydl_ops["cookiefile"] = COOKIES_FILE
 
     audio_file = None
     thumb_name = None
@@ -146,7 +142,6 @@ async def song(_, message: Message):
 @Client.on_message(command(["vsong", "video"]))
 async def vsong(client, message: Message):
     await message.delete()
-    # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
         "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
@@ -157,8 +152,6 @@ async def vsong(client, message: Message):
         
         "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
     }
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
 
     query = " ".join(message.command[1:])
     if not query:
