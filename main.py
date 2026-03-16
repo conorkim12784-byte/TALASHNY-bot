@@ -1,6 +1,12 @@
 import asyncio
 import subprocess
 import os
+
+# ── مسح proxy variables عشان yt-dlp ميتأثرش بـ Railway proxy ──
+for _k in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+           "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY", "GLOBAL_AGENT_HTTPS_PROXY"]:
+    os.environ.pop(_k, None)
+
 from pytgcalls import idle
 from pyrogram.errors import FloodWait
 from driver.veez import call_py, bot, user
