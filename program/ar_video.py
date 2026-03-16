@@ -1,9 +1,6 @@
 # فيديو.py - اوامر الفيديو العربية فقط (vplay + vstream الانجليزية موجودة في video.py)
 import re
 import asyncio
-import json
-import subprocess
-
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
@@ -15,39 +12,76 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
+import os as _os
 
+TOR_PROXY = "socks5://127.0.0.1:9050"
+COOKIES_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "cookies.txt")
+
+
+import requests as _req
+import re as _re2
 
 def _ytsearch_sync(query: str):
+    """بحث عبر YouTube Data API v3"""
     try:
-        result = subprocess.run(
-            ["yt-dlp", f"ytsearch1:{query}", "--dump-json", "--no-playlist",
-             "--no-download", "--no-warnings", "--ignore-errors"],
-            capture_output=True, text=True, timeout=60
-        )
-        if not result.stdout.strip():
+        from config import YOUTUBE_API_KEY
+        if not YOUTUBE_API_KEY:
             return None
-        data = json.loads(result.stdout.strip().split("\n")[0])
-        songname = data.get("title", "Unknown")
-        url = data.get("webpage_url", "")
-        duration_secs = data.get("duration", 0)
-        mins, secs = divmod(int(duration_secs), 60)
-        duration = f"{mins}:{secs:02d}"
-        thumbnail = data.get("thumbnail", "")
-        return [songname, url, duration, thumbnail]
-    except Exception:
+        r = _req.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={"part": "snippet", "q": query, "type": "video",
+                    "maxResults": 1, "key": YOUTUBE_API_KEY},
+            timeout=10,
+            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        if not items:
+            return None
+        item = items[0]
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"][:70]
+        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+        r2 = _req.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+            timeout=10,
+            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+        )
+        r2.raise_for_status()
+        detail_items = r2.json().get("items", [])
+        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
+        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+        total = h * 3600 + mn * 60 + s
+        mins, secs = divmod(total, 60)
+        hrs, mins = divmod(mins, 60)
+        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ar_video ytsearch error] {e}")
         return None
 
 
 async def _ytdl_video(link):
-    proc = await asyncio.create_subprocess_exec(
-        "yt-dlp", "-g", "-f", "best[height<=?720][width<=?1280]", link,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return 1, stdout.decode().split("\n")[0]
-    return 0, stderr.decode()
+    for client in ["android_vr", "ios", "android", "mweb"]:
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp", "--no-playlist",
+            "--extractor-args", f"youtube:player_client={client}",
+            "--proxy", TOR_PROXY,
+            "-g", "-f", "best[height<=?720][width<=?1280]",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if stdout:
+            lines = [l for l in stdout.decode().strip().split("\n") if l.startswith("http")]
+            if lines:
+                return 1, lines[0]
+        last_err = stderr.decode()
+    return 0, last_err
 
 
 def _get_vq(Q):

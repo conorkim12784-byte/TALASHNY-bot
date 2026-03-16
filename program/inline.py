@@ -1,4 +1,7 @@
-import json, subprocess
+# inline.py - بحث inline عبر YouTube Data API v3
+import asyncio
+import re as _re
+import requests as _req
 from pyrogram import Client, errors
 from pyrogram.types import (
     InlineQuery,
@@ -6,53 +9,82 @@ from pyrogram.types import (
     InputTextMessageContent,
 )
 
+TOR_PROXY = "socks5://127.0.0.1:9050"
+
 
 @Client.on_inline_query()
 async def inline(client: Client, query: InlineQuery):
     answers = []
-    search_query = query.query.lower().strip().rstrip()
+    search_query = query.query.lower().strip()
 
-    if search_query == "":
+    if not search_query:
         await client.answer_inline_query(
             query.id,
             results=answers,
-            switch_pm_text=" يمكنك البحث مباشرة من اليوتيوب",
+            switch_pm_text="يمكنك البحث مباشرة من اليوتيوب",
             switch_pm_parameter="help",
             cache_time=0,
         )
-    else:
-        try:
-            result = subprocess.run(
-                ["yt-dlp", f"ytsearch10:{search_query}", "--dump-json", "--no-playlist", "--no-download"],
-                capture_output=True, text=True, timeout=30
+        return
+
+    try:
+        from config import YOUTUBE_API_KEY
+        r = await asyncio.to_thread(
+            lambda: _req.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": search_query, "type": "video",
+                        "maxResults": 10, "key": YOUTUBE_API_KEY},
+                timeout=10,
+                proxies={"http": TOR_PROXY, "https": TOR_PROXY},
             )
-            for line in result.stdout.strip().split("\n"):
-                if not line:
-                    continue
-                data = json.loads(line)
-                duration_secs = data.get("duration", 0)
-                mins, secs = divmod(int(duration_secs), 60)
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+
+        if items:
+            ids = ",".join(i["id"]["videoId"] for i in items)
+            r2 = await asyncio.to_thread(
+                lambda: _req.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={"part": "contentDetails,statistics", "id": ids, "key": YOUTUBE_API_KEY},
+                    timeout=10,
+                    proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+                )
+            )
+            r2.raise_for_status()
+            details = {d["id"]: d for d in r2.json().get("items", [])}
+
+            for item in items:
+                vid_id = item["id"]["videoId"]
+                title = item["snippet"]["title"]
+                thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+                detail = details.get(vid_id, {})
+                iso = detail.get("contentDetails", {}).get("duration", "PT0S")
+                mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+                h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+                total = h * 3600 + mn * 60 + s
+                mins, secs = divmod(total, 60)
                 duration = f"{mins}:{secs:02d}"
-                views = data.get("view_count", 0)
+                views = int(detail.get("statistics", {}).get("viewCount", 0))
                 answers.append(
                     InlineQueryResultArticle(
-                        title=data.get("title", "Unknown"),
+                        title=title,
                         description=f"{duration}, {views:,} views.",
                         input_message_content=InputTextMessageContent(
-                            "🔗 https://www.youtube.com/watch?v={}".format(data.get("id", ""))
+                            f"🔗 https://www.youtube.com/watch?v={vid_id}"
                         ),
-                        thumb_url=data.get("thumbnail", ""),
+                        thumb_url=thumbnail,
                     )
                 )
-        except Exception as e:
-            print(e)
+    except Exception as e:
+        print(f"[inline search error] {e}")
 
-        try:
-            await query.answer(results=answers, cache_time=0)
-        except errors.QueryIdInvalid:
-            await query.answer(
-                results=answers,
-                cache_time=0,
-                switch_pm_text="خطاء:انتهت مهلة البحث",
-                switch_pm_parameter="",
-            )
+    try:
+        await query.answer(results=answers, cache_time=0)
+    except errors.QueryIdInvalid:
+        await query.answer(
+            results=answers,
+            cache_time=0,
+            switch_pm_text="خطأ: انتهت مهلة البحث",
+            switch_pm_parameter="",
+        )

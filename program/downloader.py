@@ -22,6 +22,7 @@ from driver.filters import command, other_filters
 
 # FIX: مسار الـ cookies
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
 # ─────────────────────────────────────────
@@ -37,6 +38,7 @@ async def _yt_api_search(query):
             "https://www.googleapis.com/youtube/v3/search",
             params={"part": "snippet", "q": query, "type": "video", "maxResults": 1, "key": YOUTUBE_API_KEY},
             timeout=10,
+            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
         )
     )
     r.raise_for_status()
@@ -52,6 +54,7 @@ async def _yt_api_search(query):
             "https://www.googleapis.com/youtube/v3/videos",
             params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
             timeout=10,
+            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
         )
     )
     r2.raise_for_status()
@@ -75,8 +78,10 @@ async def song(_, message: Message):
     m = await message.reply("🎶")
     # FIX: أضفنا cookiefile لو موجود
     ydl_ops = {
-        "format": "bestaudio[ext=m4a]",
+        "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
+        "proxy": TOR_PROXY,
+        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE
@@ -143,12 +148,14 @@ async def vsong(client, message: Message):
     await message.delete()
     # FIX: أضفنا cookiefile لو موجود
     ydl_opts = {
-        "format": "best",
+        "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
-        "prefer_ffmpeg": False,
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
+        "merge_output_format": "mp4",
+        "proxy": TOR_PROXY,
+        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE

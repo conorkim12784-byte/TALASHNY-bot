@@ -103,34 +103,12 @@ async def show_commands(c: Client, m: Message):
 async def cmds_back_main(c: Client, query: CallbackQuery):
     try:
         await query.edit_message_caption(
-            "**
-╭────⌁TALASHNY⌁────⟤
-│╭───────────⟢
-╞╡          Command List 
-╞╡ 
-╞╡ Select A Button To Learn More 
-│╰────────────╮
-│╭────────────╯
-╞╡   Enjoy A Unique Experience 
-│╰───────────⟢
-╰────⌁TALASHNY⌁────⟤
-**",
+            "**╭────⌁TALASHNY⌁────⟤\n│╭───────────⟢\n╞╡          Command List \n╞╡ \n╞╡ Select A Button To Learn More \n│╰────────────╮\n│╭────────────╯\n╞╡   Enjoy A Unique Experience \n│╰───────────⟢\n╰────⌁TALASHNY⌁────⟤**",
             reply_markup=main_keyboard()
         )
     except Exception:
         await query.edit_message_text(
-            "**
-╭────⌁TALASHNY⌁────⟤
-│╭───────────⟢
-╞╡          Command List 
-╞╡ 
-╞╡ Select A Button To Learn More 
-│╰────────────╮
-│╭────────────╯
-╞╡   Enjoy A Unique Experience 
-│╰───────────⟢
-╰────⌁TALASHNY⌁────⟤
-**",
+            "**╭────⌁TALASHNY⌁────⟤\n│╭───────────⟢\n╞╡          Command List \n╞╡ \n╞╡ Select A Button To Learn More \n│╰────────────╮\n│╭────────────╯\n╞╡   Enjoy A Unique Experience \n│╰───────────⟢\n╰────⌁TALASHNY⌁────⟤**",
             reply_markup=main_keyboard()
         )
     await query.answer()

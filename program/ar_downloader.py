@@ -23,6 +23,7 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
+        "proxy": "socks5://127.0.0.1:9050",
         "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}}}
     audio_file = None
     thumb_name = None
@@ -101,17 +102,41 @@ async def song(_, message: Message):
 @Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
 async def vsong(client, message: Message):
     await message.delete()
-    ydl_opts = {"format": "best", "keepvideo": True, "geo_bypass": True,
-                "outtmpl": "%(title)s.%(ext)s", "quiet": True}
+    ydl_opts = {
+        "format": "bestvideo[height<=720]+bestaudio/best",
+        "keepvideo": True,
+        "geo_bypass": True,
+        "outtmpl": "%(title)s.%(ext)s",
+        "quiet": True,
+        "merge_output_format": "mp4",
+        "proxy": "socks5://127.0.0.1:9050",
+        "extractor_args": {"youtube": {"player_client": ["android_vr", "ios", "android"]}},
+    }
     query = " ".join(message.command[1:])
     if not query:
         return await message.reply("» أرسل اسم الفيديو بعد الأمر")
     file_name = None
     preview = None
     try:
-        results = await asyncio.to_thread(lambda: YoutubeSearch(query, max_results=1).to_dict())
-        link = f"https://youtube.com{results[0]['url_suffix']}"
-        thumbnail = results[0]["thumbnails"][0]
+        from config import YOUTUBE_API_KEY
+        r = await asyncio.to_thread(
+            lambda: _ytrequests.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": query, "type": "video",
+                        "maxResults": 1, "key": YOUTUBE_API_KEY},
+                timeout=10,
+                proxies={"http": "socks5://127.0.0.1:9050", "https": "socks5://127.0.0.1:9050"},
+            )
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        if not items:
+            return await message.reply("✘ لم يتم العثور على الفيديو")
+        item = items[0]
+        video_id = item["id"]["videoId"]
+        title_v = item["snippet"]["title"][:40]
+        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+        link = f"https://www.youtube.com/watch?v={video_id}"
     except Exception as e:
         return await message.reply(f"✘ خطأ في البحث: {e}")
     try:
@@ -124,10 +149,11 @@ async def vsong(client, message: Message):
     except Exception as e:
         return await msg.edit(f"🚫 **خطأ:** {e}")
     try:
-        preview = await asyncio.to_thread(wget.download, thumbnail)
+        if thumbnail:
+            preview = await asyncio.to_thread(wget.download, thumbnail)
         await msg.edit("📤 **جاري رفع الفيديو...**")
-        await message.reply_video(file_name, duration=int(ytdl_data["duration"]),
-                                   thumb=preview, caption=ytdl_data["title"])
+        await message.reply_video(file_name, duration=int(ytdl_data.get("duration", 0)),
+                                   thumb=preview, caption=title_v)
         await msg.delete()
     except Exception as e:
         print(e)
