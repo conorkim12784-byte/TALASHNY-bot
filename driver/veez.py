@@ -3,7 +3,8 @@ from pyrogram import Client
 from pytgcalls import PyTgCalls
 import os
 
-SESSION_STRING = os.getenv("SESSION_STRING", "")
+# SESSION_STRING له الأولوية دائماً — لو مش موجود نستخدم SESSION_NAME كـ fallback
+SESSION_STRING = os.getenv("SESSION_STRING", "") or SESSION_NAME
 
 bot = Client(
     ":veez:",
@@ -13,18 +14,12 @@ bot = Client(
     plugins={"root": "program"},
 )
 
-if SESSION_STRING:
-    user = Client(
-        SESSION_NAME,
-        api_id=API_ID,
-        api_hash=API_HASH,
-        session_string=SESSION_STRING,
-    )
-else:
-    user = Client(
-        SESSION_NAME,
-        api_id=API_ID,
-        api_hash=API_HASH,
-    )
+# نستخدم session_string فقط — نمنع فتح session file موازي يسبب AUTH_KEY_DUPLICATED
+user = Client(
+    name="userbot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=SESSION_STRING,
+)
 
 call_py = PyTgCalls(user)
