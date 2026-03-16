@@ -1,19 +1,32 @@
 from pyrogram.enums import ChatMembersFilter
 from typing import List
 from pyrogram.types import Chat
-from cache.admins import get as gett, set
+from cache.admins import get as cache_get, set as cache_set
 
 
 async def get_administrators(chat: Chat) -> List[int]:
-    get = gett(chat.id)
+    """
+    جيب كل المشرفين في الجروب — بدون فلترة على صلاحية معينة
+    بيرجع list من الـ IDs
+    """
+    cached = cache_get(chat.id)
+    if cached:
+        return cached
 
-    if get:
-        return get
-    else:
-        administrators = []
+    administrators = []
+    try:
         async for member in chat.get_members(filter=ChatMembersFilter.ADMINISTRATORS):
-            if member.privileges and member.privileges.can_manage_video_chats:
-                administrators.append(member.user.id)
+            user = member.user
+            if user and not user.is_bot:
+                administrators.append(user.id)
+    except Exception as e:
+        print(f"[get_administrators error] {e}")
 
-        set(chat.id, administrators)
-        return administrators
+    cache_set(chat.id, administrators)
+    return administrators
+
+
+async def refresh_administrators(chat: Chat) -> List[int]:
+    """تحديث الكاش بالقوة"""
+    cache_set(chat.id, [])
+    return await get_administrators(chat)
