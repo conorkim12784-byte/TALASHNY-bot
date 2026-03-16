@@ -57,7 +57,11 @@ async def song(_, message: Message):
         "quiet": True,
         "geo_bypass": True,
         "proxy": TOR_PROXY,
-        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
+        "nocheckcertificate": True,
+        "extractor_args": {"youtube": {
+            "player_client": ["android_vr", "ios", "android", "web"],
+            "skip": ["hls", "dash", "translated_subs"],
+        }},
     }
     if os.path.exists(COOKIES_FILE):
         ydl_ops["cookiefile"] = COOKIES_FILE

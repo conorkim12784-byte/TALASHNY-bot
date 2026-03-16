@@ -120,9 +120,9 @@ async def ytdl_audio(link):
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
 
     clients = [
-        ("android",    False),
         ("android_vr", False),
         ("ios",        False),
+        ("android",    False),
         ("mweb",       False),
         ("web",        True),
     ]
@@ -131,8 +131,10 @@ async def ytdl_audio(link):
         cmd = [
             "yt-dlp", "--no-playlist",
             "--extractor-args", f"youtube:player_client={client}",
+            "--extractor-args", "youtube:skip=hls,dash,translated_subs",
             "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "--proxy", TOR_PROXY,
+            "--no-check-certificates",
             "-o", out_tpl,
         ]
         if use_cookies and os.path.exists(COOKIES_FILE):
