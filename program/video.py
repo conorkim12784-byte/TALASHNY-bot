@@ -87,16 +87,15 @@ async def ytdl_audio(link):
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
 
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-        "outtmpl": out_tpl,
+        "format": "bestaudio/best",
+        "outtmpl": "%(id)s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
         "geo_bypass": True,
         "nocheckcertificate": True,
         "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {
-            "player_client": ["android_vr", "ios", "android", "web"],
-            "skip": ["hls", "dash", "translated_subs"],
+            "player_client": ["android_vr", "ios", "android"],
         }},
     }
     if os.path.exists(COOKIES_FILE):
@@ -146,6 +145,7 @@ async def ytdl_video(link, quality=720):
             "player_client": ["android_vr", "ios", "android", "web"],
             "skip": ["hls", "dash", "translated_subs"],
         }},
+        "youtube_include_dash_manifest": False,
     }
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE

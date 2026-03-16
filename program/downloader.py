@@ -57,15 +57,15 @@ async def song(_, message: Message):
 
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-        "outtmpl": "%(title)s.%(ext)s",
+        "format": "bestaudio/best",
+        "outtmpl": "%(id)s.%(ext)s",
         "quiet": True,
+        "no_warnings": True,
         "geo_bypass": True,
-        "proxy": TOR_PROXY,
         "nocheckcertificate": True,
+        "proxy": TOR_PROXY,
         "extractor_args": {"youtube": {
-            "player_client": ["android_vr", "ios", "android", "web"],
-            "skip": ["hls", "dash", "translated_subs"],
+            "player_client": ["android_vr", "ios", "android"],
         }},
     }
     if os.path.exists(COOKIES_FILE):
