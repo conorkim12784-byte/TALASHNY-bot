@@ -17,9 +17,16 @@ async def is_allowed(c, chat_id, user_id):
         return True
     try:
         member = await c.get_chat_member(chat_id, user_id)
-        return member.status.value == "owner"
+        status = member.status.value
+        # المالك أو المشرف اللي عنده صلاحية إضافة مشرفين
+        if status in ("creator", "owner"):
+            return True
+        if status == "administrator":
+            if member.privileges and member.privileges.can_promote_members:
+                return True
     except Exception:
-        return False
+        pass
+    return False
 
 
 def _perms_to_keyboard(user_id: int, perms: set) -> InlineKeyboardMarkup:

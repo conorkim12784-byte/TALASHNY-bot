@@ -1,8 +1,7 @@
+from driver.admins import get_administrators, refresh_administrators
 # الادمن.py - اوامر الادمن العربية فقط (الانجليزية موجودة في admins.py)
-from cache.admins import admins
 from driver.veez import call_py
 from pyrogram import Client
-from pyrogram.enums import ChatMembersFilter
 from driver.queues import QUEUE, clear_queue
 from driver.filters import command2, other_filters
 from driver.decorators import authorized_users_only
@@ -18,13 +17,8 @@ from pyrogram.types import InlineKeyboardMarkup, Message, ChatPermissions
 @authorized_users_only
 async def update_admin_ar(client, message):
     await message.delete()
-    global admins
-    new_admins = []
-    new_ads = client.get_chat_members(message.chat.id, filter=ChatMembersFilter.ADMINISTRATORS)
-    async for u in new_ads:
-        new_admins.append(u.user.id)
-    admins[message.chat.id] = new_admins
-    await message.reply_text("✔ تم إعادة تحميل البوت بشكل صحيح!\n✔ تم تحديث قائمة المسؤولين!")
+    await refresh_administrators(message.chat)
+    await message.reply_text("✔ تم تحديث قائمة المسؤولين بنجاح!")
 
 
 @Client.on_message(command2(["تخطي"]) & other_filters)
