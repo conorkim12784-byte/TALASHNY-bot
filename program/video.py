@@ -155,14 +155,20 @@ def _sc_download(link: str, out_tpl: str):
 
 
 def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو — يجرب YouTube أولاً ثم Dailymotion"""
-    clients = ["tv_embedded", "web_creator", "ios", "web", "android"]
+    """تحميل فيديو — يجرب clients مختلفة بدون cookies"""
+    clients = ["tv_embedded", "mweb", "ios", "web_creator", "android"]
     for client in clients:
         ydl_opts = {
             "quiet": True, "no_warnings": True,
             "format": fmt, "outtmpl": out_tpl,
             "merge_output_format": "mp4",
-            "extractor_args": {"youtube": {"player_client": [client]}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [client],
+                    "player_skip": ["webpage", "js"],
+                }
+            },
+            "socket_timeout": 30,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -190,14 +196,21 @@ def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
 
 
 def _yt_download_audio(link: str, out_tpl: str) -> str | None:
-    """تحميل صوت من يوتيوب — بدون فيديو خالص"""
-    clients = ["tv_embedded", "web_creator", "ios", "web", "android"]
+    """تحميل صوت من يوتيوب — بيجرب clients مختلفة بدون cookies"""
+    # tv_embedded و mweb بيشتغلوا بدون تحقق في الغالب
+    clients = ["tv_embedded", "mweb", "ios", "web_creator", "android"]
     for client in clients:
         ydl_opts = {
             "quiet": True, "no_warnings": True,
             "format": "bestaudio/best",
             "outtmpl": out_tpl,
-            "extractor_args": {"youtube": {"player_client": [client]}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [client],
+                    "player_skip": ["webpage", "js"],
+                }
+            },
+            "socket_timeout": 30,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
