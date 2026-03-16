@@ -10,7 +10,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# تثبيت Node.js 20 LTS (مطلوب لحل YouTube n-challenge)
+# تثبيت Node.js 20 LTS
 RUN curl -fsSL https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz -o /tmp/node.tar.xz \
     && tar -xf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
@@ -24,5 +24,12 @@ RUN pip3 install --no-cache-dir --upgrade pip \
     && pip3 install --no-cache-dir -r requirements.txt \
     && pip3 install --no-cache-dir -U "yt-dlp[default]"
 
-# تشغيل Tor ثم تحديث yt-dlp تلقائياً ثم البوت
+# تحميل EJS scripts عشان yt-dlp يقدر يحل YouTube challenges
+RUN yt-dlp --remote-components ejs:github -v 2>&1 | head -5 || true
+
+# إنشاء yt-dlp config بيفعّل EJS تلقائياً في كل مرة
+RUN mkdir -p /root/.config/yt-dlp && \
+    echo "--js-runtimes node" > /root/.config/yt-dlp/config && \
+    echo "--remote-components ejs:github" >> /root/.config/yt-dlp/config
+
 CMD tor --RunAsDaemon 1 --SocksPort 9050 && sleep 3 && yt-dlp -U --no-colors 2>/dev/null; python3 main.py
