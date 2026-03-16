@@ -113,7 +113,9 @@ async def play(c: Client, m: Message):
                 await suhu.edit("**⚡**")
                 # صوت بس — بدون فيديو
                 await call_py.play(chat_id, MediaStream(
-                    dl, AudioQuality.HIGH,
+                    dl,
+                    audio_parameters=AudioQuality.HIGH,
+                    audio_flags=MediaStream.Flags.AUTO_DETECT,
                     video_flags=MediaStream.Flags.IGNORE
                 ))
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
@@ -181,7 +183,9 @@ async def play(c: Client, m: Message):
                 await suhu.edit("**▶️ يـتـم الـتـشـغـيـل...**")
                 # صوت بس — بدون فيديو
                 await call_py.play(chat_id, MediaStream(
-                    ytlink, AudioQuality.HIGH,
+                    ytlink,
+                    audio_parameters=AudioQuality.HIGH,
+                    audio_flags=MediaStream.Flags.AUTO_DETECT,
                     video_flags=MediaStream.Flags.IGNORE
                 ))
                 add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
