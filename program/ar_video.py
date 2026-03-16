@@ -21,78 +21,57 @@ import requests as _req
 import re as _re2
 
 def _ytsearch_sync(query: str):
-    """بحث عبر YouTube Data API v3"""
+    """بحث على SoundCloud"""
+    import yt_dlp
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "skip_download": True,
+    }
     try:
-        from config import YOUTUBE_API_KEY
-        if not YOUTUBE_API_KEY:
-            return None
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-            proxies={"http": TOR_PROXY, "https": TOR_PROXY},
-        )
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + mn * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        return [title, url, duration, thumbnail]
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            secs = int(item.get("duration") or 0)
+            mins, s2 = divmod(secs, 60)
+            h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s2:02d}" if h else f"{m}:{s2:02d}"
+            thumbnail = item.get("thumbnail") or ""
+            return [title, url, duration, thumbnail] if url else None
     except Exception as e:
-        print(f"[ar_video ytsearch error] {e}")
+        print(f"[ar_scsearch error] {e}")
         return None
 
-
 async def _ytdl_video(link):
+    """جلب stream URL من SoundCloud/أي مصدر"""
     import yt_dlp, uuid
-    clients = ["tv_embedded", "ios", "android", "web"]
-
-    # محاولة 1: stream URL
-    for client in clients:
-        ydl_opts = {
-            "quiet": True,
-            "js_interpreter": "auto",
-            "format": "best[height<=?720][width<=?1280]/best",
-            "extractor_args": {"youtube": {"player_client": [client]}},
-            "skip_download": True,
-        }
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(link, download=False)
-                url = info.get("url")
-                if not url:
-                    fmts = info.get("formats") or []
-                    for f in reversed(fmts):
-                        if f.get("url","").startswith("http"):
-                            url = f["url"]
-                            break
-                if url and url.startswith("http"):
-                    return 1, url
-        except Exception as e:
-            print(f"[ar_ytdl_video {client}] {e}")
-
-    return 0, "all clients failed"
-
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": "best[height<=?720]/best",
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(link, download=False)
+            url = info.get("url")
+            if not url:
+                fmts = info.get("formats") or []
+                for f in reversed(fmts):
+                    if f.get("url", "").startswith("http"):
+                        url = f["url"]
+                        break
+            if url and url.startswith("http"):
+                return 1, url
+    except Exception as e:
+        print(f"[ar_ytdl_video error] {e}")
+    return 0, "failed"
 
 def _get_vq(Q):
     if Q == 480:

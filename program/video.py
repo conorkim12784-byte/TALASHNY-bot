@@ -2,9 +2,8 @@ import re
 import asyncio
 import os
 import uuid
-import socket
 
-from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5, YOUTUBE_API_KEY
+from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
@@ -16,103 +15,58 @@ from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
-import re as _re
-import requests as _requests
+import yt_dlp
 
-TOR_PROXY = "socks5://127.0.0.1:9050"
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(DL_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
-def _is_tor_alive() -> bool:
-    """تشيك لو Tor شغال على البورت 9050"""
-    try:
-        s = socket.create_connection(("127.0.0.1", 9050), timeout=2)
-        s.close()
-        return True
-    except Exception:
-        return False
+def _parse_duration(seconds) -> str:
+    if not seconds:
+        return "0:00"
+    seconds = int(seconds)
+    mins, secs = divmod(seconds, 60)
+    hrs, mins = divmod(mins, 60)
+    return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
 
 
 def ytsearch(query: str):
-    """بحث عبر YouTube Data API v3"""
-    try:
-        if not YOUTUBE_API_KEY:
-            return None
-        proxies = {"http": TOR_PROXY, "https": TOR_PROXY} if _is_tor_alive() else None
-        r = _requests.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-            proxies=proxies,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-            proxies=proxies,
-        )
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + mn * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        return [title, url, duration, thumbnail]
-    except Exception as e:
-        print(f"[ytsearch error] {e}")
-        return f"ERROR: {str(e)[:200]}"
-
-
-def _clean_env() -> dict:
-    """
-    بيمسح متغيرات الـ proxy من البيئة عشان yt-dlp ميستخدمش Tor تلقائياً.
-    yt-dlp بيقرأ HTTP_PROXY/HTTPS_PROXY من الـ environment — لو Tor مش شغال بيفشل.
-    """
-    env = os.environ.copy()
-    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY",
-                "GLOBAL_AGENT_HTTPS_PROXY"]:
-        env.pop(key, None)
-    return env
-
-
-
-def _clean_env() -> dict:
-    env = os.environ.copy()
-    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY", "GLOBAL_AGENT_HTTPS_PROXY"]:
-        env.pop(key, None)
-    return env
-
-
-def _ydl_get_audio_url(link: str, client: str) -> str | None:
-    """yt-dlp Python API - جلب stream URL للصوت"""
+    """بحث على SoundCloud عبر yt-dlp — مجاني بدون API"""
     ydl_opts = {
         "quiet": True,
-        "js_interpreter": "auto",
-        "format": "bestaudio/best",
-        "extractor_args": {"youtube": {"player_client": [client]}},
+        "no_warnings": True,
+        "extract_flat": True,
         "skip_download": True,
-        "no_warnings": False,
     }
     try:
-        import yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            duration = _parse_duration(item.get("duration", 0))
+            thumbnail = item.get("thumbnail") or ""
+            if not url:
+                return None
+            return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[scsearch error] {e}")
+        return None
+
+
+def _sc_get_url(link: str):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": "bestaudio/best",
+        "skip_download": True,
+    }
+    try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(link, download=False)
             url = info.get("url")
@@ -124,68 +78,53 @@ def _ydl_get_audio_url(link: str, client: str) -> str | None:
                         break
             return url if url and url.startswith("http") else None
     except Exception as e:
-        print(f"[ydl_audio {client}] {e}")
+        print(f"[sc_get_url error] {e}")
         return None
 
 
-def _ydl_download_audio(link: str, client: str, out_tpl: str) -> str | None:
-    """yt-dlp Python API - تحميل ملف صوتي"""
+def _sc_download(link: str, out_tpl: str):
     ydl_opts = {
         "quiet": True,
-        "js_interpreter": "auto",
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-        "extractor_args": {"youtube": {"player_client": [client]}},
+        "no_warnings": True,
+        "format": "bestaudio/best",
         "outtmpl": out_tpl,
     }
     try:
-        import yt_dlp
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([link])
         return None
     except Exception as e:
-        print(f"[ydl_dl_audio {client}] {e}")
+        print(f"[sc_download error] {e}")
         return str(e)
 
 
-def _ydl_download_video(link: str, client: str, out_tpl: str, fmt: str) -> str | None:
-    """yt-dlp Python API - تحميل فيديو"""
+def _sc_download_video(link: str, out_tpl: str, fmt: str):
     ydl_opts = {
         "quiet": True,
-        "js_interpreter": "auto",
+        "no_warnings": True,
         "format": fmt,
-        "extractor_args": {"youtube": {"player_client": [client]}},
         "outtmpl": out_tpl,
         "merge_output_format": "mp4",
     }
     try:
-        import yt_dlp
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([link])
         return None
     except Exception as e:
-        print(f"[ydl_dl_video {client}] {e}")
+        print(f"[sc_dl_video error] {e}")
         return str(e)
 
 
 async def ytdl_audio(link):
-    clients = ["tv_embedded", "ios", "android", "web"]
-
-    # محاولة 1: stream URL مباشر
-    for client in clients:
-        url = await asyncio.to_thread(_ydl_get_audio_url, link, client)
-        if url:
-            return 1, url
-
-    # محاولة 2: تحميل ملف محلي
+    url = await asyncio.to_thread(_sc_get_url, link)
+    if url:
+        return 1, url
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    last_err = "all clients failed"
-    for client in clients:
-        last_err = await asyncio.to_thread(_ydl_download_audio, link, client, out_tpl) or "unknown"
-        for ff in os.listdir(AUDIO_DIR):
-            if ff.startswith(uid):
-                return 1, os.path.join(AUDIO_DIR, ff)
-
+    last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
+    for ff in os.listdir(AUDIO_DIR):
+        if ff.startswith(uid):
+            return 1, os.path.join(AUDIO_DIR, ff)
     return 0, last_err
 
 
@@ -199,18 +138,13 @@ async def ytdl_video(link, quality=720):
         fmt = "bestvideo[height<=360]+bestaudio/best"
     else:
         fmt = "bestvideo[height<=720]+bestaudio/best"
-
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-    clients = ["tv_embedded", "ios", "android", "web"]
-    for client in clients:
-        await asyncio.to_thread(_ydl_download_video, link, client, out_tpl, fmt)
-        for ff in os.listdir(DL_DIR):
-            if ff.startswith(uid):
-                return 1, os.path.join(DL_DIR, ff)
-
+    await asyncio.to_thread(_sc_download_video, link, out_tpl, fmt)
+    for ff in os.listdir(DL_DIR):
+        if ff.startswith(uid):
+            return 1, os.path.join(DL_DIR, ff)
     return 0, "failed"
-
 
 def get_video_quality(Q):
     if Q == 480:

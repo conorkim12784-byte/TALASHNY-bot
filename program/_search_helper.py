@@ -1,93 +1,106 @@
-# _search_helper.py
+# _search_helper.py — بحث وتحميل عبر SoundCloud (مجاني بدون API key)
 
 import asyncio
 import re as _re
-import requests as _req
 import os
+import uuid
 import yt_dlp
 
+AUDIO_DIR = "/tmp/tgbot_audio"
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
-def _clean_env() -> dict:
-    env = os.environ.copy()
-    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY", "GLOBAL_AGENT_HTTPS_PROXY"]:
-        env.pop(key, None)
-    return env
-
-
-def _parse_iso(iso: str) -> str:
-    m = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-    if not m:
+def _parse_duration(seconds) -> str:
+    if not seconds:
         return "0:00"
-    h, mn, s = int(m.group(1) or 0), int(m.group(2) or 0), int(m.group(3) or 0)
-    total = h * 3600 + mn * 60 + s
-    mins, secs = divmod(total, 60)
+    seconds = int(seconds)
+    mins, secs = divmod(seconds, 60)
     hrs, mins = divmod(mins, 60)
     return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
 
 
 def ytsearch(query: str):
-    """بحث عبر YouTube Data API v3"""
+    """بحث على SoundCloud عبر yt-dlp — مجاني بدون API"""
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "default_search": "scsearch1",
+        "skip_download": True,
+    }
     try:
-        from config import YOUTUBE_API_KEY
-        if not YOUTUBE_API_KEY:
-            return None
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        duration = _parse_iso(iso)
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        return [title, url, duration, thumbnail]
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            url = item.get("url") or item.get("webpage_url") or ""
+            duration = _parse_duration(item.get("duration", 0))
+            thumbnail = item.get("thumbnail") or ""
+            if not url:
+                return None
+            return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch error] {e}")
+        print(f"[scsearch error] {e}")
         return None
 
 
+def _sc_get_url(link: str):
+    """جلب stream URL من SoundCloud"""
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": "bestaudio/best",
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(link, download=False)
+            url = info.get("url")
+            if not url:
+                fmts = info.get("formats") or []
+                for f in reversed(fmts):
+                    if f.get("url", "").startswith("http"):
+                        url = f["url"]
+                        break
+            return url if url and url.startswith("http") else None
+    except Exception as e:
+        print(f"[sc_get_url error] {e}")
+        return None
+
+
+def _sc_download(link: str, out_tpl: str):
+    """تحميل ملف صوتي من SoundCloud"""
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": "bestaudio/best",
+        "outtmpl": out_tpl,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+        return None
+    except Exception as e:
+        print(f"[sc_download error] {e}")
+        return str(e)
+
+
 async def ytdl_audio(link: str):
-    """جلب stream URL للصوت عبر yt-dlp Python API"""
-    clients = ["tv_embedded", "ios", "android", "web"]
-    last_err = "all clients failed"
+    """جلب stream URL أو تحميل ملف من SoundCloud"""
+    # محاولة 1: stream URL مباشر
+    url = await asyncio.to_thread(_sc_get_url, link)
+    if url:
+        return 1, url
 
-    def _get_url(client):
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": False,
-            "js_interpreter": "auto",
-            "format": "bestaudio/best",
-            "extractor_args": {"youtube": {"player_client": [client]}},
-            "skip_download": True,
-        }
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(link, download=False)
-                url = info.get("url") or (info.get("formats") or [{}])[-1].get("url", "")
-                return url if url and url.startswith("http") else None
-        except Exception as e:
-            return None
-
-    for client in clients:
-        url = await asyncio.to_thread(_get_url, client)
-        if url:
-            return 1, url
+    # محاولة 2: تحميل ملف محلي
+    uid = uuid.uuid4().hex[:8]
+    out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
+    last_err = await asyncio.to_thread(_sc_download, link, out_tpl) or "download failed"
+    for ff in os.listdir(AUDIO_DIR):
+        if ff.startswith(uid):
+            return 1, os.path.join(AUDIO_DIR, ff)
 
     return 0, last_err
