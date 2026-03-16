@@ -180,10 +180,7 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """
-    تحميل فيديو — يجرب YouTube أولاً ثم Dailymotion تلقائياً
-    وبيمسح الملف بعد 10 دقائق
-    """
+    """تحميل فيديو من Dailymotion فقط (يوتيوب محظور على السيرفر)"""
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
@@ -194,25 +191,14 @@ async def ytdl_video(link, quality=720):
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
-    # محاولة 1: YouTube
-    await asyncio.to_thread(_yt_download_video, link, out_tpl, fmt)
+    # Dailymotion مباشرة بدون يوتيوب
+    await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
     for ff in os.listdir(DL_DIR):
         if ff.startswith(uid):
             filepath = os.path.join(DL_DIR, ff)
             asyncio.create_task(_auto_delete(filepath))
+            print(f"[ytdl_video] Dailymotion: {ff}")
             return 1, filepath
-
-    # محاولة 2: Dailymotion لو YouTube فشل
-    dm = await asyncio.to_thread(_dm_search, link)
-    if dm:
-        dm_uid = uuid.uuid4().hex[:8]
-        dm_tpl = os.path.join(DL_DIR, f"{dm_uid}.%(ext)s")
-        await asyncio.to_thread(_dm_download_video, dm[1], dm_tpl, fmt)
-        for ff in os.listdir(DL_DIR):
-            if ff.startswith(dm_uid):
-                filepath = os.path.join(DL_DIR, ff)
-                asyncio.create_task(_auto_delete(filepath))
-                return 1, filepath
 
     return 0, "failed"
 
@@ -227,7 +213,7 @@ async def _auto_delete(filepath: str, delay: int = 600):
         pass
 
 def multisearch_video(query: str):
-    """بحث متعدد المصادر: YouTube أولاً ثم Dailymotion"""
+    """بحث الفيديو على Dailymotion فقط (يوتيوب محظور على السيرفر)"""
     # YouTube
     result = ytsearch_yt(query)
     if result and isinstance(result, list) and len(result) == 4:
