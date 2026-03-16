@@ -71,6 +71,7 @@ async def _ytdl_video(link):
     for client in clients:
         ydl_opts = {
             "quiet": True,
+            "js_interpreter": "auto",
             "format": "best[height<=?720][width<=?1280]/best",
             "extractor_args": {"youtube": {"player_client": [client]}},
             "skip_download": True,

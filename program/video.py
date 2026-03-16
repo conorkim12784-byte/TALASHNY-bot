@@ -105,6 +105,7 @@ def _ydl_get_audio_url(link: str, client: str) -> str | None:
     """yt-dlp Python API - جلب stream URL للصوت"""
     ydl_opts = {
         "quiet": True,
+        "js_interpreter": "auto",
         "format": "bestaudio/best",
         "extractor_args": {"youtube": {"player_client": [client]}},
         "skip_download": True,
@@ -131,6 +132,7 @@ def _ydl_download_audio(link: str, client: str, out_tpl: str) -> str | None:
     """yt-dlp Python API - تحميل ملف صوتي"""
     ydl_opts = {
         "quiet": True,
+        "js_interpreter": "auto",
         "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "extractor_args": {"youtube": {"player_client": [client]}},
         "outtmpl": out_tpl,
@@ -149,6 +151,7 @@ def _ydl_download_video(link: str, client: str, out_tpl: str, fmt: str) -> str |
     """yt-dlp Python API - تحميل فيديو"""
     ydl_opts = {
         "quiet": True,
+        "js_interpreter": "auto",
         "format": fmt,
         "extractor_args": {"youtube": {"player_client": [client]}},
         "outtmpl": out_tpl,

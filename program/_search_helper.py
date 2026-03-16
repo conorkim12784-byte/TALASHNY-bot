@@ -72,6 +72,7 @@ async def ytdl_audio(link: str):
         ydl_opts = {
             "quiet": True,
             "no_warnings": False,
+            "js_interpreter": "auto",
             "format": "bestaudio/best",
             "extractor_args": {"youtube": {"player_client": [client]}},
             "skip_download": True,
