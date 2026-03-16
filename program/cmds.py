@@ -89,12 +89,12 @@ async def show_commands(c: Client, m: Message):
         await c.send_animation(
             m.chat.id,
             animation=GIF_URL,
-            caption="**اختار تصنيف الأوامر اللي عايزه 👇**",
+            caption="**╭────⌁TALASHNY⌁────⟤\n│╭───────────⟢\n╞╡          Command List \n╞╡ \n╞╡ Select A Button To Learn More \n│╰────────────╮\n│╭────────────╯\n╞╡   Enjoy A Unique Experience \n│╰───────────⟢\n╰────⌁TALASHNY⌁────⟤**",
             reply_markup=main_keyboard()
         )
     except Exception:
         await m.reply(
-            "**اختار تصنيف الأوامر اللي عايزه 👇**",
+            "**╭────⌁TALASHNY⌁────⟤\n│╭───────────⟢\n╞╡          Command List \n╞╡ \n╞╡ Select A Button To Learn More \n│╰────────────╮\n│╭────────────╯\n╞╡   Enjoy A Unique Experience \n│╰───────────⟢\n╰────⌁TALASHNY⌁────⟤**",
             reply_markup=main_keyboard()
         )
 
