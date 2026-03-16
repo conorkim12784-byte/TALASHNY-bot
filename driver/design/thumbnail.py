@@ -1,91 +1,115 @@
 import os
-import random
 import aiohttp
 import aiofiles
+import random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from collections import Counter
 
 W, H = 1280, 720
 
-FONT_BOLD = "driver/source/medium.ttf"
 FONT = "driver/source/regular.ttf"
+FONT_BOLD = "driver/source/medium.ttf"
 
 
 def load_fonts():
     try:
-        big = ImageFont.truetype(FONT_BOLD, 60)
-        med = ImageFont.truetype(FONT, 32)
-        small = ImageFont.truetype(FONT, 22)
+        title = ImageFont.truetype(FONT_BOLD, 55)
+        text = ImageFont.truetype(FONT, 30)
     except:
-        big = med = small = ImageFont.load_default()
-    return big, med, small
+        title = text = ImageFont.load_default()
+    return title, text
 
 
-def make_circle(img, size):
+def circle(img, size):
+
     img = img.resize((size, size)).convert("RGBA")
 
     mask = Image.new("L", (size, size), 0)
     d = ImageDraw.Draw(mask)
     d.ellipse((0, 0, size, size), fill=255)
 
-    circle = Image.new("RGBA", (size, size))
-    circle.paste(img, (0, 0), mask)
+    out = Image.new("RGBA", (size, size))
+    out.paste(img, (0, 0), mask)
 
-    return circle
+    return out
 
 
-def draw_spectrum(draw):
+def dominant_color(img):
 
-    base = H - 160
-    center = W // 2
+    img = img.resize((100, 100))
+    pixels = list(img.getdata())
 
-    for i in range(-40, 40):
+    r, g, b = Counter(pixels).most_common(1)[0][0]
 
-        x = center + i * 12
-        h = random.randint(20, 100)
+    return (r, g, b)
+
+
+def glow(base, color):
+
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(glow)
+
+    d.ellipse(
+        [50, 150, 450, 550],
+        fill=(*color, 120)
+    )
+
+    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    base.alpha_composite(glow)
+
+
+def spectrum(draw, color):
+
+    start = 250
+    base = 560
+
+    for i in range(70):
+
+        x = start + i * 12
+        h = random.randint(20, 90)
 
         draw.rectangle(
-            [x, base - h, x + 6, base],
-            fill=(255, 255, 255, 180)
+            [x, base - h, x + 7, base],
+            fill=(*color, 200)
         )
 
 
-def draw_progress(draw):
+def progress(draw, color):
 
-    bar_w = 500
-    bar_x = W // 2 - bar_w // 2
-    bar_y = H - 90
+    bar_x = 250
+    bar_y = 620
+    bar_w = 780
 
     draw.rectangle(
         [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
-        fill=(255, 255, 255, 60)
+        fill=(255,255,255,60)
     )
 
-    progress = int(bar_w * 0.4)
+    p = int(bar_w * 0.45)
 
     draw.rectangle(
-        [bar_x, bar_y, bar_x + progress, bar_y + 6],
-        fill=(255, 255, 255, 220)
+        [bar_x, bar_y, bar_x + p, bar_y + 6],
+        fill=color
     )
 
     draw.ellipse(
-        [bar_x + progress - 6, bar_y - 5,
-         bar_x + progress + 6, bar_y + 11],
-        fill=(255, 255, 255)
+        [bar_x+p-6, bar_y-5, bar_x+p+6, bar_y+11],
+        fill=color
     )
 
 
 def watermark(draw):
 
     try:
-        font = ImageFont.truetype(FONT_BOLD, 100)
+        font = ImageFont.truetype(FONT_BOLD, 42)
     except:
         font = ImageFont.load_default()
 
     draw.text(
-        (W//2 - 300, H//2 + 150),
+        (1060, 680),
         "TALASHNY",
         font=font,
-        fill=(255, 255, 255, 18)
+        fill=(255,255,255,60)
     )
 
 
@@ -93,77 +117,68 @@ async def thumb(thumbnail, title, userid, ctitle):
 
     os.makedirs("search", exist_ok=True)
 
-    path = f"search/thumb{userid}.png"
+    path = f"search/{userid}.png"
 
     cover = None
 
-    if thumbnail:
+    try:
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(thumbnail) as resp:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(thumbnail) as r:
 
-                    if resp.status == 200:
+                if r.status == 200:
 
-                        async with aiofiles.open(path, "wb") as f:
-                            await f.write(await resp.read())
+                    async with aiofiles.open(path, "wb") as f:
+                        await f.write(await r.read())
 
-                        cover = Image.open(path).convert("RGBA")
+                    cover = Image.open(path).convert("RGBA")
 
-        except:
-            pass
+    except:
+        pass
 
     if cover:
 
         bg = cover.resize((W, H))
-        bg = bg.filter(ImageFilter.GaussianBlur(30))
+        bg = bg.filter(ImageFilter.GaussianBlur(40))
+
+        color = dominant_color(cover)
 
     else:
 
-        bg = Image.new("RGBA", (W, H), (20, 20, 40))
+        bg = Image.new("RGBA", (W, H), (20,20,40))
+        color = (120,120,255)
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 160))
+    overlay = Image.new("RGBA", (W, H), (0,0,0,180))
     bg.alpha_composite(overlay)
+
+    glow(bg, color)
 
     draw = ImageDraw.Draw(bg)
 
-    big, med, small = load_fonts()
-
-    # مكان الصورة
-    cx = W // 2
-    cy = 250
+    title_font, text_font = load_fonts()
 
     if cover:
 
-        circle = make_circle(cover, 260)
-
-        bg.paste(circle, (cx - 130, cy - 130), circle)
-
-        draw.ellipse(
-            [cx - 140, cy - 140, cx + 140, cy + 140],
-            outline=(255, 255, 255, 120),
-            width=4
-        )
-
-    title = title[:32]
+        cover_circle = circle(cover, 300)
+        bg.paste(cover_circle, (80, 200), cover_circle)
 
     draw.text(
-        (W//2 - 320, 380),
-        title,
-        font=big,
-        fill=(255, 255, 255)
+        (450,260),
+        title[:32],
+        font=title_font,
+        fill=(255,255,255)
     )
 
     draw.text(
-        (W//2 - 320, 450),
+        (450,340),
         f"Playing on: {ctitle}",
-        font=med,
-        fill=(200, 200, 200)
+        font=text_font,
+        fill=(220,220,220)
     )
 
-    draw_spectrum(draw)
+    spectrum(draw, color)
 
-    draw_progress(draw)
+    progress(draw, color)
 
     watermark(draw)
 
