@@ -6,290 +6,210 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from collections import Counter
 
+try:
+    import pytz
+    CAIRO_TZ = pytz.timezone("Africa/Cairo")
+except ImportError:
+    CAIRO_TZ = None
+
 W, H = 1280, 720
 
-FONT       = "driver/source/regular.ttf"
-FONT_BOLD  = "driver/source/medium.ttf"
-
-# ── ألوان التصميم الأزرق الداكن ──────────────────────────
-BG_TOP      = (2,   8,  24)
-BG_BOT      = (5,  13,  46)
-BLUE_DARK   = (13,  36,  96)
-BLUE_MID    = (29,  78, 216)
-BLUE_LIGHT  = (59, 130, 246)
-BLUE_PALE   = (147, 197, 253)
-TEXT_WHITE  = (239, 246, 255)
-TEXT_MUTED  = (96,  165, 250)
-TEXT_DIM    = (29,  78, 216)
+FONT        = "driver/source/regular.ttf"
+FONT_BOLD   = "driver/source/medium.ttf"
 
 
-def _load_font(path, size):
+def get_cairo_time() -> str:
+    if CAIRO_TZ:
+        now = datetime.now(CAIRO_TZ)
+    else:
+        # UTC+2 يدوي لو pytz مش موجود
+        from datetime import timezone, timedelta
+        now = datetime.now(timezone(timedelta(hours=2)))
+    return now.strftime("%I:%M %p")
+
+
+def load_font(path, size):
     try:
         return ImageFont.truetype(path, size)
-    except Exception:
+    except:
         return ImageFont.load_default()
 
 
-def _gradient_bg(size):
-    """خلفية gradient أزرق داكن"""
-    img = Image.new("RGBA", size)
-    draw = ImageDraw.Draw(img)
-    w, h = size
-    for y in range(h):
-        t = y / h
-        r = int(BG_TOP[0] + (BG_BOT[0] - BG_TOP[0]) * t)
-        g = int(BG_TOP[1] + (BG_BOT[1] - BG_TOP[1]) * t)
-        b = int(BG_TOP[2] + (BG_BOT[2] - BG_TOP[2]) * t)
-        draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
-    return img
+def rounded_rect(draw, xy, radius, fill):
+    x1, y1, x2, y2 = xy
+    draw.rectangle([x1 + radius, y1, x2 - radius, y2], fill=fill)
+    draw.rectangle([x1, y1 + radius, x2, y2 - radius], fill=fill)
+    draw.ellipse([x1, y1, x1 + radius*2, y1 + radius*2], fill=fill)
+    draw.ellipse([x2 - radius*2, y1, x2, y1 + radius*2], fill=fill)
+    draw.ellipse([x1, y2 - radius*2, x1 + radius*2, y2], fill=fill)
+    draw.ellipse([x2 - radius*2, y2 - radius*2, x2, y2], fill=fill)
 
 
-def _rounded_rect(draw, xy, radius, fill, outline=None, outline_width=1):
-    """مستطيل بزوايا مدورة"""
-    x0, y0, x1, y1 = xy
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=radius,
-                            fill=fill, outline=outline, width=outline_width)
-
-
-def _glow_ellipse(base, cx, cy, rx, ry, color, alpha=80):
-    """glow بنقطة ضوء"""
-    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=(*color, alpha))
-    layer = layer.filter(ImageFilter.GaussianBlur(80))
-    base.alpha_composite(layer)
-
-
-def _cover_rounded(cover_img, size=390, radius=30):
-    """غلاف الألبوم مربع بزوايا مدورة"""
-    cover_img = cover_img.resize((size, size)).convert("RGBA")
+def rounded_image(img, size, radius=24):
+    img = img.resize((size, size)).convert("RGBA")
     mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, size - 1, size - 1], radius=radius, fill=255
-    )
+    d = ImageDraw.Draw(mask)
+    d.rounded_rectangle([0, 0, size, size], radius=radius, fill=255)
     out = Image.new("RGBA", (size, size))
-    out.paste(cover_img, (0, 0), mask)
+    out.paste(img, (0, 0), mask)
     return out
 
 
-def _equalizer_bars(draw, x_start, y_base, count, color):
-    """إيكوالايزر"""
-    bar_w = 13
-    gap   = 8
-    for i in range(count):
-        h = random.randint(28, 90)
+def dominant_color(img):
+    img = img.resize((80, 80)).convert("RGB")
+    pixels = list(img.getdata())
+    # نتجاهل الألوان الداكنة جداً
+    pixels = [p for p in pixels if sum(p) > 60]
+    if not pixels:
+        return (80, 120, 255)
+    r, g, b = Counter(pixels).most_common(1)[0][0]
+    # نجعل اللون أكثر إشباعاً
+    mx = max(r, g, b) or 1
+    factor = 200 / mx
+    return (min(int(r * factor), 255), min(int(g * factor), 255), min(int(b * factor), 255))
+
+
+def draw_glow(base, color, x, y, size):
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(glow)
+    d.ellipse([x - size, y - size, x + size, y + size], fill=(*color, 80))
+    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    base.alpha_composite(glow)
+
+
+def draw_equalizer(draw, color, x_start, y_base, count=28, bar_w=8, gap=5):
+    heights = [random.randint(15, 70) for _ in range(count)]
+    for i, h in enumerate(heights):
         x = x_start + i * (bar_w + gap)
-        alpha = 200
-        draw.rounded_rectangle(
+        alpha = random.randint(160, 230)
+        draw.rectangle(
             [x, y_base - h, x + bar_w, y_base],
-            radius=4,
             fill=(*color, alpha)
         )
 
 
-def _progress_bar(draw, x, y, total_w, progress_ratio, color):
-    """شريط التقدم"""
-    # track
-    draw.rounded_rectangle([x, y, x + total_w, y + 8], radius=4,
-                            fill=(*BLUE_DARK, 255))
-    # fill
-    filled = int(total_w * progress_ratio)
-    if filled > 0:
-        draw.rounded_rectangle([x, y, x + filled, y + 8], radius=4,
-                                fill=(*color, 255))
+def draw_progress(draw, color, x, y, width, percent=0.45):
+    # شريط خلفي
+    draw.rounded_rectangle([x, y, x + width, y + 5], radius=3, fill=(255, 255, 255, 40))
+    # شريط التقدم
+    filled = int(width * percent)
+    draw.rounded_rectangle([x, y, x + filled, y + 5], radius=3, fill=(*color, 220))
     # نقطة
     dot_x = x + filled
-    r = 12
-    draw.ellipse([dot_x - r, y + 4 - r, dot_x + r, y + 4 + r],
-                 fill=(*BLUE_LIGHT, 255))
-    draw.ellipse([dot_x - 5, y + 4 - 5, dot_x + 5, y + 4 + 5],
-                 fill=(2, 8, 24, 255))
+    draw.ellipse([dot_x - 7, y - 5, dot_x + 7, y + 10], fill=color)
 
 
-def dominant_color(img):
-    small = img.resize((80, 80)).convert("RGB")
-    pixels = list(small.getdata())
-    # نتجاهل الألوان القريبة من الأسود أو الأبيض
-    filtered = [p for p in pixels if not (
-        all(c < 30 for c in p) or all(c > 225 for c in p)
-    )]
-    if not filtered:
-        return BLUE_MID
-    r, g, b = Counter(filtered).most_common(1)[0][0]
-    return (r, g, b)
-
-
-async def thumb(thumbnail, title, userid, ctitle,
-                requester="", duration=0):
-    """
-    thumbnail  : URL صورة الألبوم
-    title      : اسم الأغنية
-    userid     : id المستخدم (للتخزين المؤقت)
-    ctitle     : اسم المجموعة
-    requester  : اسم من طلب الأغنية
-    duration   : مدة الأغنية بالثواني (لشريط التقدم)
-    """
+async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **kwargs):
 
     os.makedirs("search", exist_ok=True)
     path = f"search/{userid}.png"
     cover = None
 
-    # تحقق من صحة الـ URL
+    # تحميل صورة الغلاف
     is_valid_url = (
         thumbnail
         and isinstance(thumbnail, str)
         and thumbnail.startswith(("http://", "https://"))
     )
 
-    try:
-        if not is_valid_url:
-            raise ValueError("Invalid URL")
-        async with aiohttp.ClientSession() as s:
-            async with s.get(thumbnail, timeout=aiohttp.ClientTimeout(total=8)) as r:
-                if r.status == 200:
-                    async with aiofiles.open(path, "wb") as f:
-                        await f.write(await r.read())
-                    cover = Image.open(path).convert("RGBA")
-    except Exception:
-        pass
+    if is_valid_url:
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(thumbnail, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    if r.status == 200:
+                        async with aiofiles.open(path, "wb") as f:
+                            await f.write(await r.read())
+                        cover = Image.open(path).convert("RGBA")
+        except:
+            cover = None
 
-    # ── بناء الخلفية ─────────────────────────────────────
-    bg = _gradient_bg((W, H))
+    # ===== الخلفية =====
+    if cover:
+        bg = cover.resize((W, H)).filter(ImageFilter.GaussianBlur(45))
+        color = dominant_color(cover)
+    else:
+        bg = Image.new("RGBA", (W, H), (8, 10, 28))
+        color = (80, 120, 255)
+
+    # overlay داكن
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 160))
+    bg.alpha_composite(overlay)
 
     # glow
-    _glow_ellipse(bg, 280, 330, 320, 300, BLUE_DARK, alpha=100)
-    _glow_ellipse(bg, 950, 580, 250, 200, BLUE_DARK, alpha=60)
+    draw_glow(bg, color, 280, 340, 260)
 
     draw = ImageDraw.Draw(bg)
 
-    # ── شريط accent جانبي ────────────────────────────────
-    for i, alpha in enumerate(range(255, 0, -8)):
-        draw.rectangle([72, 110 + i * 2, 78, 114 + i * 2],
-                        fill=(*BLUE_MID, max(0, alpha)))
-
-    # ── غلاف الألبوم ─────────────────────────────────────
-    COVER_X, COVER_Y, COVER_SIZE = 80, 110, 420
-
+    # ===== صورة الغلاف — مربع بزوايا مدورة =====
+    cover_size = 280
+    cover_x, cover_y = 70, 180
     if cover:
-        accent_color = dominant_color(cover)
-        # glow بلون الغلاف
-        _glow_ellipse(bg, COVER_X + COVER_SIZE // 2,
-                      COVER_Y + COVER_SIZE // 2,
-                      260, 260, accent_color, alpha=70)
-        cover_img = _cover_rounded(cover, COVER_SIZE, radius=32)
-        bg.paste(cover_img, (COVER_X, COVER_Y), cover_img)
+        cover_sq = rounded_image(cover, cover_size, radius=22)
+        bg.paste(cover_sq, (cover_x, cover_y), cover_sq)
+        # إطار حول الصورة
+        draw.rounded_rectangle(
+            [cover_x - 2, cover_y - 2, cover_x + cover_size + 2, cover_y + cover_size + 2],
+            radius=24, outline=(*color, 180), width=2
+        )
     else:
-        accent_color = BLUE_MID
-        # مربع placeholder
-        _rounded_rect(draw,
-                      [COVER_X, COVER_Y,
-                       COVER_X + COVER_SIZE, COVER_Y + COVER_SIZE],
-                      radius=32,
-                      fill=(*BLUE_DARK, 255),
-                      outline=(*BLUE_MID, 160), outline_width=2)
-        # أيقونة موسيقى
-        note_font = _load_font(FONT_BOLD, 140)
-        draw.text((COVER_X + COVER_SIZE // 2, COVER_Y + COVER_SIZE // 2 - 20),
-                  "♫", font=note_font,
-                  fill=(*BLUE_MID, 80), anchor="mm")
+        # مربع placeholder لو مفيش صورة
+        draw.rounded_rectangle(
+            [cover_x, cover_y, cover_x + cover_size, cover_y + cover_size],
+            radius=22, fill=(20, 25, 60)
+        )
+        note_font = load_font(FONT_BOLD, 80)
+        draw.text(
+            (cover_x + cover_size // 2, cover_y + cover_size // 2),
+            "♪", font=note_font, fill=(*color, 150), anchor="mm"
+        )
 
-    # إطار الغلاف
-    _rounded_rect(draw,
-                  [COVER_X, COVER_Y,
-                   COVER_X + COVER_SIZE, COVER_Y + COVER_SIZE],
-                  radius=32, fill=None,
-                  outline=(*BLUE_LIGHT, 80), outline_width=2)
+    # ===== النصوص =====
+    title_font  = load_font(FONT_BOLD, 52)
+    sub_font    = load_font(FONT, 28)
+    small_font  = load_font(FONT, 24)
+    badge_font  = load_font(FONT_BOLD, 22)
 
-    # ── خط فاصل عمودي ────────────────────────────────────
-    SEP_X = 545
-    for i, alpha in enumerate(range(180, 0, -3)):
-        y = 80 + i * 2
-        draw.rectangle([SEP_X, y, SEP_X + 1, y + 2],
-                        fill=(*BLUE_MID, max(0, alpha)))
-
-    # ── الجانب الأيمن: المعلومات ──────────────────────────
-    INFO_X = 575
-    now_time = datetime.now().strftime("%I:%M %p")
-
-    # وقت الآن - badge
-    _rounded_rect(draw, [INFO_X, 80, INFO_X + 200, 110],
-                  radius=15,
-                  fill=(*BLUE_DARK, 200),
-                  outline=(*BLUE_MID, 120), outline_width=1)
-    time_font = _load_font(FONT, 24)
-    draw.text((INFO_X + 100, 95), f"⏰  {now_time}",
-              font=time_font, fill=TEXT_MUTED, anchor="mm")
-
-    # NOW PLAYING badge
-    _rounded_rect(draw, [INFO_X, 128, INFO_X + 195, 158],
-                  radius=15,
-                  fill=(*BLUE_MID, 200))
-    np_font = _load_font(FONT_BOLD, 22)
-    draw.text((INFO_X + 98, 143), "NOW PLAYING",
-              font=np_font, fill=(*BLUE_PALE, 255), anchor="mm")
+    text_x = 400
 
     # اسم الأغنية
-    title_font  = _load_font(FONT_BOLD, 58)
-    text_font   = _load_font(FONT, 30)
-    small_font  = _load_font(FONT, 26)
+    clean_title = title[:30] + ("..." if len(title) > 30 else "")
+    draw.text((text_x, 195), clean_title, font=title_font, fill=(255, 255, 255))
 
-    song_title = title[:28] + ("…" if len(title) > 28 else "")
-    draw.text((INFO_X, 185), song_title,
-              font=title_font, fill=TEXT_WHITE)
+    # اسم القناة/المجموعة
+    draw.text((text_x, 265), f"🎵  {ctitle}", font=sub_font, fill=(200, 200, 220))
 
-    # خط فاصل
-    draw.rectangle([INFO_X, 255, INFO_X + 310, 257],
-                   fill=(*BLUE_MID, 100))
-
-    # اسم المجموعة
-    draw.text((INFO_X, 272), "▶  playing on",
-              font=small_font, fill=TEXT_DIM)
-    draw.text((INFO_X, 305), ctitle[:30],
-              font=text_font, fill=TEXT_MUTED)
-
-    # خط فاصل
-    draw.rectangle([INFO_X, 345, INFO_X + 310, 347],
-                   fill=(*BLUE_MID, 60))
-
-    # من طلب الأغنية
+    # اسم الطالب
     if requester:
-        draw.text((INFO_X, 360), "👤  طلب بواسطة",
-                  font=small_font, fill=TEXT_DIM)
-        req_name = requester[:25] + ("…" if len(requester) > 25 else "")
-        draw.text((INFO_X, 395), req_name,
-                  font=text_font, fill=BLUE_PALE)
+        draw.text((text_x, 310), f"👤  {requester}", font=sub_font, fill=(180, 180, 210))
 
-    # ── شريط التقدم ──────────────────────────────────────
-    BAR_X = INFO_X
-    BAR_Y = 455
-    BAR_W = 620
+    # الوقت الحالي بتوقيت القاهرة
+    cairo_time = get_cairo_time()
+    draw.text((text_x, 355), f"🕐  {cairo_time}", font=sub_font, fill=(160, 160, 200))
 
-    # نسبة التقدم عشوائية للعرض (الواقع: حسب الوقت)
-    ratio = 0.42
+    # خط فاصل
+    draw.line([(text_x, 400), (1200, 400)], fill=(*color, 80), width=1)
 
-    _progress_bar(draw, BAR_X, BAR_Y, BAR_W, ratio, BLUE_LIGHT)
+    # ===== إيكوالايزر =====
+    draw_equalizer(draw, color, x_start=text_x, y_base=510, count=26, bar_w=9, gap=6)
 
-    # وقت
-    elapsed_s = int(duration * ratio)
-    elapsed   = f"{elapsed_s // 60}:{elapsed_s % 60:02d}" if duration else "0:00"
-    total_str = f"{duration // 60}:{duration % 60:02d}" if duration else "—:——"
+    # ===== شريط التقدم =====
+    draw_progress(draw, color, x=text_x, y=545, width=780)
 
-    draw.text((BAR_X, BAR_Y + 22), elapsed,
-              font=small_font, fill=TEXT_DIM)
-    draw.text((BAR_X + BAR_W, BAR_Y + 22), total_str,
-              font=small_font, fill=TEXT_DIM, anchor="ra")
+    # وقت البداية والنهاية
+    draw.text((text_x, 562), "0:00", font=small_font, fill=(*color, 200))
+    if duration and int(duration) > 0:
+        mins, secs = divmod(int(duration), 60)
+        hrs, mins = divmod(mins, 60)
+        dur_str = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
+    else:
+        dur_str = "--:--"
+    draw.text((1185, 562), dur_str, font=small_font, fill=(*color, 200), anchor="ra")
 
-    # ── إيكوالايزر ───────────────────────────────────────
-    _equalizer_bars(draw, INFO_X, 610, 25, BLUE_LIGHT)
+    # ===== watermark =====
+    wm_font = load_font(FONT_BOLD, 36)
+    draw.text((1210, 698), "TALASHNY", font=wm_font, fill=(255, 255, 255, 45), anchor="ra")
 
-    # ── watermark ────────────────────────────────────────
-    wm_font = _load_font(FONT_BOLD, 28)
-    draw.text((W - 30, H - 28), "TALASHNY",
-              font=wm_font,
-              fill=(*BLUE_MID, 140),
-              anchor="ra")
-
-    # ── حفظ ──────────────────────────────────────────────
+    # ===== حفظ =====
     out = f"search/final{userid}.png"
     bg.convert("RGB").save(out, quality=95)
     return out
