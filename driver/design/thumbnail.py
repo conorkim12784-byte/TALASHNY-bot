@@ -6,15 +6,15 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 W, H = 1280, 720
 
-FONT = "driver/source/regular.ttf"
 FONT_BOLD = "driver/source/medium.ttf"
+FONT = "driver/source/regular.ttf"
 
 
 def fonts():
     try:
-        big = ImageFont.truetype(FONT_BOLD, 48)
-        med = ImageFont.truetype(FONT, 30)
-        small = ImageFont.truetype(FONT, 22)
+        big = ImageFont.truetype(FONT_BOLD, 64)
+        med = ImageFont.truetype(FONT, 36)
+        small = ImageFont.truetype(FONT, 24)
     except:
         big = med = small = ImageFont.load_default()
     return big, med, small
@@ -33,39 +33,80 @@ def circle(img, size):
     return out
 
 
-def waveform(draw):
-    base = H - 120
-    for i in range(70):
+def neon_glow(base, cx, cy, r):
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(glow)
 
-        x = 250 + i * 12
-        h = random.randint(10, 50)
+    d.ellipse(
+        [cx-r-50, cy-r-50, cx+r+50, cy+r+50],
+        fill=(130, 90, 255, 120)
+    )
 
-        draw.rectangle(
-            [x, base - h, x + 6, base],
-            fill=(255, 255, 255, 120)
+    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    base.alpha_composite(glow)
+
+
+def spectrum(draw):
+
+    center = W // 2
+    base = H - 170
+
+    for i in range(-45, 45):
+
+        x = center + i * 12
+        h = random.randint(10, 120)
+
+        draw.rounded_rectangle(
+            [x, base - h, x + 8, base],
+            radius=3,
+            fill=(255, 255, 255, 200)
         )
+
+
+def progress(draw):
+
+    bar_w = 500
+    bar_x = W // 2 - bar_w // 2
+    bar_y = H - 90
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
+        fill=(255,255,255,60)
+    )
+
+    prog = int(bar_w * 0.45)
+
+    draw.rectangle(
+        [bar_x, bar_y, bar_x + prog, bar_y + 6],
+        fill=(255,255,255,200)
+    )
+
+    draw.ellipse(
+        [bar_x + prog - 6, bar_y - 4,
+         bar_x + prog + 6, bar_y + 10],
+        fill=(255,255,255)
+    )
 
 
 def watermark(draw):
 
     try:
-        font = ImageFont.truetype(FONT_BOLD, 32)
+        font = ImageFont.truetype(FONT_BOLD, 130)
     except:
         font = ImageFont.load_default()
 
     draw.text(
-        (W - 220, H - 40),
+        (W//2 - 350, H//2 + 150),
         "TALASHNY",
         font=font,
-        fill=(255, 255, 255, 40)
+        fill=(255,255,255,20)
     )
 
 
 async def thumb(thumbnail, title, userid, ctitle):
 
     os.makedirs("search", exist_ok=True)
-
-    thumb_path = f"search/thumb{userid}.png"
+    path = f"search/thumb{userid}.png"
 
     cover = None
 
@@ -73,87 +114,61 @@ async def thumb(thumbnail, title, userid, ctitle):
         try:
             async with aiohttp.ClientSession() as s:
                 async with s.get(thumbnail) as r:
-                    if r.status == 200:
 
-                        async with aiofiles.open(thumb_path, "wb") as f:
+                    if r.status == 200:
+                        async with aiofiles.open(path, "wb") as f:
                             await f.write(await r.read())
 
-                        cover = Image.open(thumb_path).convert("RGBA")
+                        cover = Image.open(path).convert("RGBA")
+
         except:
             pass
 
     if cover:
 
         bg = cover.resize((W, H))
-        bg = bg.filter(ImageFilter.GaussianBlur(25))
+        bg = bg.filter(ImageFilter.GaussianBlur(35))
 
     else:
 
-        bg = Image.new("RGBA", (W, H), (20, 20, 35))
+        bg = Image.new("RGBA", (W, H), (15, 15, 30))
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 150))
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 170))
     bg.alpha_composite(overlay)
 
     draw = ImageDraw.Draw(bg)
 
-    card_w = 520
-    card_h = 340
+    cx = W // 2
+    cy = H // 2 - 80
 
-    card_x = (W - card_w) // 2
-    card_y = (H - card_h) // 2
-
-    card = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 40))
-
-    card = card.filter(ImageFilter.GaussianBlur(1))
-
-    bg.paste(card, (card_x, card_y), card)
-
-    draw = ImageDraw.Draw(bg)
-
-    big, med, small = fonts()
+    neon_glow(bg, cx, cy, 150)
 
     if cover:
 
-        cover_circle = circle(cover, 160)
+        cover_circle = circle(cover, 300)
+        bg.paste(cover_circle, (cx - 150, cy - 150), cover_circle)
 
-        cx = W // 2 - 80
-        cy = card_y + 30
+    big, med, small = fonts()
 
-        bg.paste(cover_circle, (cx, cy), cover_circle)
-
-    title = title[:28]
+    title = title[:32]
 
     draw.text(
-        (W // 2 - 200, card_y + 210),
+        (W//2 - 320, H//2 + 120),
         title,
         font=big,
-        fill=(255, 255, 255)
+        fill=(255,255,255)
     )
 
     draw.text(
-        (W // 2 - 200, card_y + 270),
+        (W//2 - 320, H//2 + 200),
         f"Playing on: {ctitle}",
         font=med,
-        fill=(200, 200, 200)
+        fill=(210,210,210)
     )
 
-    bar_x = W // 2 - 200
-    bar_y = card_y + 310
-    bar_w = 400
+    spectrum(draw)
 
-    draw.rectangle(
-        [bar_x, bar_y, bar_x + bar_w, bar_y + 6],
-        fill=(255, 255, 255, 80)
-    )
-
-    prog = int(bar_w * 0.45)
-
-    draw.rectangle(
-        [bar_x, bar_y, bar_x + prog, bar_y + 6],
-        fill=(255, 255, 255, 200)
-    )
-
-    waveform(draw)
+    progress(draw)
 
     watermark(draw)
 
