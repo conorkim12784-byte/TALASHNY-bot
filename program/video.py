@@ -80,31 +80,35 @@ def ytsearch(query: str):
         return f"ERROR: {str(e)[:200]}"
 
 
+def _clean_env() -> dict:
+    """
+    بيمسح متغيرات الـ proxy من البيئة عشان yt-dlp ميستخدمش Tor تلقائياً.
+    yt-dlp بيقرأ HTTP_PROXY/HTTPS_PROXY من الـ environment — لو Tor مش شغال بيفشل.
+    """
+    env = os.environ.copy()
+    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                "ALL_PROXY", "all_proxy", "GLOBAL_AGENT_HTTP_PROXY",
+                "GLOBAL_AGENT_HTTPS_PROXY"]:
+        env.pop(key, None)
+    return env
+
+
 async def _run_ytdlp(cmd):
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=_clean_env(),
     )
     stdout, stderr = await proc.communicate()
     return stdout.decode().strip(), stderr.decode()
 
 
 def _build_cmd(client: str) -> list:
-    """
-    يبني base command لـ yt-dlp:
-    - يضيف Tor proxy لو شغال فعلاً
-    - يضيف cookies لو الملف موجود
-    - يحدد player_client
-    """
+    """يبني base command لـ yt-dlp مع cookies لو موجودة."""
     cmd = ["yt-dlp", "--no-playlist", "--no-warnings"]
-
-    if _is_tor_alive():
-        cmd += ["--proxy", TOR_PROXY]
-
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
-
     cmd += ["--extractor-args", f"youtube:player_client={client}"]
     return cmd
 
