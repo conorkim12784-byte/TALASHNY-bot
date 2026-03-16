@@ -24,7 +24,7 @@ async def song(_, message: Message):
     m = await message.reply("⚡")
     ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
         
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}}}
+        "default_search": "scsearch1"}
     audio_file = None
     thumb_name = None
     try:
@@ -110,7 +110,7 @@ async def vsong(client, message: Message):
         "quiet": True,
         "merge_output_format": "mp4",
         
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
+        "default_search": "scsearch1",
     }
     query = " ".join(message.command[1:])
     if not query:

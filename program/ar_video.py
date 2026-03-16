@@ -13,6 +13,7 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import os as _os
+from program.video import ytsearch_yt as _ytsearch_sync
 
 TOR_PROXY = "socks5://127.0.0.1:9050"
 
@@ -20,58 +21,10 @@ TOR_PROXY = "socks5://127.0.0.1:9050"
 import requests as _req
 import re as _re2
 
-def _ytsearch_sync(query: str):
-    """بحث على SoundCloud"""
-    import yt_dlp
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if not entries:
-                return None
-            item = entries[0]
-            title = (item.get("title") or query)[:70]
-            url = item.get("url") or item.get("webpage_url") or ""
-            secs = int(item.get("duration") or 0)
-            mins, s2 = divmod(secs, 60)
-            h, m = divmod(mins, 60)
-            duration = f"{h}:{m:02d}:{s2:02d}" if h else f"{m}:{s2:02d}"
-            thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail] if url else None
-    except Exception as e:
-        print(f"[ar_scsearch error] {e}")
-        return None
-
 async def _ytdl_video(link):
-    """جلب stream URL من SoundCloud/أي مصدر"""
-    import yt_dlp, uuid
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "format": "best[height<=?720]/best",
-        "skip_download": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(link, download=False)
-            url = info.get("url")
-            if not url:
-                fmts = info.get("formats") or []
-                for f in reversed(fmts):
-                    if f.get("url", "").startswith("http"):
-                        url = f["url"]
-                        break
-            if url and url.startswith("http"):
-                return 1, url
-    except Exception as e:
-        print(f"[ar_ytdl_video error] {e}")
-    return 0, "failed"
+    """تحميل فيديو من YouTube محلياً"""
+    from program.video import ytdl_video as _yt_vid
+    return await _yt_vid(link)
 
 def _get_vq(Q):
     if Q == 480:

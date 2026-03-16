@@ -1,16 +1,25 @@
-# ar_youtube.py - بحث YouTube عبر YouTube Data API v3
+# ar_youtube.py - بحث عبر yt-dlp (SoundCloud + YouTube)
 import asyncio
-import re as _re
-import requests as _req
+import yt_dlp
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
-from config import SUDO_USERS, ASSISTANT_NAME, BOT_USERNAME
-from driver.decorators import authorized_users_only, sudo_users_only, errors
 from driver.filters import command2, other_filters
-from driver.veez import user as USER
-from pyrogram import Client, filters
-from pyrogram.errors import UserAlreadyParticipant
+from pyrogram import Client
 
-TOR_PROXY = "socks5://127.0.0.1:9050"
+def _search_results(query: str):
+    """بحث على SoundCloud بـ 5 نتائج"""
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch5:{query}", download=False)
+            return info.get("entries") or []
+    except Exception as e:
+        print(f"[ar_youtube search error] {e}")
+        return []
 
 
 @Client.on_message(command2(["يوت"]))
@@ -21,53 +30,23 @@ async def ytsearch_cmd(_, message: Message):
     query = message.text.split(None, 1)[1]
     m = await message.reply_text("🔎 جاري البحث انتظر قليلآ...")
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _req.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": query, "type": "video",
-                        "maxResults": 5, "key": YOUTUBE_API_KEY},
-                timeout=10,
-                proxies={"http": TOR_PROXY, "https": TOR_PROXY},
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
+        items = await asyncio.to_thread(_search_results, query)
         if not items:
             return await m.edit("✘ لم يتم العثور على نتائج")
 
-        # جيب مدد الفيديوهات
-        ids = ",".join(i["id"]["videoId"] for i in items)
-        r2 = await asyncio.to_thread(
-            lambda: _req.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={"part": "contentDetails,statistics", "id": ids, "key": YOUTUBE_API_KEY},
-                timeout=10,
-                proxies={"http": TOR_PROXY, "https": TOR_PROXY},
-            )
-        )
-        r2.raise_for_status()
-        details = {d["id"]: d for d in r2.json().get("items", [])}
-
         text = ""
         for item in items:
-            vid_id = item["id"]["videoId"]
-            title = item["snippet"]["title"]
-            channel = item["snippet"]["channelTitle"]
-            detail = details.get(vid_id, {})
-            iso = detail.get("contentDetails", {}).get("duration", "PT0S")
-            mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-            h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-            total = h * 3600 + mn * 60 + s
-            mins, secs = divmod(total, 60)
-            duration = f"{mins}:{secs:02d}"
-            views = detail.get("statistics", {}).get("viewCount", "0")
-            views_fmt = f"{int(views):,}" if views.isdigit() else views
+            title = (item.get("title") or "")[:60]
+            url = item.get("url") or item.get("webpage_url") or ""
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60)
+            h, mn = divmod(mins, 60)
+            duration = f"{h}:{mn:02d}:{s:02d}" if h else f"{mn}:{s:02d}"
+            uploader = item.get("uploader") or item.get("channel") or ""
             text += f"🏷 **الاسم:** __{title}__\n"
             text += f"⏱ **المده:** `{duration}`\n"
-            text += f"👀 **المشاهدات:** `{views_fmt}`\n"
-            text += f"📣 **القناه:** {channel}\n"
-            text += f"🔗 **الرابط:** https://www.youtube.com/watch?v={vid_id}\n\n"
+            text += f"📣 **الفنان:** {uploader}\n"
+            text += f"🔗 **الرابط:** {url}\n\n"
 
         await m.edit(
             text,
