@@ -23,6 +23,7 @@ import json, subprocess, re as _re
 import requests as _requests
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+TOR_PROXY = "socks5://127.0.0.1:9050"
 DL_DIR = "/tmp/tgbot_vids"
 os.makedirs(DL_DIR, exist_ok=True)
 
@@ -96,6 +97,7 @@ async def ytdl_audio(link):
     for client, fmt, use_cookies in clients:
         cmd = ["yt-dlp", "--no-playlist",
                "--extractor-args", f"youtube:player_client={client}",
+               "--proxy", TOR_PROXY,
                "-g", "-f", fmt,
                "--format-sort", "acodec:opus,acodec:aac,acodec:mp4a"]
         if use_cookies and os.path.exists(COOKIES_FILE):
@@ -109,7 +111,8 @@ async def ytdl_audio(link):
         last_err = err
 
     # آخر محاولة بأبسط شكل ممكن
-    cmd = ["yt-dlp", "--no-playlist", "-g", "-f", "bestaudio",
+    cmd = ["yt-dlp", "--no-playlist", "--proxy", TOR_PROXY,
+           "-g", "-f", "bestaudio",
            "--format-sort", "acodec:opus,acodec:aac"]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
@@ -126,6 +129,7 @@ async def ytdl_audio(link):
     __import__("os").makedirs(audio_dir, exist_ok=True)
     out_tpl = f"{audio_dir}/{uid}.%(ext)s"
     cmd = ["yt-dlp", "--no-playlist",
+           "--proxy", TOR_PROXY,
            "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
            "-o", out_tpl]
     if os.path.exists(COOKIES_FILE):
@@ -168,6 +172,7 @@ async def ytdl_video(link, quality=720):
     for client, use_cookies in clients:
         cmd = ["yt-dlp", "--no-playlist",
                "--extractor-args", f"youtube:player_client={client}",
+               "--proxy", TOR_PROXY,
                "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
@@ -178,7 +183,8 @@ async def ytdl_video(link, quality=720):
                 return 1, os.path.join(DL_DIR, ff)
 
     # آخر محاولة بدون تحديد client
-    cmd = ["yt-dlp", "--no-playlist", "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
+    cmd = ["yt-dlp", "--no-playlist", "--proxy", TOR_PROXY,
+           "-f", fmt, "-o", out_tpl, "--merge-output-format", "mp4"]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(link)
