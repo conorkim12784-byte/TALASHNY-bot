@@ -52,6 +52,7 @@ async def register_stream_end_handler(call_py):
                             MediaStream(
                                 next_track["file"],
                                 audio_parameters=AudioQuality.HIGH,
+                                audio_flags=MediaStream.Flags.AUTO_DETECT,
                                 video_flags=MediaStream.Flags.IGNORE,
                             ),
                         )
