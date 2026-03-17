@@ -1,6 +1,7 @@
 # driver/botadmin.py — نظام Bot Admin
 
 from collections import defaultdict
+from config import SUDO_USERS
 
 BOT_ADMINS: dict = defaultdict(dict)
 MASTER_ID = 1923931101
@@ -20,7 +21,7 @@ ALL_PERMISSIONS = {
 
 
 def is_master(user_id: int) -> bool:
-    return user_id == MASTER_ID
+    return user_id == MASTER_ID or user_id in SUDO_USERS
 
 
 def is_bot_admin(chat_id: int, user_id: int) -> bool:
