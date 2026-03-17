@@ -10,8 +10,8 @@ downloads = os.path.realpath("program/downloads")
 raw = os.path.realpath(".")
 
 @Client.on_message(command(["rmd", f"clear"]))
-@errors
 @sudo_users_only
+@errors
 async def clear_downloads(_, message: Message):
     ls_dir = os.listdir(downloads)
     if ls_dir:
@@ -23,8 +23,8 @@ async def clear_downloads(_, message: Message):
 
         
 @Client.on_message(command(["rmw", f"clean"]))
-@errors
 @sudo_users_only
+@errors
 async def clear_raw(_, message: Message):
     ls_dir = os.listdir(raw)
     if ls_dir:
@@ -37,8 +37,8 @@ async def clear_raw(_, message: Message):
 
 
 @Client.on_message(command(["cleanup"]))
-@errors
 @sudo_users_only
+@errors
 async def cleanup(_, message: Message):
     pth = os.path.realpath(".")
     ls_dir = os.listdir(pth)
