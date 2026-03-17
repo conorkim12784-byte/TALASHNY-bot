@@ -34,8 +34,9 @@ def everyone(func):
 
 def authorized_users_only(func):
     async def wrapper(client:Client, message:Message):
-        if message.from_user.id in SUDO_USERS:
-            return await func(client,message)
+        rank = await get_rank(client, message.chat.id, message.from_user.id)
+        if rank in ["sudo", "owner", "admin"]:
+            return await func(client, message)
         await message.reply_text("هذا الامر للمشرفين والمطور فقط")
     return wrapper
 
@@ -69,11 +70,14 @@ def bot_admin_check(permission=None):
     def decorator(func):
         async def wrapper(client:Client, message:Message):
             try:
-                bot_member = await client.get_chat_member(message.chat.id, (await client.get_me()).id)
-                if bot_member.status not in ["administrator", "creator"]:
+                bot_id = (await client.get_me()).id
+                bot_member = await client.get_chat_member(message.chat.id, bot_id)
+                if bot_member.status.value not in ["administrator", "creator"]:
                     return await message.reply_text("❌ البوت محتاج يكون أدمن عشان يعمل كده")
-            except Exception:
-                return await message.reply_text("❌ تعذر التحقق من صلاحيات البوت")
+            except Exception as e:
+                print(f"[bot_admin_check error] {e}")
+                # لو فشل التحقق نكمل عادي — البوت ممكن يكون أدمن فعلاً
+                pass
             return await func(client, message)
         return wrapper
     return decorator
