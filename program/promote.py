@@ -11,6 +11,7 @@ from pyrogram.errors import ChatAdminRequired
 
 from driver.filters import command, command2, other_filters
 from driver.decorators import authorized_users_only
+from config import SUDO_USERS
 
 # ═══════════════════════════════════════
 # إعدادات
@@ -29,11 +30,11 @@ def get_ban_limit(chat_id: int) -> int:
 # التحقق من الصلاحية — مالك الجروب أو السوبر يوزر فقط
 # ═══════════════════════════════════════
 async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
-    if user_id == SUPER_USER_ID:
+    if user_id in SUDO_USERS or user_id == SUPER_USER_ID:
         return True
     try:
         member = await c.get_chat_member(chat_id, user_id)
-        return member.status.value == "creator"
+        return member.status.value in ["creator", "administrator"]
     except Exception:
         return False
 
