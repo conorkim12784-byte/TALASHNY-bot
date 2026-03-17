@@ -31,3 +31,49 @@ def everyone(func):
     async def wrapper(client:Client, message:Message):
         return await func(client,message)
     return wrapper
+
+def authorized_users_only(func):
+    async def wrapper(client:Client, message:Message):
+        if message.from_user.id in SUDO_USERS:
+            return await func(client,message)
+        await message.reply_text("هذا الامر للمشرفين والمطور فقط")
+    return wrapper
+
+def sudo_users_only(func):
+    async def wrapper(client:Client, message:Message):
+        if message.from_user.id in SUDO_USERS:
+            return await func(client,message)
+        await message.reply_text("هذا الامر للمطور فقط")
+    return wrapper
+
+def errors(func):
+    async def wrapper(client:Client, message:Message):
+        try:
+            return await func(client,message)
+        except Exception as e:
+            await message.reply_text(f"❌ خطأ: `{e}`")
+    return wrapper
+
+def humanbytes(size):
+    if not size:
+        return "0 B"
+    power = 2**10
+    n = 0
+    units = {0: "B", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
+    while size > power and n < 4:
+        size /= power
+        n += 1
+    return f"{round(size, 2)} {units[n]}"
+
+def bot_admin_check(permission=None):
+    def decorator(func):
+        async def wrapper(client:Client, message:Message):
+            try:
+                bot_member = await client.get_chat_member(message.chat.id, (await client.get_me()).id)
+                if bot_member.status not in ["administrator", "creator"]:
+                    return await message.reply_text("❌ البوت محتاج يكون أدمن عشان يعمل كده")
+            except Exception:
+                return await message.reply_text("❌ تعذر التحقق من صلاحيات البوت")
+            return await func(client, message)
+        return wrapper
+    return decorator
