@@ -1,4 +1,3 @@
-from driver.decorators import bot_admin_check, all_members_check
 # vcinfo.py — مين في الكول + مين مشغّل الأغنية
 
 from pyrogram import Client
