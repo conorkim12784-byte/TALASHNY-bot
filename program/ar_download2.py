@@ -23,6 +23,7 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("⚡")
     ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
+        "cookiefile": "/app/cookies.txt",
         
         "default_search": "scsearch1"}
     audio_file = None

@@ -174,8 +174,9 @@ async def new_chat_ar(c: Client, m: Message):
             )
 
 
-chat_watcher_group = 5
 
+
+chat_watcher_group = 5
 
 @Client.on_message(group=chat_watcher_group)
 async def chat_watcher_ar(_, message: Message):
