@@ -35,6 +35,7 @@ def _parse_duration(seconds) -> str:
 def ytsearch(query: str):
     """بحث الصوت — SoundCloud فقط (يوتيوب محظور على السيرفر)"""
     ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
@@ -63,6 +64,7 @@ def ytsearch_yt(query: str):
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
+        "cookiefile": "/app/cookies.txt",
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -86,6 +88,7 @@ def ytsearch_yt(query: str):
 def _dm_search(query: str):
     """بحث على Dailymotion — مجاني بدون API"""
     ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
@@ -111,6 +114,7 @@ def _dm_search(query: str):
 def _sc_download(link: str, out_tpl: str):
     """تحميل صوت من SoundCloud"""
     ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "format": "bestaudio/best", "outtmpl": out_tpl,
     }
@@ -128,6 +132,7 @@ def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
     clients = ["tv_embedded", "mweb", "ios", "web_creator", "android"]
     for client in clients:
         ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
             "quiet": True, "no_warnings": True,
             "format": fmt, "outtmpl": out_tpl,
             "merge_output_format": "mp4",
@@ -137,6 +142,7 @@ def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
                     "player_skip": ["webpage", "js"],
                 }
             },
+            "cookiefile": "/app/cookies.txt",
             "socket_timeout": 30,
         }
         try:
@@ -151,6 +157,7 @@ def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
 def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
     """تحميل فيديو من Dailymotion"""
     ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "format": fmt, "outtmpl": out_tpl,
         "merge_output_format": "mp4",

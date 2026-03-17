@@ -143,6 +143,7 @@ async def song(_, message: Message):
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
+        "cookiefile": "/app/cookies.txt",
         "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
         "geo_bypass": True,
