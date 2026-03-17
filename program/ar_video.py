@@ -9,7 +9,7 @@ from driver.filters import command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from pyrogram import Client
-from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
+from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdInvalid
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import os as _os
@@ -62,7 +62,7 @@ async def _check_and_join(c, m, chat_id):
             if invitelink.startswith("https://t.me/+"):
                 invitelink = invitelink.replace("https://t.me/+", "https://t.me/joinchat/")
             await user.join_chat(invitelink)
-    except UserNotParticipant:
+    except (UserNotParticipant, PeerIdInvalid):
         try:
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):

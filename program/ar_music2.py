@@ -1,6 +1,6 @@
 # موسيقى.py - اوامر التشغيل العربية فقط (play الانجليزي موجود في music.py)
 from pyrogram import Client
-from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
+from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdInvalid
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality
 from program.utils.inline import stream_markup
@@ -47,7 +47,7 @@ async def play_ar(c: Client, m: Message):
             if invitelink.startswith("https://t.me/+"):
                 invitelink = invitelink.replace("https://t.me/+", "https://t.me/joinchat/")
             await user.join_chat(invitelink)
-    except UserNotParticipant:
+    except (UserNotParticipant, PeerIdInvalid):
         try:
             invitelink = await c.export_chat_invite_link(chat_id)
             if invitelink.startswith("https://t.me/+"):
