@@ -81,3 +81,17 @@ def bot_admin_check(permission=None):
             return await func(client, message)
         return wrapper
     return decorator
+
+def target_rank_check(func):
+    """يمنع استخدام الأمر على شخص رتبته أعلى أو مساوية"""
+    async def wrapper(client:Client, message:Message):
+        actor_rank = await get_rank(client, message.chat.id, message.from_user.id)
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_id = message.reply_to_message.from_user.id
+            target_rank = await get_rank(client, message.chat.id, target_id)
+            from driver.permissions import can_target
+            if not can_target(actor_rank, target_rank):
+                await message.reply_text("❌ لا يمكنك استخدام هذا الأمر على شخص رتبته أعلى أو مساوية لك")
+                return
+        return await func(client, message)
+    return wrapper
