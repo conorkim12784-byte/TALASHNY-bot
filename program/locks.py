@@ -7,7 +7,7 @@ from pyrogram import Client, filters, raw
 from pyrogram.types import Message, ChatPermissions
 from pyrogram.errors import ChatNotModified
 from driver.filters import command, command2, other_filters
-from driver.decorators import bot_admin_check
+from driver.decorators import bot_admin_check, owner_only
 
 # { chat_id: { lock_type: bool } }
 locks_state: dict = defaultdict(lambda: {
@@ -54,6 +54,7 @@ async def apply_locks(c: Client, chat_id: int):
 
 
 @Client.on_message((command(["lock"]) | command2(["قفل"])) & other_filters)
+@owner_only
 @bot_admin_check("lock")
 async def lock_cmd(c: Client, m: Message):
     await m.delete()
@@ -86,6 +87,7 @@ async def lock_cmd(c: Client, m: Message):
 
 
 @Client.on_message((command(["unlock"]) | command2(["فتح"])) & other_filters)
+@owner_only
 @bot_admin_check("lock")
 async def unlock_cmd(c: Client, m: Message):
     await m.delete()

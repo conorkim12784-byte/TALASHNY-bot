@@ -187,7 +187,7 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """تحميل فيديو من Dailymotion فقط (يوتيوب محظور على السيرفر)"""
+    """تحميل فيديو — يجرب يوتيوب أولاً ثم Dailymotion"""
     if quality == 480:
         fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
@@ -198,13 +198,17 @@ async def ytdl_video(link, quality=720):
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
 
-    # Dailymotion مباشرة بدون يوتيوب
-    await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
+    # جرب يوتيوب أولاً
+    err = await asyncio.to_thread(_yt_download_video, link, out_tpl, fmt)
+    if err is not None:
+        # لو فشل يوتيوب جرب Dailymotion
+        err = await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
+
     for ff in os.listdir(DL_DIR):
         if ff.startswith(uid):
             filepath = os.path.join(DL_DIR, ff)
             asyncio.create_task(_auto_delete(filepath))
-            print(f"[ytdl_video] Dailymotion: {ff}")
+            print(f"[ytdl_video] success: {ff}")
             return 1, filepath
 
     return 0, "failed"

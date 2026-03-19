@@ -13,7 +13,7 @@ from driver.decorators import authorized_users_only, sudo_users_only, errors
 @Client.on_message(
     command(["userbotjoin"]) & other_filters
 )
-@authorized_users_only
+@sudo_users_only
 async def join_chat(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -31,7 +31,7 @@ async def join_chat(c: Client, m: Message):
 @Client.on_message(
     command(["userbotleave"]) & other_filters
 )
-@authorized_users_only
+@sudo_users_only
 async def leave_chat(_, m: Message):
     await m.delete()
     chat_id = m.chat.id

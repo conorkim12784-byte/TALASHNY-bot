@@ -4,7 +4,7 @@ from driver.veez import call_py
 from pyrogram import Client
 from driver.queues import QUEUE, clear_queue
 from driver.filters import command2, other_filters
-from driver.decorators import authorized_users_only
+from driver.decorators import authorized_users_only, admin_only, target_rank_check
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
@@ -14,7 +14,7 @@ from pyrogram.types import InlineKeyboardMarkup, Message, ChatPermissions
 
 
 @Client.on_message(command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
-@authorized_users_only
+@owner_only
 async def update_admin_ar(client, message):
     await message.delete()
     await refresh_administrators(message.chat)
@@ -22,7 +22,7 @@ async def update_admin_ar(client, message):
 
 
 @Client.on_message(command2(["تخطي"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def skip_ar(c: Client, m: Message):
     await m.delete()
     user_id = m.from_user.id
@@ -61,7 +61,7 @@ async def skip_ar(c: Client, m: Message):
 
 
 @Client.on_message(command2(["انهاء"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def stop_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -77,7 +77,7 @@ async def stop_ar(client, m: Message):
 
 
 @Client.on_message(command2(["اسكت"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def skt_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -93,7 +93,7 @@ async def skt_ar(client, m: Message):
 
 
 @Client.on_message(command2(["ايقاف", "ايقاف_مؤقت", "توقف"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def pause_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -108,7 +108,7 @@ async def pause_ar(client, m: Message):
 
 
 @Client.on_message(command2(["كمل", "استكمال", "استكمل"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def resume_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -123,7 +123,7 @@ async def resume_ar(client, m: Message):
 
 
 @Client.on_message(command2(["ميوت"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def mute_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -138,7 +138,7 @@ async def mute_ar(client, m: Message):
 
 
 @Client.on_message(command2(["فك_ميوت", "ازاله_ميوت"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def unmute_ar(client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -153,7 +153,7 @@ async def unmute_ar(client, m: Message):
 
 
 @Client.on_message(command2(["تحكم", "صوت"]) & other_filters)
-@authorized_users_only
+@admin_only
 async def volume_ar(client, m: Message):
     await m.delete()
     if len(m.command) < 2:
@@ -174,7 +174,8 @@ async def volume_ar(client, m: Message):
 # أمر: كتم مستخدم (منع الكتابة) — رد على رسالته
 # ══════════════════════════════════════════════════════════
 @Client.on_message(command2(["كتم", "اسكت_المستخدم", "كتم_مستخدم"]) & other_filters)
-@authorized_users_only
+@admin_only
+@target_rank_check
 async def silence_user(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
@@ -204,7 +205,8 @@ async def silence_user(c: Client, m: Message):
 # أمر: فك كتم مستخدم
 # ══════════════════════════════════════════════════════════
 @Client.on_message(command2(["فك_كتم", "فك كتم", "رفع_كتم", "رفع كتم"]) & other_filters)
-@authorized_users_only
+@admin_only
+@target_rank_check
 async def unsilence_user(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
