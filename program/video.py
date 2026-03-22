@@ -59,28 +59,41 @@ def ytsearch(query: str):
 
 
 def ytsearch_yt(query: str):
-    """بحث على YouTube — للفيديو"""
-    ydl_opts = {
-        "quiet": True, "no_warnings": True,
-        "extract_flat": True, "skip_download": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if not entries:
-                return None
-            item = entries[0]
+    """بحث على YouTube عبر Piped API بدون cookies"""
+    import requests
+    instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.projectsegfau.lt",
+        "https://piped-api.garudalinux.org",
+        "https://pipedapi.adminforge.de",
+        "https://piped-api.privacy.com.de",
+    ]
+    for base in instances:
+        try:
+            r = requests.get(
+                f"{base}/search",
+                params={"q": query, "filter": "videos"},
+                timeout=10
+            )
+            if r.status_code != 200:
+                continue
+            items = r.json().get("items", [])
+            if not items:
+                continue
+            item = items[0]
+            vid_id = item.get("url", "").replace("/watch?v=", "")
+            if not vid_id:
+                continue
             title = (item.get("title") or query)[:70]
-            url = item.get("url") or item.get("webpage_url") or ""
+            url = f"https://www.youtube.com/watch?v={vid_id}"
             secs = int(item.get("duration") or 0)
             mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
             duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
             thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail] if url else None
-    except Exception as e:
-        print(f"[ytsearch_yt error] {e}")
-        return None
+            return [title, url, duration, thumbnail]
+        except Exception as e:
+            print(f"[ytsearch_yt piped {base}] {e}")
+    return None
 
 
 def _dm_search(query: str):
