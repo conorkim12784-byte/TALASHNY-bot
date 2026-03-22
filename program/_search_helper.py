@@ -21,7 +21,6 @@ def _parse_duration(seconds) -> str:
 def _search(query: str, source: str = "scsearch1"):
     """بحث عام — SoundCloud أو Dailymotion"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
@@ -53,7 +52,6 @@ def ytsearch(query: str):
 def _sc_download(link: str, out_tpl: str):
     """تحميل صوت من SoundCloud"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "format": "bestaudio/best", "outtmpl": out_tpl,
     }

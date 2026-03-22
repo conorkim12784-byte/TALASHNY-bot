@@ -23,8 +23,8 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
-        "cookiefile": "/app/cookies.txt",
-        
+        "extractor_args": {"youtube": {"player_client": ["ios"]}},
+        "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"},
         "default_search": "scsearch1"}
     audio_file = None
     thumb_name = None

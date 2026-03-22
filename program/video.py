@@ -35,7 +35,6 @@ def _parse_duration(seconds) -> str:
 def ytsearch(query: str):
     """بحث الصوت — SoundCloud فقط (يوتيوب محظور على السيرفر)"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
@@ -64,7 +63,6 @@ def ytsearch_yt(query: str):
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
-        "cookiefile": "/app/cookies.txt",
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -88,7 +86,6 @@ def ytsearch_yt(query: str):
 def _dm_search(query: str):
     """بحث على Dailymotion — مجاني بدون API"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
     }
@@ -114,7 +111,6 @@ def _dm_search(query: str):
 def _sc_download(link: str, out_tpl: str):
     """تحميل صوت من SoundCloud"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "format": "bestaudio/best", "outtmpl": out_tpl,
     }
@@ -128,20 +124,24 @@ def _sc_download(link: str, out_tpl: str):
 
 
 def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو — يجرب clients مختلفة بدون cookies"""
-    clients = ["ios", "android", "tv_embedded", "web_creator", "mweb"]
+    """تحميل فيديو — يجرب clients مختلفة"""
+    clients = ["ios", "android", "tv_embedded"]
     for client in clients:
         ydl_opts = {
-            "quiet": True, "no_warnings": True,
-            "format": fmt, "outtmpl": out_tpl,
-            "merge_output_format": "mp4", "prefer_free_formats": True,
-            "cookiefile": "/app/cookies.txt",
+            "quiet": True,
+            "no_warnings": True,
+            "format": fmt,
+            "outtmpl": out_tpl,
+            "merge_output_format": "mp4",
             "extractor_args": {
                 "youtube": {
                     "player_client": [client],
                 }
             },
             "socket_timeout": 30,
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)",
+            },
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -155,7 +155,6 @@ def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
 def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
     """تحميل فيديو من Dailymotion"""
     ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
         "quiet": True, "no_warnings": True,
         "format": fmt, "outtmpl": out_tpl,
         "merge_output_format": "mp4", "prefer_free_formats": True,
