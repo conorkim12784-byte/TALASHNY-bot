@@ -79,7 +79,7 @@ async def song(_, message: Message):
         "format": "bestaudio/best",
         "outtmpl": "%(title)s.%(ext)s",
         
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "android", "tv_embedded"]}},
     }
 
     audio_file = None
@@ -151,7 +151,7 @@ async def vsong(client, message: Message):
         "quiet": True,
         "merge_output_format": "mp4",
         
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios", "android"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "android", "tv_embedded"]}},
     }
 
     query = " ".join(message.command[1:])

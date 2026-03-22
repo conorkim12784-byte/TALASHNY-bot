@@ -129,20 +129,18 @@ def _sc_download(link: str, out_tpl: str):
 
 def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
     """تحميل فيديو — يجرب clients مختلفة بدون cookies"""
-    clients = ["tv_embedded", "mweb", "ios", "web_creator", "android"]
+    clients = ["ios", "android", "tv_embedded", "web_creator", "mweb"]
     for client in clients:
         ydl_opts = {
-        "cookiefile": "/app/cookies.txt",
             "quiet": True, "no_warnings": True,
             "format": fmt, "outtmpl": out_tpl,
             "merge_output_format": "mp4",
+            "cookiefile": "/app/cookies.txt",
             "extractor_args": {
                 "youtube": {
                     "player_client": [client],
-                    "player_skip": ["webpage", "js"],
                 }
             },
-            "cookiefile": "/app/cookies.txt",
             "socket_timeout": 30,
         }
         try:
