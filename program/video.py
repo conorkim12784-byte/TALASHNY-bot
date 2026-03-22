@@ -187,11 +187,11 @@ ytdl = ytdl_audio
 async def ytdl_video(link, quality=720):
     """تحميل فيديو — يجرب يوتيوب أولاً ثم Dailymotion"""
     if quality == 480:
-        fmt = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
+        fmt = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     elif quality == 360:
-        fmt = "bestvideo[height<=360]+bestaudio/best[height<=360]/best"
+        fmt = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best[height<=360]/best"
     else:
-        fmt = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+        fmt = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best"
 
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
