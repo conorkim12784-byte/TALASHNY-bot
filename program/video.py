@@ -123,33 +123,112 @@ def _sc_download(link: str, out_tpl: str):
         return str(e)
 
 
-def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو — يجرب clients مختلفة"""
-    clients = ["ios", "android", "tv_embedded"]
-    for client in clients:
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "format": fmt,
-            "outtmpl": out_tpl,
-            "merge_output_format": "mp4",
-            "extractor_args": {
-                "youtube": {
-                    "player_client": [client],
-                }
-            },
-            "socket_timeout": 30,
-            "http_headers": {
-                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)",
-            },
-        }
+def _get_piped_streams(video_id: str):
+    """جيب streams الفيديو والصوت من Piped API بدون cookies"""
+    import requests
+    instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.projectsegfau.lt",
+        "https://piped-api.garudalinux.org",
+        "https://pipedapi.adminforge.de",
+        "https://piped-api.privacy.com.de",
+    ]
+    for base in instances:
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([link])
-            return None
+            r = requests.get(f"{base}/streams/{video_id}", timeout=10)
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            video_streams = data.get("videoStreams", [])
+            audio_streams = data.get("audioStreams", [])
+
+            # فيديو مدمج (بيكون أسهل)
+            combined = [s for s in video_streams if s.get("videoOnly") == False and s.get("url")]
+            if combined:
+                best = sorted(combined, key=lambda x: x.get("quality", ""), reverse=True)
+                return {"type": "combined", "url": best[0]["url"]}
+
+            # فيديو + صوت منفصلين
+            video_only = [s for s in video_streams if s.get("url")]
+            audio_only = [s for s in audio_streams if s.get("url")]
+            if video_only and audio_only:
+                best_v = sorted(video_only, key=lambda x: x.get("quality", ""), reverse=True)[0]["url"]
+                best_a = sorted(audio_only, key=lambda x: x.get("quality", ""), reverse=True)[0]["url"]
+                return {"type": "separate", "video": best_v, "audio": best_a}
+
         except Exception as e:
-            print(f"[yt_dl_video {client}] {e}")
-    return "all clients failed"
+            print(f"[piped {base}] {e}")
+    return None
+
+
+def _download_piped(streams: dict, out_tpl: str) -> bool:
+    """حمّل من Piped streams مباشرة"""
+    import requests, uuid as _uuid, subprocess
+    uid = _uuid.uuid4().hex[:8]
+
+    if streams["type"] == "combined":
+        try:
+            r = requests.get(streams["url"], stream=True, timeout=60)
+            ext = "mp4"
+            fname = out_tpl.replace("%(ext)s", ext)
+            with open(fname, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            return True
+        except Exception as e:
+            print(f"[piped combined dl] {e}")
+            return False
+
+    elif streams["type"] == "separate":
+        try:
+            v_file = f"/tmp/{uid}_v.mp4"
+            a_file = f"/tmp/{uid}_a.m4a"
+            out_file = out_tpl.replace("%(ext)s", "mp4")
+
+            for url, path in [(streams["video"], v_file), (streams["audio"], a_file)]:
+                r = requests.get(url, stream=True, timeout=60)
+                with open(path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+            # دمج بـ ffmpeg
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", v_file, "-i", a_file,
+                "-c:v", "copy", "-c:a", "aac",
+                out_file
+            ], capture_output=True)
+
+            import os
+            for f in [v_file, a_file]:
+                try: os.remove(f)
+                except: pass
+            return True
+        except Exception as e:
+            print(f"[piped separate dl] {e}")
+            return False
+    return False
+
+
+def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
+    """تحميل فيديو — عبر Piped API بدون cookies"""
+    import re as _re
+
+    # استخرج video ID
+    match = _re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", link)
+    if not match:
+        return "invalid youtube link"
+
+    video_id = match.group(1)
+
+    # جرب Piped
+    streams = _get_piped_streams(video_id)
+    if streams:
+        success = _download_piped(streams, out_tpl)
+        if success:
+            return None
+
+    return "piped failed"
 
 
 def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
