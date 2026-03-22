@@ -17,6 +17,8 @@ from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import yt_dlp
 
+TOR_PROXIES = {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}
+
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(DL_DIR, exist_ok=True)
@@ -59,32 +61,41 @@ def ytsearch(query: str):
 
 
 def ytsearch_yt(query: str):
-    """بحث على YouTube عبر yt-dlp"""
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if not entries:
-                return None
-            item = entries[0]
+    """بحث على YouTube عبر Piped API بدون cookies"""
+    import requests
+    instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi.tokhmi.xyz",
+        "https://pipedapi.moomoo.me",
+        "https://api.piped.projectsegfau.lt",
+        "https://pipedapi.in.projectsegfau.lt",
+    ]
+    for base in instances:
+        try:
+            r = requests.get(
+                f"{base}/search",
+                params={"q": query, "filter": "videos"},
+                timeout=10
+            )
+            if r.status_code != 200:
+                continue
+            items = r.json().get("items", [])
+            if not items:
+                continue
+            item = items[0]
+            vid_id = item.get("url", "").replace("/watch?v=", "")
+            if not vid_id:
+                continue
             title = (item.get("title") or query)[:70]
-            url = item.get("url") or item.get("webpage_url") or ""
+            url = f"https://www.youtube.com/watch?v={vid_id}"
             secs = int(item.get("duration") or 0)
             mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
             duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
             thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail] if url else None
-    except Exception as e:
-        print(f"[ytsearch_yt error] {e}")
+            return [title, url, duration, thumbnail]
+        except Exception as e:
+            print(f"[ytsearch_yt piped {base}] {e}")
     return None
-
 
 def _dm_search(query: str):
     """بحث على Dailymotion — مجاني بدون API"""
@@ -138,7 +149,7 @@ def _get_piped_streams(video_id: str):
     ]
     for base in instances:
         try:
-            r = requests.get(f"{base}/streams/{video_id}", timeout=10)
+            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -171,7 +182,7 @@ def _download_piped(streams: dict, out_tpl: str) -> bool:
 
     if streams["type"] == "combined":
         try:
-            r = requests.get(streams["url"], stream=True, timeout=60)
+            r = requests.get(streams["url"], stream=True, proxies=TOR_PROXIES, timeout=60)
             ext = "mp4"
             fname = out_tpl.replace("%(ext)s", ext)
             with open(fname, "wb") as f:
@@ -189,7 +200,7 @@ def _download_piped(streams: dict, out_tpl: str) -> bool:
             out_file = out_tpl.replace("%(ext)s", "mp4")
 
             for url, path in [(streams["video"], v_file), (streams["audio"], a_file)]:
-                r = requests.get(url, stream=True, timeout=60)
+                r = requests.get(url, stream=True, proxies=TOR_PROXIES, timeout=60)
                 with open(path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
