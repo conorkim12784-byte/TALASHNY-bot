@@ -4,7 +4,7 @@ from driver.veez import call_py
 from pyrogram import Client
 from driver.queues import QUEUE, clear_queue
 from driver.filters import command2, other_filters
-from driver.decorators import authorized_users_only, admin_only, target_rank_check
+from driver.decorators import authorized_users_only, admin_only, owner_only, target_rank_check
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup
 from driver.design.thumbnail import thumb
