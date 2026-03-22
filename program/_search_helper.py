@@ -72,9 +72,9 @@ def _piped_search_audio(query: str):
     import requests
     instances = [
         "https://pipedapi.kavin.rocks",
+        "https://pipedapi.tokhmi.xyz",
+        "https://pipedapi.moomoo.me",
         "https://api.piped.projectsegfau.lt",
-        "https://piped-api.garudalinux.org",
-        "https://pipedapi.adminforge.de",
     ]
     for base in instances:
         try:
@@ -135,10 +135,10 @@ def _piped_download_audio(video_id: str, out_tpl: str) -> bool:
     import requests
     instances = [
         "https://pipedapi.kavin.rocks",
+        "https://pipedapi.tokhmi.xyz",
+        "https://pipedapi.moomoo.me",
         "https://api.piped.projectsegfau.lt",
-        "https://piped-api.garudalinux.org",
-        "https://pipedapi.adminforge.de",
-        "https://piped-api.privacy.com.de",
+        "https://pipedapi.in.projectsegfau.lt",
     ]
     for base in instances:
         try:

@@ -63,10 +63,10 @@ def ytsearch_yt(query: str):
     import requests
     instances = [
         "https://pipedapi.kavin.rocks",
+        "https://pipedapi.tokhmi.xyz",
+        "https://pipedapi.moomoo.me",
         "https://api.piped.projectsegfau.lt",
-        "https://piped-api.garudalinux.org",
-        "https://pipedapi.adminforge.de",
-        "https://piped-api.privacy.com.de",
+        "https://pipedapi.in.projectsegfau.lt",
     ]
     for base in instances:
         try:
@@ -141,10 +141,10 @@ def _get_piped_streams(video_id: str):
     import requests
     instances = [
         "https://pipedapi.kavin.rocks",
+        "https://pipedapi.tokhmi.xyz",
+        "https://pipedapi.moomoo.me",
         "https://api.piped.projectsegfau.lt",
-        "https://piped-api.garudalinux.org",
-        "https://pipedapi.adminforge.de",
-        "https://piped-api.privacy.com.de",
+        "https://pipedapi.in.projectsegfau.lt",
     ]
     for base in instances:
         try:
@@ -314,7 +314,7 @@ def multisearch_video(query: str):
     if result and isinstance(result, list) and len(result) == 4:
         return result
     # Dailymotion fallback
-    result = dmsearch(query)
+    result = _dm_search(query)
     if result and isinstance(result, list) and len(result) == 4:
         return result
     return None
