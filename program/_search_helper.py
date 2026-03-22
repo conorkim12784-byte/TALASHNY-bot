@@ -67,48 +67,9 @@ def _search(query: str, source: str = "scsearch1"):
         return None
 
 
-def _piped_search_audio(query: str):
-    """بحث على يوتيوب عبر Piped API للصوت"""
-    import requests
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.tokhmi.xyz",
-        "https://pipedapi.moomoo.me",
-        "https://api.piped.projectsegfau.lt",
-    ]
-    for base in instances:
-        try:
-            r = requests.get(
-                f"{base}/search",
-                params={"q": query, "filter": "videos"},
-                timeout=10
-            )
-            if r.status_code != 200:
-                continue
-            items = r.json().get("items", [])
-            if not items:
-                continue
-            item = items[0]
-            vid_id = item.get("url", "").replace("/watch?v=", "")
-            if not vid_id:
-                continue
-            title = (item.get("title") or query)[:70]
-            url = f"https://www.youtube.com/watch?v={vid_id}"
-            secs = int(item.get("duration") or 0)
-            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-            thumbnail = item.get("thumbnail") or ""
-            return [title, url, duration, thumbnail]
-        except Exception as e:
-            print(f"[piped_search_audio {base}] {e}")
-    return None
-
-
 def ytsearch(query: str):
-    """بحث على SoundCloud أولاً، ثم Piped/YouTube، ثم Dailymotion"""
+    """بحث على SoundCloud أولاً، ثم Dailymotion"""
     result = _search(query, "scsearch1")
-    if not result:
-        result = _piped_search_audio(query)
     if not result:
         result = _search(query, "dmsearch1")
     return result
