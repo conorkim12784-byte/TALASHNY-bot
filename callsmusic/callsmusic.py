@@ -1,5 +1,3 @@
-# FIX: معالجة FloodWait في stream end handler
-
 import os
 import asyncio
 from pyrogram.errors import FloodWait
@@ -30,36 +28,22 @@ async def register_stream_end_handler(call_py):
         queues.task_done(chat_id)
 
         if queues.is_empty(chat_id):
-            # مفيش أغاني تانية — اخرج من المكالمة مع معالجة FloodWait
-            for attempt in range(3):
-                try:
-                    await call_py.leave_call(chat_id)
-                    break
-                except FloodWait as e:
-                    print(f"[FloodWait] leave_call: waiting {e.value}s")
-                    await asyncio.sleep(e.value)
-                except Exception as e:
-                    print(f"[leave_call error] {e}")
-                    break
+            try:
+                await call_py.leave_call(chat_id)
+            except Exception as e:
+                print(f"[leave_call error] {e}")
         else:
             next_track = queues.get(chat_id)
             if next_track:
-                # شغّل الأغنية التالية مع معالجة FloodWait
-                for attempt in range(5):
-                    try:
-                        await call_py.play(
-                            chat_id,
-                            MediaStream(
-                                next_track["file"],
-                                audio_parameters=AudioQuality.HIGH,
-                                audio_flags=MediaStream.Flags.AUTO_DETECT,
-                                video_flags=MediaStream.Flags.IGNORE,
-                            ),
-                        )
-                        break
-                    except FloodWait as e:
-                        print(f"[FloodWait] play next track: waiting {e.value}s (attempt {attempt+1})")
-                        await asyncio.sleep(e.value)
-                    except Exception as e:
-                        print(f"[play next track error] {e}")
-                        break
+                try:
+                    await call_py.play(
+                        chat_id,
+                        MediaStream(
+                            next_track["file"],
+                            audio_parameters=AudioQuality.HIGH,
+                            audio_flags=MediaStream.Flags.AUTO_DETECT,
+                            video_flags=MediaStream.Flags.IGNORE,
+                        ),
+                    )
+                except Exception as e:
+                    print(f"[play next track error] {e}")
