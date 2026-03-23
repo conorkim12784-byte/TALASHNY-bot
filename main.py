@@ -1,4 +1,11 @@
 import asyncio
+
+# Fix: Create event loop before importing pytgcalls
+# pytgcalls sync.py calls asyncio.get_event_loop() at import time,
+# which fails in Python 3.10+ if no loop exists in the main thread.
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 from pytgcalls import idle
 from driver.veez import call_py, bot, user
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
@@ -21,4 +28,4 @@ async def start_bot():
     await bot.stop()
 
 
-asyncio.run(start_bot())
+loop.run_until_complete(start_bot())
