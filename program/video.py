@@ -261,6 +261,24 @@ def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
         return str(e)
 
 
+async def ytdl_direct(link: str):
+    """جيب رابط مباشر من يوتيوب بدون تحميل — yt-dlp -g"""
+    import asyncio
+    proc = await asyncio.create_subprocess_exec(
+        "yt-dlp",
+        "-g",
+        "-f", "best[height<=?720][width<=?1280]/best",
+        link,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        url = stdout.decode().strip().split(chr(10))[0]
+        return 1, url
+    return 0, stderr.decode().strip()
+
+
 async def ytdl_audio(link):
     """تحميل صوت من SoundCloud فقط"""
     uid = uuid.uuid4().hex[:8]
@@ -277,23 +295,22 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """تحميل فيديو — يجرب يوتيوب أولاً ثم Dailymotion"""
-    fmt = "best[ext=mp4]/best"
+    """جيب رابط مباشر بـ yt-dlp -g بدون تحميل"""
+    # أولاً جرب yt-dlp -g للحصول على رابط مباشر
+    veez, direct_url = await ytdl_direct(link)
+    if veez == 1 and direct_url:
+        print(f"[ytdl_video] direct URL: OK")
+        return 1, direct_url
 
+    # Fallback: جرب Dailymotion لو مش يوتيوب
+    fmt = "best[ext=mp4]/best"
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-
-    # جرب يوتيوب أولاً
-    err = await asyncio.to_thread(_yt_download_video, link, out_tpl, fmt)
-    if err is not None:
-        # لو فشل يوتيوب جرب Dailymotion
-        err = await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
-
+    await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
     for ff in os.listdir(DL_DIR):
         if ff.startswith(uid):
             filepath = os.path.join(DL_DIR, ff)
             asyncio.create_task(_auto_delete(filepath))
-            print(f"[ytdl_video] success: {ff}")
             return 1, filepath
 
     return 0, "failed"

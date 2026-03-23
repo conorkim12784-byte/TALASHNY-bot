@@ -9,7 +9,7 @@ def _get_piped_audio_url(video_id: str) -> str | None:
     ]
     for base in instances:
         try:
-            r = requests.get(f"{base}/streams/{video_id}", timeout=10)
+            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -103,7 +103,7 @@ def _piped_download_audio(video_id: str, out_tpl: str) -> bool:
     ]
     for base in instances:
         try:
-            r = requests.get(f"{base}/streams/{video_id}", timeout=10)
+            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -118,7 +118,7 @@ def _piped_download_audio(video_id: str, out_tpl: str) -> bool:
             if not best_audio:
                 continue
             audio_url = best_audio[0]["url"]
-            r2 = requests.get(audio_url, stream=True, timeout=60)
+            r2 = requests.get(audio_url, stream=True, proxies=TOR_PROXIES, timeout=60)
             fname = out_tpl.replace("%(ext)s", "m4a")
             with open(fname, "wb") as f:
                 for chunk in r2.iter_content(chunk_size=8192):
@@ -130,22 +130,29 @@ def _piped_download_audio(video_id: str, out_tpl: str) -> bool:
 
 
 async def ytdl_audio(link: str):
-    """تحميل صوت — يجرب Piped أولاً ثم SoundCloud"""
+    """جيب رابط مباشر للصوت بـ yt-dlp -g"""
+    import asyncio as _asyncio
     import re as _re
-    uid = uuid.uuid4().hex[:8]
-    out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
 
-    # لو رابط يوتيوب جرب Piped
-    match = _re.search(r"(?:v=|youtu\.be/)([\w-]{11})", link)
-    if match:
-        vid_id = match.group(1)
-        success = await asyncio.to_thread(_piped_download_audio, vid_id, out_tpl)
-        if success:
-            for ff in os.listdir(AUDIO_DIR):
-                if ff.startswith(uid):
-                    return 1, os.path.join(AUDIO_DIR, ff)
+    # لو رابط يوتيوب استخدم yt-dlp -g
+    if "youtube.com" in link or "youtu.be" in link:
+        proc = await _asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-g",
+            "-f", "bestaudio/best",
+            link,
+            stdout=_asyncio.subprocess.PIPE,
+            stderr=_asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if stdout:
+            url = stdout.decode().strip().split(chr(10))[0]
+            print(f"[ytdl_audio] direct URL: OK")
+            return 1, url
 
     # Fallback: SoundCloud
+    uid = uuid.uuid4().hex[:8]
+    out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
     await asyncio.to_thread(_sc_download, link, out_tpl)
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
