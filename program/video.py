@@ -61,98 +61,57 @@ def ytsearch(query: str):
 
 
 def ytsearch_yt(query: str):
-    """بحث على YouTube — YouTube Data API v3 أولاً ثم Piped كـ fallback"""
-    import requests
-    from config import YOUTUBE_API_KEY
+    """بحث فيديو — yt-dlp ytsearch أولاً ثم Dailymotion كـ fallback"""
+    # --- الطريقة الأولى: yt-dlp ytsearch (بدون cookies) ---
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if entries:
+                item = entries[0]
+                vid_id = item.get("id") or item.get("url", "").replace("/watch?v=", "")
+                if vid_id and not vid_id.startswith("http"):
+                    url = f"https://www.youtube.com/watch?v={vid_id}"
+                elif item.get("webpage_url"):
+                    url = item["webpage_url"]
+                else:
+                    url = item.get("url", "")
+                title = (item.get("title") or query)[:70]
+                secs = int(item.get("duration") or 0)
+                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                thumbnail = item.get("thumbnail") or ""
+                if url:
+                    print(f"[ytsearch_yt yt-dlp] {title}")
+                    return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ytsearch_yt yt-dlp] {e}")
 
-    # --- الطريقة الأولى: YouTube Data API v3 الرسمية ---
-    if YOUTUBE_API_KEY:
-        try:
-            r = requests.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={
-                    "part": "snippet",
-                    "q": query,
-                    "type": "video",
-                    "maxResults": 1,
-                    "key": YOUTUBE_API_KEY,
-                },
-                timeout=10,
-            )
-            if r.status_code == 200:
-                items = r.json().get("items", [])
-                if items:
-                    item = items[0]
-                    vid_id = item["id"].get("videoId", "")
-                    if vid_id:
-                        title = (item["snippet"].get("title") or query)[:70]
-                        url = f"https://www.youtube.com/watch?v={vid_id}"
-                        thumbnail = (
-                            item["snippet"].get("thumbnails", {})
-                            .get("high", {})
-                            .get("url", "")
-                        )
-                        # جيب المدة من contentDetails
-                        dur_r = requests.get(
-                            "https://www.googleapis.com/youtube/v3/videos",
-                            params={
-                                "part": "contentDetails",
-                                "id": vid_id,
-                                "key": YOUTUBE_API_KEY,
-                            },
-                            timeout=8,
-                        )
-                        duration = "0:00"
-                        if dur_r.status_code == 200:
-                            dur_items = dur_r.json().get("items", [])
-                            if dur_items:
-                                import re as _re
-                                iso = dur_items[0]["contentDetails"].get("duration", "")
-                                m_obj = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-                                if m_obj:
-                                    h = int(m_obj.group(1) or 0)
-                                    m = int(m_obj.group(2) or 0)
-                                    s = int(m_obj.group(3) or 0)
-                                    duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-                        print(f"[ytsearch_yt YT-API] {title}")
-                        return [title, url, duration, thumbnail]
-        except Exception as e:
-            print(f"[ytsearch_yt YT-API] {e}")
+    # --- الطريقة الثانية: Dailymotion كـ fallback ---
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True}) as ydl:
+            info = ydl.extract_info(f"dmsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if entries:
+                item = entries[0]
+                url = item.get("url") or item.get("webpage_url") or ""
+                title = (item.get("title") or query)[:70]
+                secs = int(item.get("duration") or 0)
+                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
+                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                thumbnail = item.get("thumbnail") or ""
+                if url:
+                    print(f"[ytsearch_yt Dailymotion] {title}")
+                    return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ytsearch_yt dmsearch] {e}")
 
-    # --- الطريقة الثانية: Piped API كـ fallback ---
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.tokhmi.xyz",
-        "https://pipedapi.moomoo.me",
-        "https://api.piped.projectsegfau.lt",
-        "https://pipedapi.in.projectsegfau.lt",
-    ]
-    for base in instances:
-        try:
-            r = requests.get(
-                f"{base}/search",
-                params={"q": query, "filter": "videos"},
-                timeout=10,
-            )
-            if r.status_code != 200:
-                continue
-            items = r.json().get("items", [])
-            if not items:
-                continue
-            item = items[0]
-            vid_id = item.get("url", "").replace("/watch?v=", "")
-            if not vid_id:
-                continue
-            title = (item.get("title") or query)[:70]
-            url = f"https://www.youtube.com/watch?v={vid_id}"
-            secs = int(item.get("duration") or 0)
-            mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-            thumbnail = item.get("thumbnail") or ""
-            print(f"[ytsearch_yt Piped] {title}")
-            return [title, url, duration, thumbnail]
-        except Exception as e:
-            print(f"[ytsearch_yt piped {base}] {e}")
     return None
 
 def _dm_search(query: str):
@@ -384,13 +343,8 @@ async def _auto_delete(filepath: str, delay: int = 600):
         pass
 
 def multisearch_video(query: str):
-    """بحث الفيديو على Dailymotion فقط (يوتيوب محظور على السيرفر)"""
-    # YouTube
+    """بحث الفيديو — ytsearch_yt بيجرب yt-dlp ytsearch ثم Dailymotion تلقائياً"""
     result = ytsearch_yt(query)
-    if result and isinstance(result, list) and len(result) == 4:
-        return result
-    # Dailymotion fallback
-    result = _dm_search(query)
     if result and isinstance(result, list) and len(result) == 4:
         return result
     return None
