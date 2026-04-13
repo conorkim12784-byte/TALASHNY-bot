@@ -1,4 +1,4 @@
-# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر yt-dlp -g
+# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر yt-dlp
 
 import asyncio
 import os
@@ -25,7 +25,6 @@ def ytsearch(query: str):
     """بحث على YouTube عبر Data API v3"""
     try:
         from config import YOUTUBE_API_KEY
-        # البحث عن الفيديو
         r = requests.get(
             "https://www.googleapis.com/youtube/v3/search",
             params={"part": "snippet", "q": query, "type": "video",
@@ -41,7 +40,6 @@ def ytsearch(query: str):
         video_id = item["id"]["videoId"]
         title = item["snippet"]["title"][:70]
         thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        # جيب المدة
         r2 = requests.get(
             "https://www.googleapis.com/youtube/v3/videos",
             params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
@@ -60,12 +58,19 @@ def ytsearch(query: str):
 
 
 async def ytdl_audio(link: str):
-    """جيب رابط مباشر للصوت عبر yt-dlp -g (بدون تحميل، بدون بروكسي)"""
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" --no-check-certificate "{link}"'
-    )
-    if stdout:
-        print(f"[ytdl_audio] direct URL OK")
-        return 1, stdout.split("\n")[0]
-    print(f"[ytdl_audio error] {stderr[:200]}")
-    return 0, stderr
+    """جيب رابط مباشر للصوت — بيجرب tv_embedded ثم ios ثم web_creator"""
+    clients = ["tv_embedded", "ios", "web_creator"]
+    for client in clients:
+        stdout, stderr = await bash(
+            f'yt-dlp -g -f "bestaudio/best" '
+            f'--extractor-args "youtube:player_client={client}" '
+            f'--js-runtimes nodejs '
+            f'--no-check-certificate "{link}"'
+        )
+        if stdout:
+            url = stdout.split("\n")[0].strip()
+            if url:
+                print(f"[ytdl_audio] OK via {client}")
+                return 1, url
+        print(f"[ytdl_audio] {client} failed: {stderr[:100]}")
+    return 0, "failed all clients"
