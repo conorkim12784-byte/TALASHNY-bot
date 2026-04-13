@@ -35,28 +35,33 @@ def _parse_duration(seconds) -> str:
 
 
 def ytsearch(query: str):
-    """بحث الصوت — SoundCloud فقط (يوتيوب محظور على السيرفر)"""
+    """بحث الصوت — YouTube عبر yt-dlp"""
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios"]}},
+        "http_headers": {
+            "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
+        },
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch1:{query}", download=False)
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
             entries = info.get("entries") or []
             if entries:
                 item = entries[0]
+                vid_id = item.get("id") or ""
+                url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id and not vid_id.startswith("http") else (item.get("webpage_url") or item.get("url") or "")
                 title = (item.get("title") or query)[:70]
-                url = item.get("url") or item.get("webpage_url") or ""
                 secs = int(item.get("duration") or 0)
                 mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
                 duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
                 thumbnail = item.get("thumbnail") or ""
                 if url:
-                    print(f"[ytsearch] SoundCloud: {title}")
+                    print(f"[ytsearch] YouTube: {title}")
                     return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch SC] {e}")
+        print(f"[ytsearch YT] {e}")
     return None
 
 
@@ -297,14 +302,32 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """تحميل صوت من SoundCloud فقط"""
+    """تحميل صوت من YouTube عبر yt-dlp"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    await asyncio.to_thread(_sc_download, link, out_tpl)
-    for ff in os.listdir(AUDIO_DIR):
-        if ff.startswith(uid):
-            print(f"[ytdl_audio] SoundCloud: {ff}")
-            return 1, os.path.join(AUDIO_DIR, ff)
+
+    def _download():
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "format": "bestaudio/best",
+            "outtmpl": out_tpl,
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+
+    try:
+        await asyncio.to_thread(_download)
+        for ff in os.listdir(AUDIO_DIR):
+            if ff.startswith(uid):
+                print(f"[ytdl_audio] YouTube: {ff}")
+                return 1, os.path.join(AUDIO_DIR, ff)
+    except Exception as e:
+        print(f"[ytdl_audio error] {e}")
+
     return 0, "download failed"
 
 
@@ -312,23 +335,37 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر بـ yt-dlp -g بدون تحميل"""
-    # أولاً جرب yt-dlp -g للحصول على رابط مباشر
-    veez, direct_url = await ytdl_direct(link)
-    if veez == 1 and direct_url:
-        print(f"[ytdl_video] direct URL: OK")
-        return 1, direct_url
-
-    # Fallback: جرب Dailymotion لو مش يوتيوب
-    fmt = "best[ext=mp4]/best"
+    """تحميل فيديو من YouTube عبر yt-dlp"""
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-    await asyncio.to_thread(_dm_download_video, link, out_tpl, fmt)
-    for ff in os.listdir(DL_DIR):
-        if ff.startswith(uid):
-            filepath = os.path.join(DL_DIR, ff)
-            asyncio.create_task(_auto_delete(filepath))
-            return 1, filepath
+
+    fmt_map = {720: "bestvideo[height<=720]+bestaudio/best", 480: "bestvideo[height<=480]+bestaudio/best", 360: "bestvideo[height<=360]+bestaudio/best"}
+    fmt = fmt_map.get(quality, "bestvideo[height<=720]+bestaudio/best")
+
+    def _download():
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "format": fmt,
+            "outtmpl": out_tpl,
+            "merge_output_format": "mp4",
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+
+    try:
+        await asyncio.to_thread(_download)
+        for ff in os.listdir(DL_DIR):
+            if ff.startswith(uid):
+                filepath = os.path.join(DL_DIR, ff)
+                asyncio.create_task(_auto_delete(filepath))
+                print(f"[ytdl_video] YouTube: {ff}")
+                return 1, filepath
+    except Exception as e:
+        print(f"[ytdl_video error] {e}")
 
     return 0, "failed"
 
@@ -343,7 +380,7 @@ async def _auto_delete(filepath: str, delay: int = 600):
         pass
 
 def multisearch_video(query: str):
-    """بحث الفيديو — ytsearch_yt بيجرب yt-dlp ytsearch ثم Dailymotion تلقائياً"""
+    """بحث الفيديو — YouTube عبر yt-dlp"""
     result = ytsearch_yt(query)
     if result and isinstance(result, list) and len(result) == 4:
         return result

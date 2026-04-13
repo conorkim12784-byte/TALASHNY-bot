@@ -52,11 +52,31 @@ def _search(query: str, source: str = "scsearch1"):
 
 
 def ytsearch(query: str):
-    """بحث على SoundCloud أولاً، ثم Dailymotion"""
-    result = _search(query, "scsearch1")
-    if not result:
-        result = _search(query, "dmsearch1")
-    return result
+    """بحث على YouTube عبر yt-dlp"""
+    ydl_opts = {
+        "quiet": True, "no_warnings": True,
+        "extract_flat": True, "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios"]}},
+        "http_headers": {
+            "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
+        },
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            vid_id = item.get("id") or ""
+            url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id and not vid_id.startswith("http") else (item.get("webpage_url") or item.get("url") or "")
+            title = (item.get("title") or query)[:70]
+            duration = _parse_duration(item.get("duration", 0))
+            thumbnail = item.get("thumbnail") or ""
+            return [title, url, duration, thumbnail] if url else None
+    except Exception as e:
+        print(f"[ytsearch YT error] {e}")
+        return None
 
 
 def _get_piped_audio_url(video_id: str):
@@ -100,25 +120,31 @@ def _sc_download(link: str, out_tpl: str):
 
 async def ytdl_audio(link: str):
     """
-    جيب رابط/ملف صوت:
-    - يوتيوب -> Piped API (رابط مباشر بدون cookies)
-    - SoundCloud/Dailymotion -> تحميل مباشر
+    تحميل صوت من YouTube عبر yt-dlp مباشرة
     """
-    # لو رابط يوتيوب استخدم Piped API
-    if "youtube.com" in link or "youtu.be" in link:
-        match = _re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", link)
-        if match:
-            video_id = match.group(1)
-            audio_url = await asyncio.to_thread(_get_piped_audio_url, video_id)
-            if audio_url:
-                return 1, audio_url
-
-    # Fallback: تحميل من SoundCloud أو Dailymotion
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-    await asyncio.to_thread(_sc_download, link, out_tpl)
-    for ff in os.listdir(AUDIO_DIR):
-        if ff.startswith(uid):
-            return 1, os.path.join(AUDIO_DIR, ff)
+
+    def _download():
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "format": "bestaudio/best",
+            "outtmpl": out_tpl,
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([link])
+
+    try:
+        await asyncio.to_thread(_download)
+        for ff in os.listdir(AUDIO_DIR):
+            if ff.startswith(uid):
+                print(f"[ytdl_audio] YouTube: {ff}")
+                return 1, os.path.join(AUDIO_DIR, ff)
+    except Exception as e:
+        print(f"[ytdl_audio error] {e}")
 
     return 0, "download failed"
