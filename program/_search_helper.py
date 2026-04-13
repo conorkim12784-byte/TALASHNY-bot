@@ -1,38 +1,22 @@
-
-def _get_piped_audio_url(video_id: str) -> str | None:
-    """جيب رابط الصوت من Piped API"""
-    import requests
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://api.piped.projectsegfau.lt",
-        "https://piped-api.garudalinux.org",
-    ]
-    for base in instances:
-        try:
-            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
-            if r.status_code != 200:
-                continue
-            data = r.json()
-            audio_streams = data.get("audioStreams", [])
-            if not audio_streams:
-                continue
-            best = sorted(audio_streams, key=lambda x: x.get("bitrate", 0), reverse=True)
-            if best:
-                return best[0]["url"]
-        except Exception as e:
-            print(f"[piped_audio {base}] {e}")
-    return None
-
-
-# _search_helper.py — بحث وتحميل عبر SoundCloud و Dailymotion
+# _search_helper.py — بحث وتحميل عبر SoundCloud و Piped API (بدون cookies)
 
 import asyncio
 import os
 import uuid
+import re as _re
+import requests
 import yt_dlp
 
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
+
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.tokhmi.xyz",
+    "https://pipedapi.moomoo.me",
+    "https://api.piped.projectsegfau.lt",
+    "https://pipedapi.in.projectsegfau.lt",
+]
 
 
 def _parse_duration(seconds) -> str:
@@ -75,8 +59,32 @@ def ytsearch(query: str):
     return result
 
 
+def _get_piped_audio_url(video_id: str):
+    """جيب رابط الصوت المباشر من Piped API"""
+    for base in PIPED_INSTANCES:
+        try:
+            r = requests.get(f"{base}/streams/{video_id}", timeout=10)
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            audio_streams = data.get("audioStreams", [])
+            if not audio_streams:
+                continue
+            best = sorted(
+                [s for s in audio_streams if s.get("url")],
+                key=lambda x: x.get("bitrate", 0),
+                reverse=True
+            )
+            if best:
+                print(f"[piped_audio] OK from {base}")
+                return best[0]["url"]
+        except Exception as e:
+            print(f"[piped_audio {base}] {e}")
+    return None
+
+
 def _sc_download(link: str, out_tpl: str):
-    """تحميل صوت من SoundCloud"""
+    """تحميل صوت من SoundCloud أو Dailymotion"""
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "format": "bestaudio/best", "outtmpl": out_tpl,
@@ -87,74 +95,30 @@ def _sc_download(link: str, out_tpl: str):
         return None
     except Exception as e:
         print(f"[sc_download error] {e}")
-        # جرب Dailymotion كـ fallback
         return str(e)
 
 
-def _piped_download_audio(video_id: str, out_tpl: str) -> bool:
-    """تحميل صوت من Piped API"""
-    import requests
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.tokhmi.xyz",
-        "https://pipedapi.moomoo.me",
-        "https://api.piped.projectsegfau.lt",
-        "https://pipedapi.in.projectsegfau.lt",
-    ]
-    for base in instances:
-        try:
-            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
-            if r.status_code != 200:
-                continue
-            data = r.json()
-            audio_streams = data.get("audioStreams", [])
-            if not audio_streams:
-                continue
-            best_audio = sorted(
-                [s for s in audio_streams if s.get("url")],
-                key=lambda x: x.get("bitrate", 0),
-                reverse=True
-            )
-            if not best_audio:
-                continue
-            audio_url = best_audio[0]["url"]
-            r2 = requests.get(audio_url, stream=True, proxies=TOR_PROXIES, timeout=60)
-            fname = out_tpl.replace("%(ext)s", "m4a")
-            with open(fname, "wb") as f:
-                for chunk in r2.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            return True
-        except Exception as e:
-            print(f"[piped_audio {base}] {e}")
-    return False
-
-
 async def ytdl_audio(link: str):
-    """جيب رابط مباشر للصوت بـ yt-dlp -g"""
-    import asyncio as _asyncio
-    import re as _re
-
-    # لو رابط يوتيوب استخدم yt-dlp -g
+    """
+    جيب رابط/ملف صوت:
+    - يوتيوب -> Piped API (رابط مباشر بدون cookies)
+    - SoundCloud/Dailymotion -> تحميل مباشر
+    """
+    # لو رابط يوتيوب استخدم Piped API
     if "youtube.com" in link or "youtu.be" in link:
-        proc = await _asyncio.create_subprocess_exec(
-            "yt-dlp",
-            "-g",
-            "-f", "bestaudio/best",
-            link,
-            stdout=_asyncio.subprocess.PIPE,
-            stderr=_asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if stdout:
-            url = stdout.decode().strip().split(chr(10))[0]
-            print(f"[ytdl_audio] direct URL: OK")
-            return 1, url
+        match = _re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", link)
+        if match:
+            video_id = match.group(1)
+            audio_url = await asyncio.to_thread(_get_piped_audio_url, video_id)
+            if audio_url:
+                return 1, audio_url
 
-    # Fallback: SoundCloud
+    # Fallback: تحميل من SoundCloud أو Dailymotion
     uid = uuid.uuid4().hex[:8]
     out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
     await asyncio.to_thread(_sc_download, link, out_tpl)
     for ff in os.listdir(AUDIO_DIR):
         if ff.startswith(uid):
             return 1, os.path.join(AUDIO_DIR, ff)
+
     return 0, "download failed"
