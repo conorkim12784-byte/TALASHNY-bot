@@ -11,11 +11,13 @@ from driver.filters import command, other_filters, command2
 from driver.queues import QUEUE, add_to_queue
 from driver.nowplaying import current_requester
 from driver.veez import call_py, user
+from driver.utils import bash
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdInvalid
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import yt_dlp
+from youtubesearchpython import VideosSearch
 
 TOR_PROXIES = {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}
 
@@ -35,89 +37,35 @@ def _parse_duration(seconds) -> str:
 
 
 def ytsearch(query: str):
-    """بحث الصوت — YouTube عبر yt-dlp"""
-    ydl_opts = {
-        "quiet": True, "no_warnings": True,
-        "extract_flat": True, "skip_download": True,
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        "http_headers": {
-            "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
-        },
-    }
+    """بحث الصوت — YouTube عبر youtubesearchpython"""
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if entries:
-                item = entries[0]
-                vid_id = item.get("id") or ""
-                url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id and not vid_id.startswith("http") else (item.get("webpage_url") or item.get("url") or "")
-                title = (item.get("title") or query)[:70]
-                secs = int(item.get("duration") or 0)
-                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-                thumbnail = item.get("thumbnail") or ""
-                if url:
-                    print(f"[ytsearch] YouTube: {title}")
-                    return [title, url, duration, thumbnail]
+        search = VideosSearch(query, limit=1).result()
+        data = search["result"][0]
+        title = data["title"][:70]
+        url = data["link"]
+        duration = data["duration"]
+        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
+        print(f"[ytsearch] YouTube: {title}")
+        return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch YT] {e}")
-    return None
+        print(f"[ytsearch] {e}")
+        return None
 
 
 def ytsearch_yt(query: str):
-    """بحث فيديو — yt-dlp ytsearch أولاً ثم Dailymotion كـ fallback"""
-    # --- الطريقة الأولى: yt-dlp ytsearch (بدون cookies) ---
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": True,
-        "skip_download": True,
-    }
+    """بحث فيديو — YouTube عبر youtubesearchpython"""
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if entries:
-                item = entries[0]
-                vid_id = item.get("id") or item.get("url", "").replace("/watch?v=", "")
-                if vid_id and not vid_id.startswith("http"):
-                    url = f"https://www.youtube.com/watch?v={vid_id}"
-                elif item.get("webpage_url"):
-                    url = item["webpage_url"]
-                else:
-                    url = item.get("url", "")
-                title = (item.get("title") or query)[:70]
-                secs = int(item.get("duration") or 0)
-                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-                thumbnail = item.get("thumbnail") or ""
-                if url:
-                    print(f"[ytsearch_yt yt-dlp] {title}")
-                    return [title, url, duration, thumbnail]
+        search = VideosSearch(query, limit=1).result()
+        data = search["result"][0]
+        title = data["title"][:70]
+        url = data["link"]
+        duration = data["duration"]
+        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
+        print(f"[ytsearch_yt] YouTube: {title}")
+        return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch_yt yt-dlp] {e}")
-
-    # --- الطريقة الثانية: Dailymotion كـ fallback ---
-    try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True}) as ydl:
-            info = ydl.extract_info(f"dmsearch1:{query}", download=False)
-            entries = info.get("entries") or []
-            if entries:
-                item = entries[0]
-                url = item.get("url") or item.get("webpage_url") or ""
-                title = (item.get("title") or query)[:70]
-                secs = int(item.get("duration") or 0)
-                mins, s = divmod(secs, 60); h, m = divmod(mins, 60)
-                duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-                thumbnail = item.get("thumbnail") or ""
-                if url:
-                    print(f"[ytsearch_yt Dailymotion] {title}")
-                    return [title, url, duration, thumbnail]
-    except Exception as e:
-        print(f"[ytsearch_yt dmsearch] {e}")
-
-    return None
+        print(f"[ytsearch_yt] {e}")
+        return None
 
 def _dm_search(query: str):
     """بحث على Dailymotion — مجاني بدون API"""
@@ -302,72 +250,30 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """تحميل صوت من YouTube عبر yt-dlp"""
-    uid = uuid.uuid4().hex[:8]
-    out_tpl = os.path.join(AUDIO_DIR, f"{uid}.%(ext)s")
-
-    def _download():
-        ydl_opts = {
-            "quiet": True, "no_warnings": True,
-            "format": "bestaudio/best",
-            "outtmpl": out_tpl,
-            "extractor_args": {"youtube": {"player_client": ["ios"]}},
-            "http_headers": {
-                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
-            },
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-
-    try:
-        await asyncio.to_thread(_download)
-        for ff in os.listdir(AUDIO_DIR):
-            if ff.startswith(uid):
-                print(f"[ytdl_audio] YouTube: {ff}")
-                return 1, os.path.join(AUDIO_DIR, ff)
-    except Exception as e:
-        print(f"[ytdl_audio error] {e}")
-
-    return 0, "download failed"
+    """جيب رابط مباشر للصوت من YouTube عبر yt-dlp -g (بدون تحميل)"""
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "bestaudio/best" {link}'
+    )
+    if stdout:
+        print(f"[ytdl_audio] direct URL OK")
+        return 1, stdout.split("\n")[0]
+    print(f"[ytdl_audio error] {stderr}")
+    return 0, stderr
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """تحميل فيديو من YouTube عبر yt-dlp"""
-    uid = uuid.uuid4().hex[:8]
-    out_tpl = os.path.join(DL_DIR, f"{uid}.%(ext)s")
-
-    fmt_map = {720: "bestvideo[height<=720]+bestaudio/best", 480: "bestvideo[height<=480]+bestaudio/best", 360: "bestvideo[height<=360]+bestaudio/best"}
-    fmt = fmt_map.get(quality, "bestvideo[height<=720]+bestaudio/best")
-
-    def _download():
-        ydl_opts = {
-            "quiet": True, "no_warnings": True,
-            "format": fmt,
-            "outtmpl": out_tpl,
-            "merge_output_format": "mp4",
-            "extractor_args": {"youtube": {"player_client": ["ios"]}},
-            "http_headers": {
-                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"
-            },
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-
-    try:
-        await asyncio.to_thread(_download)
-        for ff in os.listdir(DL_DIR):
-            if ff.startswith(uid):
-                filepath = os.path.join(DL_DIR, ff)
-                asyncio.create_task(_auto_delete(filepath))
-                print(f"[ytdl_video] YouTube: {ff}")
-                return 1, filepath
-    except Exception as e:
-        print(f"[ytdl_video error] {e}")
-
-    return 0, "failed"
+    """جيب رابط مباشر للفيديو من YouTube عبر yt-dlp -g (بدون تحميل)"""
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" {link}'
+    )
+    if stdout:
+        print(f"[ytdl_video] direct URL OK")
+        return 1, stdout.split("\n")[0]
+    print(f"[ytdl_video error] {stderr}")
+    return 0, stderr
 
 
 async def _auto_delete(filepath: str, delay: int = 600):

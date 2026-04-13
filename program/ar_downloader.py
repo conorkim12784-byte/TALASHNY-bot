@@ -1,5 +1,4 @@
 # Copyright (C) 2021 By Amor Music-Project
-# Fixed: song() converted to async + await everywhere
 
 from __future__ import unicode_literals
 import asyncio
@@ -9,9 +8,8 @@ import wget
 import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
-import requests as _ytrequests
-import re as _ytre
 from yt_dlp import YoutubeDL
+from youtubesearchpython import VideosSearch
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
@@ -22,52 +20,27 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
-    ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"},
-        "default_search": "ytsearch1"}
+    ydl_ops = {
+        "format": "bestaudio[ext=m4a]",
+        "outtmpl": "%(title)s.%(ext)s",
+    }
     audio_file = None
     thumb_name = None
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": query, "type": "video", "maxResults": 1, "key": YOUTUBE_API_KEY},
-                timeout=10,
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
+        search = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
+        results = search["result"]
+        if not results:
             await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
             return
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:40]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        link = f"https://www.youtube.com/watch?v={video_id}"
-        r2 = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-                timeout=10,
-            )
-        )
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        mt = _ytre.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total_s = h * 3600 + mn * 60 + s
-        _m, _s = divmod(total_s, 60)
-        _h, _m = divmod(_m, 60)
-        duration = f"{_h}:{_m:02d}:{_s:02d}" if _h else f"{_m}:{_s:02d}"
-        if thumbnail:
-            thumb_name = f"{title}.jpg"
-            thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
-            with open(thumb_name, "wb") as f:
-                f.write(thumb_data.content)
+        data = results[0]
+        title = data["title"][:40]
+        link = data["link"]
+        duration = data["duration"] or "0:00"
+        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
+        thumb_name = f"{title}.jpg"
+        thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
+        with open(thumb_name, "wb") as f:
+            f.write(thumb_data.content)
     except Exception as e:
         await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
         print(str(e))
@@ -104,14 +77,12 @@ async def song(_, message: Message):
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
-        "format": "bestvideo[height<=720]+bestaudio/best",
+        "format": "best[height<=720]/best",
         "keepvideo": True,
         "geo_bypass": True,
         "outtmpl": "%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        
-        "default_search": "scsearch1",
     }
     query = " ".join(message.command[1:])
     if not query:
@@ -119,25 +90,14 @@ async def vsong(client, message: Message):
     file_name = None
     preview = None
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": query, "type": "video",
-                        "maxResults": 1, "key": YOUTUBE_API_KEY},
-                timeout=10,
-                
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
+        search = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
+        results = search["result"]
+        if not results:
             return await message.reply("✘ لم يتم العثور على الفيديو")
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title_v = item["snippet"]["title"][:40]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        link = f"https://www.youtube.com/watch?v={video_id}"
+        data = results[0]
+        title_v = data["title"][:40]
+        link = data["link"]
+        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
     except Exception as e:
         return await message.reply(f"✘ خطأ في البحث: {e}")
     try:
@@ -150,8 +110,7 @@ async def vsong(client, message: Message):
     except Exception as e:
         return await msg.edit(f"🚫 **خطأ:** {e}")
     try:
-        if thumbnail:
-            preview = await asyncio.to_thread(wget.download, thumbnail)
+        preview = await asyncio.to_thread(wget.download, thumbnail)
         await msg.edit("📤 **جاري رفع الفيديو...**")
         await message.reply_video(file_name, duration=int(ytdl_data.get("duration", 0)),
                                    thumb=preview, caption=title_v)
