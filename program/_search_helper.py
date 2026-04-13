@@ -1,33 +1,58 @@
-# _search_helper.py — بحث وتحميل عبر YouTube (youtubesearchpython + yt-dlp -g)
+# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر yt-dlp -g
 
 import asyncio
 import os
+import re as _re
+import requests
 from driver.utils import bash
-from youtubesearchpython import VideosSearch
 
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
-def _parse_duration(seconds) -> str:
-    if not seconds:
+def _parse_iso_duration(iso: str) -> str:
+    mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+    if not mt:
         return "0:00"
-    seconds = int(seconds)
-    mins, s = divmod(seconds, 60)
-    h, m = divmod(mins, 60)
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+    h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3))
+    total = h * 3600 + m * 60 + s
+    mins, secs = divmod(total, 60)
+    hrs, mins = divmod(mins, 60)
+    return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
 
 
 def ytsearch(query: str):
-    """بحث على YouTube عبر youtubesearchpython"""
+    """بحث على YouTube عبر Data API v3"""
     try:
-        search = VideosSearch(query, limit=1).result()
-        data = search["result"][0]
-        title = data["title"][:70]
-        url = data["link"]
-        duration = data["duration"]
-        thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
-        print(f"[ytsearch] YouTube: {title}")
+        from config import YOUTUBE_API_KEY
+        # البحث عن الفيديو
+        r = requests.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={"part": "snippet", "q": query, "type": "video",
+                    "maxResults": 1, "key": YOUTUBE_API_KEY},
+            timeout=10,
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        if not items:
+            print("[ytsearch] no results from API")
+            return None
+        item = items[0]
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"][:70]
+        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+        # جيب المدة
+        r2 = requests.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+            timeout=10,
+        )
+        r2.raise_for_status()
+        detail = r2.json().get("items", [])
+        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
+        duration = _parse_iso_duration(iso)
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        print(f"[ytsearch] YouTube API: {title}")
         return [title, url, duration, thumbnail]
     except Exception as e:
         print(f"[ytsearch error] {e}")
@@ -35,12 +60,12 @@ def ytsearch(query: str):
 
 
 async def ytdl_audio(link: str):
-    """جيب رابط مباشر للصوت من YouTube عبر yt-dlp -g (بدون تحميل)"""
+    """جيب رابط مباشر للصوت عبر yt-dlp -g (بدون تحميل، بدون بروكسي)"""
     stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" {link}'
+        f'yt-dlp -g -f "bestaudio/best" --no-check-certificate "{link}"'
     )
     if stdout:
         print(f"[ytdl_audio] direct URL OK")
         return 1, stdout.split("\n")[0]
-    print(f"[ytdl_audio error] {stderr}")
+    print(f"[ytdl_audio error] {stderr[:200]}")
     return 0, stderr
