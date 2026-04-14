@@ -15,6 +15,8 @@ from yt_dlp import YoutubeDL
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
 
 @Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))
 async def song(_, message: Message):
@@ -22,7 +24,7 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("⚡")
-    ydl_ops = {"format": "bestaudio/best", "outtmpl": "/tmp/%(title)s.%(ext)s",
+    ydl_ops = {"format": "bestaudio/best", "outtmpl": "/tmp/%(title)s.%(ext)s", "cookiefile": COOKIES_FILE,
         "extractor_args": {"youtube": {"player_client": ["ios"]}},
         "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"},
         "default_search": "scsearch1"}
@@ -110,7 +112,7 @@ async def vsong(client, message: Message):
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        
+        "cookiefile": COOKIES_FILE,
         "default_search": "scsearch1",
     }
     query = " ".join(message.command[1:])

@@ -22,6 +22,7 @@ from driver.filters import command, other_filters
 
 # FIX: مسار الـ cookies
 TOR_PROXY = "socks5://127.0.0.1:9050"
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
 
 
 # ─────────────────────────────────────────
@@ -78,7 +79,7 @@ async def song(_, message: Message):
     ydl_ops = {
         "format": "bestaudio/best",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
-        
+        "cookiefile": COOKIES_FILE,
         "extractor_args": {"youtube": {"player_client": ["ios", "android", "tv_embedded"]}},
     }
 
@@ -149,7 +150,7 @@ async def vsong(client, message: Message):
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        
+        "cookiefile": COOKIES_FILE,
         "extractor_args": {"youtube": {"player_client": ["ios", "android", "tv_embedded"]}},
     }
 
