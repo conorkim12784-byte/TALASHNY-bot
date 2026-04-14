@@ -301,44 +301,38 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — بيجرب tv_embedded ثم ios ثم web_creator"""
-    clients = ["tv_embedded", "ios", "web_creator"]
-    for client in clients:
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "bestaudio/best" '
-            f'--extractor-args "youtube:player_client={client}" '
-            f'--js-runtimes nodejs '
-            f'--no-check-certificate "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_audio] OK via {client}")
-                return 1, url
-        print(f"[ytdl_audio] {client} failed: {stderr[:100]}")
-    return 0, "failed all clients"
+    """جيب رابط مباشر للصوت عبر bgutil po_token"""
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "bestaudio/best" '
+        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+        f'--no-check-certificate "{link}"'
+    )
+    if stdout:
+        url = stdout.split("\n")[0].strip()
+        if url:
+            print(f"[ytdl_audio] OK via bgutil")
+            return 1, url
+    print(f"[ytdl_audio] bgutil failed: {stderr[:200]}")
+    return 0, stderr
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — بيجرب tv_embedded ثم ios ثم web_creator"""
-    clients = ["tv_embedded", "ios", "web_creator"]
-    for client in clients:
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-            f'--extractor-args "youtube:player_client={client}" '
-            f'--js-runtimes nodejs '
-            f'--no-check-certificate "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_video] OK via {client}")
-                return 1, url
-        print(f"[ytdl_video] {client} failed: {stderr[:100]}")
-    return 0, "failed all clients"
+    """جيب رابط مباشر للفيديو عبر bgutil po_token"""
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
+        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+        f'--no-check-certificate "{link}"'
+    )
+    if stdout:
+        url = stdout.split("\n")[0].strip()
+        if url:
+            print(f"[ytdl_video] OK via bgutil")
+            return 1, url
+    print(f"[ytdl_video] bgutil failed: {stderr[:200]}")
+    return 0, stderr
 
 
 async def _auto_delete(filepath: str, delay: int = 600):

@@ -1,4 +1,4 @@
-# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر yt-dlp
+# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر bgutil po_token
 
 import asyncio
 import os
@@ -58,19 +58,16 @@ def ytsearch(query: str):
 
 
 async def ytdl_audio(link: str):
-    """جيب رابط مباشر للصوت — بيجرب tv_embedded ثم ios ثم web_creator"""
-    clients = ["tv_embedded", "ios", "web_creator"]
-    for client in clients:
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "bestaudio/best" '
-            f'--extractor-args "youtube:player_client={client}" '
-            f'--js-runtimes nodejs '
-            f'--no-check-certificate "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_audio] OK via {client}")
-                return 1, url
-        print(f"[ytdl_audio] {client} failed: {stderr[:100]}")
-    return 0, "failed all clients"
+    """جيب رابط مباشر للصوت عبر bgutil po_token"""
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "bestaudio/best" '
+        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+        f'--no-check-certificate "{link}"'
+    )
+    if stdout:
+        url = stdout.split("\n")[0].strip()
+        if url:
+            print(f"[ytdl_audio] OK via bgutil")
+            return 1, url
+    print(f"[ytdl_audio] bgutil failed: {stderr[:200]}")
+    return 0, stderr
