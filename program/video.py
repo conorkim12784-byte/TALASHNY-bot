@@ -17,6 +17,9 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdIn
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import yt_dlp
+import sys, os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from ytdl_utils import COOKIES_FILE
 
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
@@ -291,6 +294,7 @@ async def ytdl_direct(link: str):
     proc = await asyncio.create_subprocess_exec(
         "yt-dlp",
         "-g",
+        "--cookies", COOKIES_FILE,
         "-f", "best[height<=?720][width<=?1280]/best",
         link,
         stdout=asyncio.subprocess.PIPE,
@@ -317,6 +321,7 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
             "no_warnings": True,
             "nocheckcertificate": True,
             "proxy": "",
+            "cookiefile": COOKIES_FILE,
             "extractor_args": {"youtube": {"player_client": [client]}},
             "skip_download": True,
         }

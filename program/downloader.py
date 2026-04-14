@@ -15,6 +15,9 @@ from pyrogram.types import Message
 import requests as _ytrequests
 import re as _ytre
 from yt_dlp import YoutubeDL
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from ytdl_utils import COOKIES_FILE
 
 from config import BOT_USERNAME as bn
 from driver.decorators import humanbytes
@@ -74,6 +77,7 @@ async def song(_, message: Message):
     ydl_ops = {
         "format": "bestaudio/best",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
+        "cookiefile": COOKIES_FILE,
         "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
         "nocheckcertificate": True,
         "proxy": "",
@@ -148,6 +152,7 @@ async def vsong(client, message: Message):
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
+        "cookiefile": COOKIES_FILE,
         "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
         "nocheckcertificate": True,
         "proxy": "",
