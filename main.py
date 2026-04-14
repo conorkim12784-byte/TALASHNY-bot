@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 # Fix: Create event loop before importing pytgcalls
 # pytgcalls sync.py calls asyncio.get_event_loop() at import time,
@@ -11,16 +10,6 @@ from pytgcalls import idle
 from driver.veez import call_py, bot, user
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
 from callsmusic import register_stream_end_handler
-
-# ─── Suppress ChannelInvalid errors from Pyrogram story parsing ───
-# Pyrogram 2.x tries to resolve peer for stories from unknown channels,
-# which raises ChannelInvalid (400) — safe to ignore completely.
-logging.getLogger("pyrogram.dispatcher").addFilter(
-    type("_IgnoreChannelInvalid", (logging.Filter,), {
-        "filter": lambda self, r: "CHANNEL_INVALID" not in r.getMessage()
-        and "ChannelInvalid" not in r.getMessage()
-    })()
-)
 
 
 async def start_bot():
