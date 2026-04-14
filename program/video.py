@@ -301,38 +301,18 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — cookies اولا ثم bgutil"""
-    import os as _os
-    cookies_path = _os.path.normpath(
-        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "cookies.txt")
-    )
-
-    # المحاولة الاولى: cookies
-    if _os.path.exists(cookies_path):
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "bestaudio/best" '
-            f'--cookies "{cookies_path}" '
-            f'--no-check-certificate "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_audio] OK via cookies")
-                return 1, url
-        print(f"[ytdl_audio] cookies failed: {stderr[:200]}")
-
-    # المحاولة الثانية: bgutil
+    """جيب رابط مباشر للصوت — mobile client بدون cookies"""
     stdout, stderr = await bash(
         f'yt-dlp -g -f "bestaudio/best" '
-        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+        f'--extractor-args "youtube:player_client=ios,android,tv_embedded" '
         f'--no-check-certificate "{link}"'
     )
     if stdout:
         url = stdout.split("\n")[0].strip()
         if url:
-            print(f"[ytdl_audio] OK via bgutil")
+            print(f"[ytdl_audio] OK")
             return 1, url
-    print(f"[ytdl_audio] all methods failed: {stderr[:200]}")
+    print(f"[ytdl_audio] failed: {stderr[:200]}")
     return 0, stderr
 
 
@@ -340,38 +320,18 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — cookies اولا ثم bgutil"""
-    import os as _os
-    cookies_path = _os.path.normpath(
-        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "cookies.txt")
-    )
-
-    # المحاولة الاولى: cookies
-    if _os.path.exists(cookies_path):
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-            f'--cookies "{cookies_path}" '
-            f'--no-check-certificate "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_video] OK via cookies")
-                return 1, url
-        print(f"[ytdl_video] cookies failed: {stderr[:200]}")
-
-    # المحاولة الثانية: bgutil
+    """جيب رابط مباشر للفيديو — mobile client بدون cookies"""
     stdout, stderr = await bash(
         f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+        f'--extractor-args "youtube:player_client=ios,android,tv_embedded" '
         f'--no-check-certificate "{link}"'
     )
     if stdout:
         url = stdout.split("\n")[0].strip()
         if url:
-            print(f"[ytdl_video] OK via bgutil")
+            print(f"[ytdl_video] OK")
             return 1, url
-    print(f"[ytdl_video] all methods failed: {stderr[:200]}")
+    print(f"[ytdl_video] failed: {stderr[:200]}")
     return 0, stderr
 
 
