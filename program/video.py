@@ -303,60 +303,51 @@ async def ytdl_direct(link: str):
     return 0, stderr.decode().strip()
 
 
-async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — بدون cookies أو bgutil
-    بيجرب player clients: ios → tv_embedded → android → web_creator
+def _ydl_get_url(link: str, fmt: str) -> tuple:
+    """
+    استخرج رابط مباشر عبر yt-dlp Python API.
+    بيجرب: ios -> tv_embedded -> android -> web_creator
+    proxy="" بيتجاوز أي system proxy بيبلوك YouTube.
     """
     clients = ["ios", "tv_embedded", "android", "web_creator"]
     for client in clients:
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "bestaudio/best" '
-            f'--extractor-args "youtube:player_client={client}" '
-            f'--no-check-certificate --no-warnings "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_audio] OK via client={client}")
-                return 1, url
-        print(f"[ytdl_audio] client={client} failed: {stderr[:120]}")
-
-    # fallback: Piped API
-    import re as _re
-    match = _re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", link)
-    if match:
-        streams = _get_piped_streams(match.group(1))
-        if streams:
-            audio_url = streams.get("audio") or streams.get("url")
-            if audio_url:
-                print("[ytdl_audio] OK via Piped fallback")
-                return 1, audio_url
-
+        ydl_opts = {
+            "format": fmt,
+            "quiet": True,
+            "no_warnings": True,
+            "nocheckcertificate": True,
+            "proxy": "",
+            "extractor_args": {"youtube": {"player_client": [client]}},
+            "skip_download": True,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(link, download=False)
+                url = info.get("url") or (
+                    info.get("requested_formats", [{}])[0].get("url")
+                    if info.get("requested_formats") else None
+                )
+                if url:
+                    print(f"[ydl_get_url] OK via client={client}")
+                    return 1, url
+        except Exception as e:
+            print(f"[ydl_get_url] client={client} failed: {str(e)[:120]}")
     return 0, "all extraction methods failed"
+
+
+async def ytdl_audio(link):
+    """جيب رابط مباشر للصوت — Python API بدون proxy"""
+    return await asyncio.to_thread(_ydl_get_url, link, "bestaudio/best")
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — بدون cookies أو bgutil
-    بيجرب player clients: ios → tv_embedded → android
-    """
-    clients = ["ios", "tv_embedded", "android"]
-    for client in clients:
-        stdout, stderr = await bash(
-            f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]/best" '
-            f'--extractor-args "youtube:player_client={client}" '
-            f'--no-check-certificate --no-warnings "{link}"'
-        )
-        if stdout:
-            url = stdout.split("\n")[0].strip()
-            if url:
-                print(f"[ytdl_video] OK via client={client}")
-                return 1, url
-        print(f"[ytdl_video] client={client} failed: {stderr[:120]}")
-
-    return 0, "all extraction methods failed"
+    """جيب رابط مباشر للفيديو — Python API بدون proxy"""
+    return await asyncio.to_thread(
+        _ydl_get_url, link, f"best[height<=?{quality}][width<=?1280]/best"
+    )
 
 
 async def _auto_delete(filepath: str, delay: int = 600):

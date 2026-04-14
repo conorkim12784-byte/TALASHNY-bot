@@ -76,6 +76,7 @@ async def song(_, message: Message):
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
         "nocheckcertificate": True,
+        "proxy": "",
         "quiet": True,
         "no_warnings": True,
     }
@@ -149,6 +150,7 @@ async def vsong(client, message: Message):
         "merge_output_format": "mp4",
         "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
         "nocheckcertificate": True,
+        "proxy": "",
         "no_warnings": True,
     }
 
