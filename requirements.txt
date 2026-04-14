@@ -17,3 +17,4 @@ psutil
 future
 wget
 ffmpeg-python
+bgutil-ytdlp-pot-provider
