@@ -310,10 +310,11 @@ async def ytdl_direct(link: str):
 def _ydl_get_url(link: str, fmt: str) -> tuple:
     """
     استخرج رابط مباشر عبر yt-dlp Python API.
-    بيجرب: ios -> tv_embedded -> android -> web_creator
+    بيجرب: mweb -> ios -> tv_embedded -> web -> android
     proxy="" بيتجاوز أي system proxy بيبلوك YouTube.
     """
-    clients = ["ios", "tv_embedded", "android", "web_creator"]
+    # ترتيب الـ clients من الأكتر نجاح للأقل (2025)
+    clients = ["mweb", "ios", "tv_embedded", "web", "android"]
     for client in clients:
         ydl_opts = {
             "format": fmt,
@@ -322,16 +323,32 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
             "nocheckcertificate": True,
             "proxy": "",
             "cookiefile": COOKIES_FILE,
-            "extractor_args": {"youtube": {"player_client": [client]}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [client],
+                    "skip": ["hls", "dash"],  # تجنب الـ formats المشكلة
+                }
+            },
             "skip_download": True,
+            # تحديث الـ headers عشان يشبه browser حقيقي
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(link, download=False)
-                url = info.get("url") or (
-                    info.get("requested_formats", [{}])[0].get("url")
-                    if info.get("requested_formats") else None
-                )
+                # بنجرب url مباشر الأول، لو مش موجود نجرب requested_formats
+                url = info.get("url")
+                if not url and info.get("requested_formats"):
+                    url = info["requested_formats"][0].get("url")
+                if not url and info.get("formats"):
+                    # خد الـ format الأحسن اللي عنده url
+                    for f in reversed(info["formats"]):
+                        if f.get("url") and not f["url"].startswith("manifest"):
+                            url = f["url"]
+                            break
                 if url:
                     print(f"[ydl_get_url] OK via client={client}")
                     return 1, url

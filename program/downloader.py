@@ -78,7 +78,15 @@ async def song(_, message: Message):
         "format": "bestaudio/best",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "cookiefile": COOKIES_FILE,
-        "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb", "ios", "tv_embedded", "web"],
+                "skip": ["hls", "dash"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        },
         "nocheckcertificate": True,
         "proxy": "",
         "quiet": True,
@@ -153,7 +161,15 @@ async def vsong(client, message: Message):
         "quiet": True,
         "merge_output_format": "mp4",
         "cookiefile": COOKIES_FILE,
-        "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb", "ios", "tv_embedded", "web"],
+                "skip": ["hls", "dash"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        },
         "nocheckcertificate": True,
         "proxy": "",
         "no_warnings": True,
