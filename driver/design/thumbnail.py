@@ -205,10 +205,6 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
         dur_str = "--:--"
     draw.text((1185, 562), dur_str, font=small_font, fill=(*color, 200), anchor="ra")
 
-    # ===== watermark =====
-    wm_font = load_font(FONT_BOLD, 36)
-    draw.text((1210, 698), "TALASHNY", font=wm_font, fill=(255, 255, 255, 45), anchor="ra")
-
     # ===== حفظ =====
     out = f"search/final{userid}.png"
     bg.convert("RGB").save(out, quality=95)
