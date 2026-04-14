@@ -23,11 +23,9 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "format": "bestaudio[ext=m4a]",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "cookiefile": COOKIES_FILE,
-        "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
-        "nocheckcertificate": True,
     }
     audio_file = None
     thumb_name = None
@@ -82,15 +80,13 @@ async def song(_, message: Message):
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
-        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+        "format": "best[height<=720]/best",
         "keepvideo": True,
         "geo_bypass": True,
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
         "cookiefile": COOKIES_FILE,
-        "extractor_args": {"youtube": {"player_client": ["ios", "tv_embedded", "android", "web_creator"]}},
-        "nocheckcertificate": True,
     }
     query = " ".join(message.command[1:])
     if not query:
