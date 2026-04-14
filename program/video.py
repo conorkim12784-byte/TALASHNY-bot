@@ -34,88 +34,144 @@ def _parse_duration(seconds) -> str:
 
 
 def ytsearch(query: str):
-    """بحث الصوت — YouTube Data API v3"""
+    """بحث الصوت — YouTube Data API v3 مع fallback عبر yt-dlp"""
     import re as _re2
     import requests as _req
+
+    # --- الطريقة الأولى: YouTube Data API v3 ---
     try:
         from config import YOUTUBE_API_KEY
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            print("[ytsearch] no results")
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail = r2.json().get("items", [])
-        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
-        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + m * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        print(f"[ytsearch] YouTube API: {title}")
-        return [title, url, duration, thumbnail]
+        if YOUTUBE_API_KEY:
+            r = _req.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": query, "type": "video",
+                        "maxResults": 1, "key": YOUTUBE_API_KEY},
+                timeout=10,
+            )
+            r.raise_for_status()
+            items = r.json().get("items", [])
+            if items:
+                item = items[0]
+                video_id = item["id"]["videoId"]
+                title = item["snippet"]["title"][:70]
+                thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+                r2 = _req.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+                    timeout=10,
+                )
+                r2.raise_for_status()
+                detail = r2.json().get("items", [])
+                iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
+                mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+                h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+                total = h * 3600 + m * 60 + s
+                mins, secs = divmod(total, 60)
+                hrs, mins = divmod(mins, 60)
+                duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                print(f"[ytsearch] YouTube API OK: {title}")
+                return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch error] {e}")
+        print(f"[ytsearch API error] {e}")
+
+    # --- الطريقة الثانية: yt-dlp fallback ---
+    try:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "extract_flat": True, "skip_download": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            video_id = item.get("id") or ""
+            url = item.get("url") or item.get("webpage_url") or f"https://www.youtube.com/watch?v={video_id}"
+            if not url.startswith("http"):
+                url = f"https://www.youtube.com/watch?v={video_id}"
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60)
+            h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            thumbnail = item.get("thumbnail") or f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            print(f"[ytsearch] yt-dlp fallback OK: {title}")
+            return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ytsearch yt-dlp error] {e}")
         return None
 
 
 def ytsearch_yt(query: str):
-    """بحث فيديو — YouTube Data API v3"""
+    """بحث فيديو — YouTube Data API v3 مع fallback عبر yt-dlp"""
     import re as _re2
     import requests as _req
+
+    # --- الطريقة الأولى: YouTube Data API v3 ---
     try:
         from config import YOUTUBE_API_KEY
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
-            print("[ytsearch_yt] no results")
-            return None
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail = r2.json().get("items", [])
-        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
-        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + m * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        print(f"[ytsearch_yt] YouTube API: {title}")
-        return [title, url, duration, thumbnail]
+        if YOUTUBE_API_KEY:
+            r = _req.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": query, "type": "video",
+                        "maxResults": 1, "key": YOUTUBE_API_KEY},
+                timeout=10,
+            )
+            r.raise_for_status()
+            items = r.json().get("items", [])
+            if items:
+                item = items[0]
+                video_id = item["id"]["videoId"]
+                title = item["snippet"]["title"][:70]
+                thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
+                r2 = _req.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
+                    timeout=10,
+                )
+                r2.raise_for_status()
+                detail = r2.json().get("items", [])
+                iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
+                mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+                h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
+                total = h * 3600 + m * 60 + s
+                mins, secs = divmod(total, 60)
+                hrs, mins = divmod(mins, 60)
+                duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                print(f"[ytsearch_yt] YouTube API OK: {title}")
+                return [title, url, duration, thumbnail]
     except Exception as e:
-        print(f"[ytsearch_yt error] {e}")
+        print(f"[ytsearch_yt API error] {e}")
+
+    # --- الطريقة الثانية: yt-dlp fallback ---
+    try:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True,
+            "extract_flat": True, "skip_download": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries") or []
+            if not entries:
+                return None
+            item = entries[0]
+            title = (item.get("title") or query)[:70]
+            video_id = item.get("id") or ""
+            url = item.get("url") or item.get("webpage_url") or f"https://www.youtube.com/watch?v={video_id}"
+            if not url.startswith("http"):
+                url = f"https://www.youtube.com/watch?v={video_id}"
+            secs = int(item.get("duration") or 0)
+            mins, s = divmod(secs, 60)
+            h, m = divmod(mins, 60)
+            duration = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            thumbnail = item.get("thumbnail") or f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            print(f"[ytsearch_yt] yt-dlp fallback OK: {title}")
+            return [title, url, duration, thumbnail]
+    except Exception as e:
+        print(f"[ytsearch_yt yt-dlp error] {e}")
         return None
 
 def _dm_search(query: str):
@@ -301,65 +357,154 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — mweb client (HLS بدون PO token)"""
-    # mweb بيدي HLS formats مش محتاجة PO token حالياً
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" '
-        f'--extractor-args "youtube:player_client=mweb" '
-        f'--no-check-certificate "{link}"'
-    )
-    if stdout:
-        url = stdout.split("\n")[0].strip()
-        if url:
-            print(f"[ytdl_audio] OK via mweb")
-            return 1, url
+    """
+    جيب رابط مباشر للصوت من يوتيوب.
+    يجرب yt-dlp مباشرة أولاً بدون إضافات، ثم مع cookies، ثم bgutil كـ fallback.
+    """
+    # الطريقة الأولى: yt-dlp مباشرة
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-g",
+            "-f", "bestaudio/best",
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--no-playlist",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        if stdout:
+            url = stdout.decode().strip().split("\n")[0]
+            if url.startswith("http"):
+                print(f"[ytdl_audio] OK via yt-dlp direct")
+                return 1, url
+    except asyncio.TimeoutError:
+        print("[ytdl_audio] yt-dlp direct timed out")
+    except Exception as e:
+        print(f"[ytdl_audio] yt-dlp direct error: {e}")
 
-    # fallback: android_music
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" '
-        f'--extractor-args "youtube:player_client=android_music" '
-        f'--no-check-certificate "{link}"'
-    )
-    if stdout:
-        url = stdout.split("\n")[0].strip()
-        if url:
-            print(f"[ytdl_audio] OK via android_music")
-            return 1, url
+    # الطريقة الثانية: yt-dlp مع cookies
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-g",
+            "-f", "bestaudio/best",
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--no-playlist",
+            "--cookies", "/app/cookies.txt",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        if stdout:
+            url = stdout.decode().strip().split("\n")[0]
+            if url.startswith("http"):
+                print(f"[ytdl_audio] OK via yt-dlp + cookies")
+                return 1, url
+    except asyncio.TimeoutError:
+        print("[ytdl_audio] cookies timed out")
+    except Exception as e:
+        print(f"[ytdl_audio] cookies error: {e}")
 
-    print(f"[ytdl_audio] failed: {stderr[:200]}")
-    return 0, stderr
+    # الطريقة الثالثة: bgutil (لو موجود على السيرفر)
+    try:
+        stdout, stderr = await bash(
+            f'yt-dlp -g -f "bestaudio/best" '
+            f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+            f'--no-check-certificate "{link}"'
+        )
+        if stdout:
+            url = stdout.split("\n")[0].strip()
+            if url.startswith("http"):
+                print(f"[ytdl_audio] OK via bgutil")
+                return 1, url
+    except Exception as e:
+        print(f"[ytdl_audio] bgutil error: {e}")
+
+    print(f"[ytdl_audio] all methods failed for: {link}")
+    return 0, "فشل تحميل الرابط — تأكد من تحديث yt-dlp أو إضافة cookies.txt"
 
 
 ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — mweb client"""
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-        f'--extractor-args "youtube:player_client=mweb" '
-        f'--no-check-certificate "{link}"'
-    )
-    if stdout:
-        url = stdout.split("\n")[0].strip()
-        if url:
-            print(f"[ytdl_video] OK via mweb")
-            return 1, url
+    """
+    جيب رابط مباشر للفيديو من يوتيوب.
+    يجرب yt-dlp مباشرة أولاً بدون إضافات، ثم مع cookies، ثم bgutil كـ fallback.
+    """
+    fmt = f"best[height<=?{quality}][width<=?1280]/best"
 
-    # fallback
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-        f'--extractor-args "youtube:player_client=android" '
-        f'--no-check-certificate "{link}"'
-    )
-    if stdout:
-        url = stdout.split("\n")[0].strip()
-        if url:
-            print(f"[ytdl_video] OK via android")
-            return 1, url
+    # الطريقة الأولى: yt-dlp مباشرة
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-g",
+            "-f", fmt,
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--no-playlist",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        if stdout:
+            url = stdout.decode().strip().split("\n")[0]
+            if url.startswith("http"):
+                print(f"[ytdl_video] OK via yt-dlp direct")
+                return 1, url
+    except asyncio.TimeoutError:
+        print("[ytdl_video] yt-dlp direct timed out")
+    except Exception as e:
+        print(f"[ytdl_video] yt-dlp direct error: {e}")
 
-    print(f"[ytdl_video] failed: {stderr[:200]}")
-    return 0, stderr
+    # الطريقة الثانية: yt-dlp مع cookies
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-g",
+            "-f", fmt,
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--no-playlist",
+            "--cookies", "/app/cookies.txt",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        if stdout:
+            url = stdout.decode().strip().split("\n")[0]
+            if url.startswith("http"):
+                print(f"[ytdl_video] OK via yt-dlp + cookies")
+                return 1, url
+    except asyncio.TimeoutError:
+        print("[ytdl_video] cookies timed out")
+    except Exception as e:
+        print(f"[ytdl_video] cookies error: {e}")
+
+    # الطريقة الثالثة: bgutil (لو موجود)
+    try:
+        stdout, stderr = await bash(
+            f'yt-dlp -g -f "{fmt}" '
+            f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
+            f'--no-check-certificate "{link}"'
+        )
+        if stdout:
+            url = stdout.split("\n")[0].strip()
+            if url.startswith("http"):
+                print(f"[ytdl_video] OK via bgutil")
+                return 1, url
+    except Exception as e:
+        print(f"[ytdl_video] bgutil error: {e}")
+
+    print(f"[ytdl_video] all methods failed for: {link}")
+    return 0, "فشل تحميل رابط الفيديو — تأكد من تحديث yt-dlp أو إضافة cookies.txt"
 
 
 async def _auto_delete(filepath: str, delay: int = 600):
