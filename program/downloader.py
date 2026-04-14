@@ -77,7 +77,7 @@ async def song(_, message: Message):
     m = await message.reply("🎶")
     ydl_ops = {
         "format": "bestaudio/best",
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
         
         "extractor_args": {"youtube": {"player_client": ["ios", "android", "tv_embedded"]}},
     }
@@ -92,7 +92,7 @@ async def song(_, message: Message):
             return
         title, link, duration, thumbnail = res
         if thumbnail:
-            thumb_name = f"{title}.jpg"
+            thumb_name = f"/tmp/{title}.jpg"
             thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
             with open(thumb_name, "wb") as f:
                 f.write(thumb_data.content)
@@ -146,7 +146,7 @@ async def vsong(client, message: Message):
         "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
         "geo_bypass": True,
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
         

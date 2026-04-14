@@ -22,7 +22,7 @@ async def song(_, message: Message):
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {
         "format": "bestaudio[ext=m4a]",
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
     }
     audio_file = None
     thumb_name = None
@@ -37,7 +37,7 @@ async def song(_, message: Message):
         link = data["link"]
         duration = data["duration"] or "0:00"
         thumbnail = f"https://i.ytimg.com/vi/{data['id']}/hqdefault.jpg"
-        thumb_name = f"{title}.jpg"
+        thumb_name = f"/tmp/{title}.jpg"
         thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
         with open(thumb_name, "wb") as f:
             f.write(thumb_data.content)
@@ -80,7 +80,7 @@ async def vsong(client, message: Message):
         "format": "best[height<=720]/best",
         "keepvideo": True,
         "geo_bypass": True,
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
     }

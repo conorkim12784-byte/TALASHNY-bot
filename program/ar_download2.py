@@ -22,7 +22,7 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("⚡")
-    ydl_ops = {"format": "bestaudio/best", "outtmpl": "%(title)s.%(ext)s",
+    ydl_ops = {"format": "bestaudio/best", "outtmpl": "/tmp/%(title)s.%(ext)s",
         "extractor_args": {"youtube": {"player_client": ["ios"]}},
         "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"},
         "default_search": "scsearch1"}
@@ -64,7 +64,7 @@ async def song(_, message: Message):
         _h, _m = divmod(_m, 60)
         duration = f"{_h}:{_m:02d}:{_s:02d}" if _h else f"{_m}:{_s:02d}"
         if thumbnail:
-            thumb_name = f"{title}.jpg"
+            thumb_name = f"/tmp/{title}.jpg"
             thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
             with open(thumb_name, "wb") as f:
                 f.write(thumb_data.content)
@@ -107,7 +107,7 @@ async def vsong(client, message: Message):
         "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
         "geo_bypass": True,
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
         
