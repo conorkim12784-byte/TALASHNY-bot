@@ -314,9 +314,17 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
     proxy="" بيتجاوز أي system proxy بيبلوك YouTube.
     """
     clients = ["ios", "tv_embedded", "android", "web_creator"]
+
+    # لو الـ fmt بيحتوي على height selector، نضيف fallback أشمل
+    fallback_fmt = fmt
+    if "height<=" in fmt:
+        # مثلاً: best[height<=720] -> best[height<=720]/best
+        if "/best" not in fmt:
+            fallback_fmt = fmt + "/best"
+
     for client in clients:
         ydl_opts = {
-            "format": fmt,
+            "format": fallback_fmt,
             "quiet": True,
             "no_warnings": True,
             "nocheckcertificate": True,
@@ -337,6 +345,31 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
                     return 1, url
         except Exception as e:
             print(f"[ydl_get_url] client={client} failed: {str(e)[:120]}")
+
+    # آخر محاولة: نجرب "best" بدون أي قيود
+    ydl_opts_fallback = {
+        "format": "best",
+        "quiet": True,
+        "no_warnings": True,
+        "nocheckcertificate": True,
+        "proxy": "",
+        "cookiefile": COOKIES_FILE,
+        "extractor_args": {"youtube": {"player_client": ["ios"]}},
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+            info = ydl.extract_info(link, download=False)
+            url = info.get("url") or (
+                info.get("requested_formats", [{}])[0].get("url")
+                if info.get("requested_formats") else None
+            )
+            if url:
+                print("[ydl_get_url] OK via fallback 'best'")
+                return 1, url
+    except Exception as e:
+        print(f"[ydl_get_url] fallback failed: {str(e)[:120]}")
+
     return 0, "all extraction methods failed"
 
 
