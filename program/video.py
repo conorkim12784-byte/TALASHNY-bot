@@ -301,17 +301,31 @@ async def ytdl_direct(link: str):
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — mobile client بدون cookies"""
+    """جيب رابط مباشر للصوت — mweb client (HLS بدون PO token)"""
+    # mweb بيدي HLS formats مش محتاجة PO token حالياً
     stdout, stderr = await bash(
         f'yt-dlp -g -f "bestaudio/best" '
-        f'--extractor-args "youtube:player_client=ios,android,tv_embedded" '
+        f'--extractor-args "youtube:player_client=mweb" '
         f'--no-check-certificate "{link}"'
     )
     if stdout:
         url = stdout.split("\n")[0].strip()
         if url:
-            print(f"[ytdl_audio] OK")
+            print(f"[ytdl_audio] OK via mweb")
             return 1, url
+
+    # fallback: android_music
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "bestaudio/best" '
+        f'--extractor-args "youtube:player_client=android_music" '
+        f'--no-check-certificate "{link}"'
+    )
+    if stdout:
+        url = stdout.split("\n")[0].strip()
+        if url:
+            print(f"[ytdl_audio] OK via android_music")
+            return 1, url
+
     print(f"[ytdl_audio] failed: {stderr[:200]}")
     return 0, stderr
 
@@ -320,17 +334,30 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — mobile client بدون cookies"""
+    """جيب رابط مباشر للفيديو — mweb client"""
     stdout, stderr = await bash(
         f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
-        f'--extractor-args "youtube:player_client=ios,android,tv_embedded" '
+        f'--extractor-args "youtube:player_client=mweb" '
         f'--no-check-certificate "{link}"'
     )
     if stdout:
         url = stdout.split("\n")[0].strip()
         if url:
-            print(f"[ytdl_video] OK")
+            print(f"[ytdl_video] OK via mweb")
             return 1, url
+
+    # fallback
+    stdout, stderr = await bash(
+        f'yt-dlp -g -f "best[height<=?{quality}][width<=?1280]" '
+        f'--extractor-args "youtube:player_client=android" '
+        f'--no-check-certificate "{link}"'
+    )
+    if stdout:
+        url = stdout.split("\n")[0].strip()
+        if url:
+            print(f"[ytdl_video] OK via android")
+            return 1, url
+
     print(f"[ytdl_video] failed: {stderr[:200]}")
     return 0, stderr
 
