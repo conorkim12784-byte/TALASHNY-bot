@@ -1,7 +1,6 @@
 tgcrypto
 py-tgcalls==2.2.11
 pyrofork
-youtube-search-python
 yt-dlp
 speedtest-cli
 youtube-search
@@ -17,5 +16,3 @@ psutil
 future
 wget
 ffmpeg-python
-bgutil-ytdlp-pot-provider
-httpx==0.24.1
