@@ -1,5 +1,4 @@
-# Copyright (C) 2021 By Amor Music-Project
-# Fixed: song() converted to async + await everywhere
+# ar_download2.py — نسخة عربية من downloader بدون API أو cookies
 
 from __future__ import unicode_literals
 import asyncio
@@ -9,13 +8,28 @@ import wget
 import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
-import requests as _ytrequests
-import re as _ytre
 from yt_dlp import YoutubeDL
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
+async def _yt_search(query: str):
+    """بحث عبر youtube-search-python بدون API"""
+    try:
+        from youtubesearchpython import VideosSearch
+        results = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
+        items = results.get("result", [])
+        if not items:
+            return None
+        item = items[0]
+        title = (item.get("title") or query)[:40]
+        url = item.get("link") or ""
+        duration_raw = item.get("duration") or "0:00"
+        thumbnail = f"https://i.ytimg.com/vi/{item.get('id', '')}/hqdefault.jpg"
+        return title, url, duration_raw, thumbnail
+    except Exception as e:
+        print(f"[ar_download2 search error] {e}")
+        return None
 
 
 @Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))
@@ -24,47 +38,30 @@ async def song(_, message: Message):
     if not query:
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("⚡")
-    ydl_ops = {"format": "bestaudio/best", "outtmpl": "/tmp/%(title)s.%(ext)s", "cookiefile": COOKIES_FILE,
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"},
-        "default_search": "scsearch1"}
+    ydl_ops = {
+        "format": "bestaudio/best",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
+        "nocheckcertificate": True,
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb", "ios", "tv_embedded", "web"],
+                "skip": ["hls", "dash"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        },
+    }
     audio_file = None
     thumb_name = None
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": query, "type": "video", "maxResults": 1, "key": YOUTUBE_API_KEY},
-                timeout=10,
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
+        res = await _yt_search(query)
+        if not res:
             await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
             return
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:40]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        link = f"https://www.youtube.com/watch?v={video_id}"
-        r2 = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-                timeout=10,
-            )
-        )
-        r2.raise_for_status()
-        detail_items = r2.json().get("items", [])
-        iso = detail_items[0]["contentDetails"]["duration"] if detail_items else "PT0S"
-        mt = _ytre.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total_s = h * 3600 + mn * 60 + s
-        _m, _s = divmod(total_s, 60)
-        _h, _m = divmod(_m, 60)
-        duration = f"{_h}:{_m:02d}:{_s:02d}" if _h else f"{_m}:{_s:02d}"
+        title, link, duration, thumbnail = res
         if thumbnail:
             thumb_name = f"/tmp/{title}.jpg"
             thumb_data = await asyncio.to_thread(requests.get, thumbnail, allow_redirects=True)
@@ -112,8 +109,17 @@ async def vsong(client, message: Message):
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        "cookiefile": COOKIES_FILE,
-        "default_search": "scsearch1",
+        "nocheckcertificate": True,
+        "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb", "ios", "tv_embedded", "web"],
+                "skip": ["hls", "dash"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        },
     }
     query = " ".join(message.command[1:])
     if not query:
@@ -121,25 +127,10 @@ async def vsong(client, message: Message):
     file_name = None
     preview = None
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _ytrequests.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": query, "type": "video",
-                        "maxResults": 1, "key": YOUTUBE_API_KEY},
-                timeout=10,
-                
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        if not items:
+        res = await _yt_search(query)
+        if not res:
             return await message.reply("✘ لم يتم العثور على الفيديو")
-        item = items[0]
-        video_id = item["id"]["videoId"]
-        title_v = item["snippet"]["title"][:40]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        link = f"https://www.youtube.com/watch?v={video_id}"
+        title_v, link, _, thumbnail = res
     except Exception as e:
         return await message.reply(f"✘ خطأ في البحث: {e}")
     try:
@@ -187,7 +178,7 @@ async def search_lyrics(_, message: Message):
             lyric_text = data["lyrics"][:4000]
             await rep.edit(f"🎵 **{query}**\n\n{lyric_text}")
         else:
-            await rep.edit("✘ **لم يتم العثور على كلمات**\n\n» جرب: /بحث فنان - أغنية")
+            await rep.edit("✘ **لم يتم العثور على كلمات**\n\n» جرب: بحث فنان - أغنية")
     except Exception as e:
         await rep.edit("✘ **لم يتم العثور على نتائج**\n\n» مثال: بحث Fairuz - Nassam Alayna")
         print(e)

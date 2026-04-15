@@ -13,7 +13,7 @@ from youtubesearchpython import VideosSearch
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+
 
 
 @Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))
@@ -23,9 +23,8 @@ async def song(_, message: Message):
         return await message.reply("» أرسل اسم الأغنية بعد الأمر")
     m = await message.reply("🔎 جاري البحث انتظر قليلآ...")
     ydl_ops = {
-        "format": "bestaudio[ext=m4a]",
+        "format": "bestaudio/best",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
-        "cookiefile": COOKIES_FILE,
     }
     audio_file = None
     thumb_name = None
@@ -80,13 +79,12 @@ async def song(_, message: Message):
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
-        "format": "best[height<=720]/best",
+        "format": "bestvideo[height<=720]+bestaudio/best",
         "keepvideo": True,
         "geo_bypass": True,
         "outtmpl": "/tmp/%(title)s.%(ext)s",
         "quiet": True,
         "merge_output_format": "mp4",
-        "cookiefile": COOKIES_FILE,
     }
     query = " ".join(message.command[1:])
     if not query:

@@ -1,73 +1,70 @@
-# _search_helper.py — بحث عبر YouTube Data API v3 + تشغيل عبر bgutil po_token
+# _search_helper.py — بحث + تشغيل بدون API أو cookies أو proxy
 
 import asyncio
 import os
-import re as _re
-import requests
-from driver.utils import bash
+import yt_dlp
 
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
-def _parse_iso_duration(iso: str) -> str:
-    mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-    if not mt:
-        return "0:00"
-    h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3))
-    total = h * 3600 + m * 60 + s
-    mins, secs = divmod(total, 60)
-    hrs, mins = divmod(mins, 60)
-    return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-
-
 def ytsearch(query: str):
-    """بحث على YouTube عبر Data API v3"""
+    """بحث على YouTube — youtube-search-python بدون API"""
     try:
-        from config import YOUTUBE_API_KEY
-        r = requests.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
+        from youtubesearchpython import VideosSearch
+        results = VideosSearch(query, limit=1).result()
+        items = results.get("result", [])
         if not items:
-            print("[ytsearch] no results from API")
+            print("[ytsearch] no results")
             return None
         item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail = r2.json().get("items", [])
-        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
-        duration = _parse_iso_duration(iso)
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        print(f"[ytsearch] YouTube API: {title}")
-        return [title, url, duration, thumbnail]
+        title = (item.get("title") or query)[:70]
+        url = item.get("link") or ""
+        duration_raw = item.get("duration") or "0:00"
+        thumbnail = ""
+        thumbs = item.get("thumbnails") or []
+        if thumbs:
+            thumbnail = thumbs[-1].get("url") or ""
+        print(f"[ytsearch] OK: {title}")
+        return [title, url, duration_raw, thumbnail]
     except Exception as e:
         print(f"[ytsearch error] {e}")
         return None
 
 
 async def ytdl_audio(link: str):
-    """جيب رابط مباشر للصوت عبر bgutil po_token"""
-    stdout, stderr = await bash(
-        f'yt-dlp -g -f "bestaudio/best" '
-        f'--extractor-args "youtubepot-bgutilscript:server_home=/bgutil/server" '
-        f'--no-check-certificate "{link}"'
-    )
-    if stdout:
-        url = stdout.split("\n")[0].strip()
-        if url:
-            print(f"[ytdl_audio] OK via bgutil")
-            return 1, url
-    print(f"[ytdl_audio] bgutil failed: {stderr[:200]}")
-    return 0, stderr
+    """جيب رابط مباشر للصوت — yt-dlp Python API بدون cookies"""
+    def _get():
+        clients = ["mweb", "ios", "tv_embedded", "web"]
+        for client in clients:
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "nocheckcertificate": True,
+                "skip_download": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": [client],
+                        "skip": ["hls", "dash"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            }
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(link, download=False)
+                    url = info.get("url")
+                    if not url and info.get("requested_formats"):
+                        url = info["requested_formats"][0].get("url")
+                    if url:
+                        print(f"[ytdl_audio] OK via client={client}")
+                        return 1, url
+            except Exception as e:
+                print(f"[ytdl_audio] client={client} failed: {str(e)[:100]}")
+        return 0, "all clients failed"
+
+    return await asyncio.to_thread(_get)

@@ -1,15 +1,12 @@
-# inline.py - بحث inline عبر YouTube Data API v3
+# inline.py — بحث inline بدون API أو proxy
+
 import asyncio
-import re as _re
-import requests as _req
 from pyrogram import Client, errors
 from pyrogram.types import (
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
 )
-
-TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
 @Client.on_inline_query()
@@ -28,54 +25,27 @@ async def inline(client: Client, query: InlineQuery):
         return
 
     try:
-        from config import YOUTUBE_API_KEY
-        r = await asyncio.to_thread(
-            lambda: _req.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "q": search_query, "type": "video",
-                        "maxResults": 10, "key": YOUTUBE_API_KEY},
-                timeout=10,
-                proxies={"http": TOR_PROXY, "https": TOR_PROXY},
-            )
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
+        from youtubesearchpython import VideosSearch
+        results = await asyncio.to_thread(lambda: VideosSearch(search_query, limit=10).result())
+        items = results.get("result", [])
 
-        if items:
-            ids = ",".join(i["id"]["videoId"] for i in items)
-            r2 = await asyncio.to_thread(
-                lambda: _req.get(
-                    "https://www.googleapis.com/youtube/v3/videos",
-                    params={"part": "contentDetails,statistics", "id": ids, "key": YOUTUBE_API_KEY},
-                    timeout=10,
-                    proxies={"http": TOR_PROXY, "https": TOR_PROXY},
+        for item in items:
+            vid_id = item.get("id") or item.get("link", "").split("v=")[-1].split("&")[0]
+            title = item.get("title", "")
+            thumbs = item.get("thumbnails") or []
+            thumbnail = thumbs[-1].get("url") if thumbs else ""
+            duration = item.get("duration") or "0:00"
+            views_raw = (item.get("viewCount") or {}).get("text") or "0"
+            answers.append(
+                InlineQueryResultArticle(
+                    title=title,
+                    description=f"{duration}, {views_raw} views.",
+                    input_message_content=InputTextMessageContent(
+                        f"🔗 https://www.youtube.com/watch?v={vid_id}"
+                    ),
+                    thumb_url=thumbnail,
                 )
             )
-            r2.raise_for_status()
-            details = {d["id"]: d for d in r2.json().get("items", [])}
-
-            for item in items:
-                vid_id = item["id"]["videoId"]
-                title = item["snippet"]["title"]
-                thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-                detail = details.get(vid_id, {})
-                iso = detail.get("contentDetails", {}).get("duration", "PT0S")
-                mt = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-                h, mn, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-                total = h * 3600 + mn * 60 + s
-                mins, secs = divmod(total, 60)
-                duration = f"{mins}:{secs:02d}"
-                views = int(detail.get("statistics", {}).get("viewCount", 0))
-                answers.append(
-                    InlineQueryResultArticle(
-                        title=title,
-                        description=f"{duration}, {views:,} views.",
-                        input_message_content=InputTextMessageContent(
-                            f"🔗 https://www.youtube.com/watch?v={vid_id}"
-                        ),
-                        thumb_url=thumbnail,
-                    )
-                )
     except Exception as e:
         print(f"[inline search error] {e}")
 

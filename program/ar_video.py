@@ -15,11 +15,8 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import os as _os
 from program.video import multisearch_video as _ytsearch_sync
 
-TOR_PROXY = "socks5://127.0.0.1:9050"
 
 
-import requests as _req
-import re as _re2
 
 async def _ytdl_video(link):
     """تحميل فيديو من YouTube محلياً"""

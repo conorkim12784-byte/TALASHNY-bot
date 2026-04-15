@@ -17,17 +17,11 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdIn
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import yt_dlp
-import sys, os as _os
-sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-from ytdl_utils import COOKIES_FILE
 
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
 os.makedirs(DL_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
-
-# Piped API fallback proxies (disabled by default — set to {} if no proxy needed)
-TOR_PROXIES = {}
 
 
 def _parse_duration(seconds) -> str:
@@ -39,93 +33,60 @@ def _parse_duration(seconds) -> str:
     return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
 
 
+# ─────────────────────────────────────────
+# البحث — youtube-search-python فقط بدون API
+# ─────────────────────────────────────────
+
 def ytsearch(query: str):
-    """بحث الصوت — YouTube Data API v3"""
-    import re as _re2
-    import requests as _req
+    """بحث الصوت — youtube-search-python بدون API أو cookies"""
     try:
-        from config import YOUTUBE_API_KEY
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
+        from youtubesearchpython import VideosSearch
+        results = VideosSearch(query, limit=1).result()
+        items = results.get("result", [])
         if not items:
             print("[ytsearch] no results")
             return None
         item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail = r2.json().get("items", [])
-        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
-        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + m * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        print(f"[ytsearch] YouTube API: {title}")
-        return [title, url, duration, thumbnail]
+        title = (item.get("title") or query)[:70]
+        url = item.get("link") or ""
+        duration_raw = item.get("duration") or "0:00"
+        thumbnail = ""
+        thumbs = item.get("thumbnails") or []
+        if thumbs:
+            thumbnail = thumbs[-1].get("url") or ""
+        print(f"[ytsearch] OK: {title}")
+        return [title, url, duration_raw, thumbnail]
     except Exception as e:
         print(f"[ytsearch error] {e}")
         return None
 
 
 def ytsearch_yt(query: str):
-    """بحث فيديو — YouTube Data API v3"""
-    import re as _re2
-    import requests as _req
+    """بحث الفيديو — youtube-search-python بدون API أو cookies"""
     try:
-        from config import YOUTUBE_API_KEY
-        r = _req.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={"part": "snippet", "q": query, "type": "video",
-                    "maxResults": 1, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
+        from youtubesearchpython import VideosSearch
+        results = VideosSearch(query, limit=1).result()
+        items = results.get("result", [])
         if not items:
             print("[ytsearch_yt] no results")
             return None
         item = items[0]
-        video_id = item["id"]["videoId"]
-        title = item["snippet"]["title"][:70]
-        thumbnail = item["snippet"]["thumbnails"].get("high", {}).get("url", "")
-        r2 = _req.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"part": "contentDetails", "id": video_id, "key": YOUTUBE_API_KEY},
-            timeout=10,
-        )
-        r2.raise_for_status()
-        detail = r2.json().get("items", [])
-        iso = detail[0]["contentDetails"]["duration"] if detail else "PT0S"
-        mt = _re2.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
-        h, m, s = (int(mt.group(i) or 0) for i in (1, 2, 3)) if mt else (0, 0, 0)
-        total = h * 3600 + m * 60 + s
-        mins, secs = divmod(total, 60)
-        hrs, mins = divmod(mins, 60)
-        duration = f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        print(f"[ytsearch_yt] YouTube API: {title}")
-        return [title, url, duration, thumbnail]
+        title = (item.get("title") or query)[:70]
+        url = item.get("link") or ""
+        duration_raw = item.get("duration") or "0:00"
+        thumbnail = ""
+        thumbs = item.get("thumbnails") or []
+        if thumbs:
+            thumbnail = thumbs[-1].get("url") or ""
+        print(f"[ytsearch_yt] OK: {title}")
+        return [title, url, duration_raw, thumbnail]
     except Exception as e:
         print(f"[ytsearch_yt error] {e}")
         return None
 
+
 def _dm_search(query: str):
-    """بحث على Dailymotion — مجاني بدون API"""
+    """بحث على Dailymotion — yt-dlp بدون API"""
     ydl_opts = {
         "quiet": True, "no_warnings": True,
         "extract_flat": True, "skip_download": True,
@@ -164,156 +125,16 @@ def _sc_download(link: str, out_tpl: str):
         return str(e)
 
 
-def _get_piped_streams(video_id: str):
-    """جيب streams الفيديو والصوت من Piped API بدون cookies"""
-    import requests
-    instances = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.tokhmi.xyz",
-        "https://pipedapi.moomoo.me",
-        "https://api.piped.projectsegfau.lt",
-        "https://pipedapi.in.projectsegfau.lt",
-    ]
-    for base in instances:
-        try:
-            r = requests.get(f"{base}/streams/{video_id}", proxies=TOR_PROXIES, timeout=10)
-            if r.status_code != 200:
-                continue
-            data = r.json()
-            video_streams = data.get("videoStreams", [])
-            audio_streams = data.get("audioStreams", [])
-
-            # فيديو مدمج (بيكون أسهل)
-            combined = [s for s in video_streams if s.get("videoOnly") == False and s.get("url")]
-            if combined:
-                best = sorted(combined, key=lambda x: x.get("quality", ""), reverse=True)
-                return {"type": "combined", "url": best[0]["url"]}
-
-            # فيديو + صوت منفصلين
-            video_only = [s for s in video_streams if s.get("url")]
-            audio_only = [s for s in audio_streams if s.get("url")]
-            if video_only and audio_only:
-                best_v = sorted(video_only, key=lambda x: x.get("quality", ""), reverse=True)[0]["url"]
-                best_a = sorted(audio_only, key=lambda x: x.get("quality", ""), reverse=True)[0]["url"]
-                return {"type": "separate", "video": best_v, "audio": best_a}
-
-        except Exception as e:
-            print(f"[piped {base}] {e}")
-    return None
-
-
-def _download_piped(streams: dict, out_tpl: str) -> bool:
-    """حمّل من Piped streams مباشرة"""
-    import requests, uuid as _uuid, subprocess
-    uid = _uuid.uuid4().hex[:8]
-
-    if streams["type"] == "combined":
-        try:
-            r = requests.get(streams["url"], stream=True, proxies=TOR_PROXIES, timeout=60)
-            ext = "mp4"
-            fname = out_tpl.replace("%(ext)s", ext)
-            with open(fname, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            return True
-        except Exception as e:
-            print(f"[piped combined dl] {e}")
-            return False
-
-    elif streams["type"] == "separate":
-        try:
-            v_file = f"/tmp/{uid}_v.mp4"
-            a_file = f"/tmp/{uid}_a.m4a"
-            out_file = out_tpl.replace("%(ext)s", "mp4")
-
-            for url, path in [(streams["video"], v_file), (streams["audio"], a_file)]:
-                r = requests.get(url, stream=True, proxies=TOR_PROXIES, timeout=60)
-                with open(path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-            # دمج بـ ffmpeg
-            subprocess.run([
-                "ffmpeg", "-y",
-                "-i", v_file, "-i", a_file,
-                "-c:v", "copy", "-c:a", "aac",
-                out_file
-            ], capture_output=True)
-
-            import os
-            for f in [v_file, a_file]:
-                try: os.remove(f)
-                except: pass
-            return True
-        except Exception as e:
-            print(f"[piped separate dl] {e}")
-            return False
-    return False
-
-
-def _yt_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو — عبر Piped API بدون cookies"""
-    import re as _re
-
-    # استخرج video ID
-    match = _re.search(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})", link)
-    if not match:
-        return "invalid youtube link"
-
-    video_id = match.group(1)
-
-    # جرب Piped
-    streams = _get_piped_streams(video_id)
-    if streams:
-        success = _download_piped(streams, out_tpl)
-        if success:
-            return None
-
-    return "piped failed"
-
-
-def _dm_download_video(link: str, out_tpl: str, fmt: str) -> str | None:
-    """تحميل فيديو من Dailymotion"""
-    ydl_opts = {
-        "quiet": True, "no_warnings": True,
-        "format": fmt, "outtmpl": out_tpl,
-        "merge_output_format": "mp4", "prefer_free_formats": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-        return None
-    except Exception as e:
-        print(f"[dm_dl_video error] {e}")
-        return str(e)
-
-
-async def ytdl_direct(link: str):
-    """جيب رابط مباشر من يوتيوب بدون تحميل — yt-dlp -g"""
-    import asyncio
-    proc = await asyncio.create_subprocess_exec(
-        "yt-dlp",
-        "-g",
-        "--cookies", COOKIES_FILE,
-        "-f", "best[height<=?720][width<=?1280]/best",
-        link,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        url = stdout.decode().strip().split(chr(10))[0]
-        return 1, url
-    return 0, stderr.decode().strip()
-
+# ─────────────────────────────────────────
+# استخراج رابط مباشر — yt-dlp Python API بدون cookies
+# ─────────────────────────────────────────
 
 def _ydl_get_url(link: str, fmt: str) -> tuple:
     """
     استخرج رابط مباشر عبر yt-dlp Python API.
-    بيجرب: mweb -> ios -> tv_embedded -> web -> android
-    proxy="" بيتجاوز أي system proxy بيبلوك YouTube.
+    بيجرب clients مختلفة بالترتيب من الأنجح للأقل.
+    بدون cookies، بدون proxy، بدون API.
     """
-    # ترتيب الـ clients من الأكتر نجاح للأقل (2025)
     clients = ["mweb", "ios", "tv_embedded", "web", "android"]
     for client in clients:
         ydl_opts = {
@@ -321,16 +142,13 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
             "quiet": True,
             "no_warnings": True,
             "nocheckcertificate": True,
-            "proxy": "",
-            "cookiefile": COOKIES_FILE,
             "extractor_args": {
                 "youtube": {
                     "player_client": [client],
-                    "skip": ["hls", "dash"],  # تجنب الـ formats المشكلة
+                    "skip": ["hls", "dash"],
                 }
             },
             "skip_download": True,
-            # تحديث الـ headers عشان يشبه browser حقيقي
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -339,12 +157,10 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(link, download=False)
-                # بنجرب url مباشر الأول، لو مش موجود نجرب requested_formats
                 url = info.get("url")
                 if not url and info.get("requested_formats"):
                     url = info["requested_formats"][0].get("url")
                 if not url and info.get("formats"):
-                    # خد الـ format الأحسن اللي عنده url
                     for f in reversed(info["formats"]):
                         if f.get("url") and not f["url"].startswith("manifest"):
                             url = f["url"]
@@ -358,7 +174,7 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — Python API بدون proxy"""
+    """جيب رابط مباشر للصوت — Python API بدون cookies"""
     return await asyncio.to_thread(_ydl_get_url, link, "bestaudio/best")
 
 
@@ -366,14 +182,13 @@ ytdl = ytdl_audio
 
 
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — Python API بدون proxy"""
+    """جيب رابط مباشر للفيديو — Python API بدون cookies"""
     return await asyncio.to_thread(
         _ydl_get_url, link, f"best[height<=?{quality}][width<=?1280]/best"
     )
 
 
 async def _auto_delete(filepath: str, delay: int = 600):
-    """حذف الملف تلقائياً بعد 10 دقائق"""
     await asyncio.sleep(delay)
     try:
         if os.path.exists(filepath):
@@ -381,8 +196,8 @@ async def _auto_delete(filepath: str, delay: int = 600):
     except Exception:
         pass
 
+
 def multisearch_video(query: str):
-    """بحث الفيديو — YouTube عبر yt-dlp"""
     result = ytsearch_yt(query)
     if result and isinstance(result, list) and len(result) == 4:
         return result
@@ -486,7 +301,6 @@ async def vplay(c: Client, m: Message):
             await m.reply_photo(photo=image, reply_markup=InlineKeyboardMarkup(buttons),
                 caption=f"💡 **بدء تشغيل الفيديو.**\n\n🏷 **الاسم:** [{songname}]({link})\n💭 **المجموعه:** `{chat_id}`\n**⏱ المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
         return
-
     if len(m.command) < 2:
         return await m.reply("» الرد على **ملف فيديو** أو **أعط شيئًا للبحث**")
     loser = await c.send_message(chat_id, "🔎 **جاري البحث...**")
@@ -495,7 +309,7 @@ async def vplay(c: Client, m: Message):
     vq = VideoQuality.HD_720p
     search = multisearch_video(query)
     if not search or not isinstance(search, list) or len(search) != 4:
-        return await loser.edit("✘ **لم يتم العثور على نتائج على YouTube أو Dailymotion**")
+        return await loser.edit("✘ **لم يتم العثور على نتائج**")
     songname, url, duration, thumbnail = search
     await loser.edit("⏳ **جاري التحميل...**")
     veez, filepath = await ytdl_video(url, Q)
