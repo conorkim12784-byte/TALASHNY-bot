@@ -24,8 +24,9 @@ from driver.filters import command, other_filters
 async def _yt_search(query: str):
     """بحث عبر youtube-search-python بدون API"""
     try:
-        from youtubesearchpython import VideosSearch
-        results = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
+        from program.ytsearch_core import search_youtube_async as _yt_search_async
+        results_raw = await _yt_search_async(query, limit=1)
+        results = [{"result": [{"title": r["title"], "link": r["url"], "duration": r["duration"], "id": r["id"]}]} for r in results_raw] if results_raw else []
         items = results.get("result", [])
         if not items:
             return None

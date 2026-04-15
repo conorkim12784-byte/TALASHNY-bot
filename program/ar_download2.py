@@ -14,22 +14,13 @@ from driver.filters import command2, other_filters
 
 
 async def _yt_search(query: str):
-    """بحث عبر youtube-search-python بدون API"""
-    try:
-        from youtubesearchpython import VideosSearch
-        results = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
-        items = results.get("result", [])
-        if not items:
-            return None
-        item = items[0]
-        title = (item.get("title") or query)[:40]
-        url = item.get("link") or ""
-        duration_raw = item.get("duration") or "0:00"
-        thumbnail = f"https://i.ytimg.com/vi/{item.get('id', '')}/hqdefault.jpg"
-        return title, url, duration_raw, thumbnail
-    except Exception as e:
-        print(f"[ar_download2 search error] {e}")
+    """بحث عبر ytsearch_core بدون أي dependency خارجي"""
+    from program.ytsearch_core import search_youtube_async
+    results = await search_youtube_async(query, limit=1)
+    if not results:
         return None
+    r = results[0]
+    return r["title"][:40], r["url"], r["duration"], r["thumbnail"]
 
 
 @Client.on_message(command2(["تحميل", "تحميل_موسيقي"]))

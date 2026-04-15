@@ -9,7 +9,6 @@ import yt_dlp
 from pyrogram import Client
 from pyrogram.types import Message
 from yt_dlp import YoutubeDL
-from youtubesearchpython import VideosSearch
 from config import BOT_USERNAME as bn
 from driver.filters import command2, other_filters
 
@@ -29,8 +28,9 @@ async def song(_, message: Message):
     audio_file = None
     thumb_name = None
     try:
-        search = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
-        results = search["result"]
+        from program.ytsearch_core import search_youtube_async as _s
+        _res = await _s(query, limit=1)
+        results = [{"title": r["title"], "link": r["url"], "duration": r["duration"], "id": r["id"]} for r in _res] if _res else []
         if not results:
             await m.edit("✘ لم يتم العثور على الاغنية\n\nيرجى إعطاء اسم أغنية صالح")
             return
@@ -92,8 +92,9 @@ async def vsong(client, message: Message):
     file_name = None
     preview = None
     try:
-        search = await asyncio.to_thread(lambda: VideosSearch(query, limit=1).result())
-        results = search["result"]
+        from program.ytsearch_core import search_youtube_async as _s
+        _res = await _s(query, limit=1)
+        results = [{"title": r["title"], "link": r["url"], "duration": r["duration"], "id": r["id"]} for r in _res] if _res else []
         if not results:
             return await message.reply("✘ لم يتم العثور على الفيديو")
         data = results[0]

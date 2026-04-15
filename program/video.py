@@ -1,7 +1,6 @@
 import re
 import asyncio
 import os
-import uuid
 
 from config import BOT_USERNAME, IMG_1, IMG_2, IMG_5
 from program.utils.inline import stream_markup
@@ -17,6 +16,7 @@ from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdIn
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 import yt_dlp
+from program.ytsearch_core import ytsearch, ytsearch_yt
 
 DL_DIR = "/tmp/tgbot_vids"
 AUDIO_DIR = "/tmp/tgbot_audio"
@@ -33,64 +33,8 @@ def _parse_duration(seconds) -> str:
     return f"{hrs}:{mins:02d}:{secs:02d}" if hrs else f"{mins}:{secs:02d}"
 
 
-# ─────────────────────────────────────────
-# البحث — youtube-search-python فقط بدون API
-# ─────────────────────────────────────────
-
-def ytsearch(query: str):
-    """بحث الصوت — youtube-search-python بدون API أو cookies"""
-    try:
-        from youtubesearchpython import VideosSearch
-        results = VideosSearch(query, limit=1).result()
-        items = results.get("result", [])
-        if not items:
-            print("[ytsearch] no results")
-            return None
-        item = items[0]
-        title = (item.get("title") or query)[:70]
-        url = item.get("link") or ""
-        duration_raw = item.get("duration") or "0:00"
-        thumbnail = ""
-        thumbs = item.get("thumbnails") or []
-        if thumbs:
-            thumbnail = thumbs[-1].get("url") or ""
-        print(f"[ytsearch] OK: {title}")
-        return [title, url, duration_raw, thumbnail]
-    except Exception as e:
-        print(f"[ytsearch error] {e}")
-        return None
-
-
-def ytsearch_yt(query: str):
-    """بحث الفيديو — youtube-search-python بدون API أو cookies"""
-    try:
-        from youtubesearchpython import VideosSearch
-        results = VideosSearch(query, limit=1).result()
-        items = results.get("result", [])
-        if not items:
-            print("[ytsearch_yt] no results")
-            return None
-        item = items[0]
-        title = (item.get("title") or query)[:70]
-        url = item.get("link") or ""
-        duration_raw = item.get("duration") or "0:00"
-        thumbnail = ""
-        thumbs = item.get("thumbnails") or []
-        if thumbs:
-            thumbnail = thumbs[-1].get("url") or ""
-        print(f"[ytsearch_yt] OK: {title}")
-        return [title, url, duration_raw, thumbnail]
-    except Exception as e:
-        print(f"[ytsearch_yt error] {e}")
-        return None
-
-
 def _dm_search(query: str):
-    """بحث على Dailymotion — yt-dlp بدون API"""
-    ydl_opts = {
-        "quiet": True, "no_warnings": True,
-        "extract_flat": True, "skip_download": True,
-    }
+    ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"dmsearch1:{query}", download=False)
@@ -111,11 +55,7 @@ def _dm_search(query: str):
 
 
 def _sc_download(link: str, out_tpl: str):
-    """تحميل صوت من SoundCloud"""
-    ydl_opts = {
-        "quiet": True, "no_warnings": True,
-        "format": "bestaudio/best", "outtmpl": out_tpl,
-    }
+    ydl_opts = {"quiet": True, "no_warnings": True, "format": "bestaudio/best", "outtmpl": out_tpl}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([link])
@@ -125,16 +65,7 @@ def _sc_download(link: str, out_tpl: str):
         return str(e)
 
 
-# ─────────────────────────────────────────
-# استخراج رابط مباشر — yt-dlp Python API بدون cookies
-# ─────────────────────────────────────────
-
 def _ydl_get_url(link: str, fmt: str) -> tuple:
-    """
-    استخرج رابط مباشر عبر yt-dlp Python API.
-    بيجرب clients مختلفة بالترتيب من الأنجح للأقل.
-    بدون cookies، بدون proxy، بدون API.
-    """
     clients = ["mweb", "ios", "tv_embedded", "web", "android"]
     for client in clients:
         ydl_opts = {
@@ -142,12 +73,7 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
             "quiet": True,
             "no_warnings": True,
             "nocheckcertificate": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": [client],
-                    "skip": ["hls", "dash"],
-                }
-            },
+            "extractor_args": {"youtube": {"player_client": [client], "skip": ["hls", "dash"]}},
             "skip_download": True,
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
@@ -174,19 +100,12 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
 
 
 async def ytdl_audio(link):
-    """جيب رابط مباشر للصوت — Python API بدون cookies"""
     return await asyncio.to_thread(_ydl_get_url, link, "bestaudio/best")
-
 
 ytdl = ytdl_audio
 
-
 async def ytdl_video(link, quality=720):
-    """جيب رابط مباشر للفيديو — Python API بدون cookies"""
-    return await asyncio.to_thread(
-        _ydl_get_url, link, f"best[height<=?{quality}][width<=?1280]/best"
-    )
-
+    return await asyncio.to_thread(_ydl_get_url, link, f"best[height<=?{quality}][width<=?1280]/best")
 
 async def _auto_delete(filepath: str, delay: int = 600):
     await asyncio.sleep(delay)
@@ -196,21 +115,16 @@ async def _auto_delete(filepath: str, delay: int = 600):
     except Exception:
         pass
 
-
 def multisearch_video(query: str):
     result = ytsearch_yt(query)
     if result and isinstance(result, list) and len(result) == 4:
         return result
     return None
 
-
 def get_video_quality(Q):
-    if Q == 480:
-        return VideoQuality.SD_480p
-    elif Q == 360:
-        return VideoQuality.SD_360p
+    if Q == 480: return VideoQuality.SD_480p
+    elif Q == 360: return VideoQuality.SD_360p
     return VideoQuality.HD_720p
-
 
 async def _check_and_join(c, m, chat_id):
     try:
@@ -261,7 +175,7 @@ async def vplay(c: Client, m: Message):
     chat_id = m.chat.id
     user_id = m.from_user.id
     if m.sender_chat:
-        return await m.reply_text("you're an __Anonymous__ user !\n\n» revert back to your real user account to use this bot.")
+        return await m.reply_text("you're an __Anonymous__ user !")
     if not await _check_and_join(c, m, chat_id):
         return
     if replied and (replied.video or replied.document):
@@ -308,7 +222,7 @@ async def vplay(c: Client, m: Message):
     Q = 720
     vq = VideoQuality.HD_720p
     search = multisearch_video(query)
-    if not search or not isinstance(search, list) or len(search) != 4:
+    if not search:
         return await loser.edit("✘ **لم يتم العثور على نتائج**")
     songname, url, duration, thumbnail = search
     await loser.edit("⏳ **جاري التحميل...**")
@@ -336,16 +250,12 @@ async def vplay(c: Client, m: Message):
                 caption=f"🎬 **جاري تشغيل الفيديو**\n\n🏷 **الاسم:** [{songname}]({url})\n💭 **المجموعه:** `{chat_id}`\n⏱️ **المده:** `{duration}`\n🎧 **طلب بواسطة:** [{m.from_user.first_name}](tg://user?id={m.from_user.id})")
             async def cleanup():
                 await asyncio.sleep(600)
-                try:
-                    os.remove(filepath)
-                except Exception:
-                    pass
+                try: os.remove(filepath)
+                except: pass
             asyncio.create_task(cleanup())
         except Exception as ep:
-            try:
-                os.remove(filepath)
-            except Exception:
-                pass
+            try: os.remove(filepath)
+            except: pass
             await loser.delete()
             await m.reply_text(f"🚫 خطأ: `{ep}`")
 
@@ -362,8 +272,7 @@ async def vstream(c: Client, m: Message):
     if len(m.command) < 2:
         return await m.reply("» اعطني رابط مباشر للتشغيل")
     if len(m.command) == 2:
-        link = m.text.split(None, 1)[1]
-        Q = 720
+        link = m.text.split(None, 1)[1]; Q = 720
     elif len(m.command) == 3:
         op = m.text.split(None, 1)[1]
         link = op.split(None, 1)[0]
@@ -373,12 +282,10 @@ async def vstream(c: Client, m: Message):
         return await m.reply("**/vstream {link} {720/480/360}**")
     loser = await c.send_message(chat_id, "🔄 **تتم المعالجة...**")
     regex = r"^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+"
-    match = re.match(regex, link)
-    if match:
+    if re.match(regex, link):
         veez, livelink = await ytdl_audio(link)
     else:
-        livelink = link
-        veez = 1
+        livelink = link; veez = 1
     if veez == 0:
         return await loser.edit(f"✔ تم اكتشاف خطأ\n\n» `{livelink[:200]}`")
     vq = get_video_quality(Q)
