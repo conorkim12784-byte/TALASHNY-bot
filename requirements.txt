@@ -18,3 +18,4 @@ future
 wget
 ffmpeg-python
 bgutil-ytdlp-pot-provider
+httpx==0.24.1
