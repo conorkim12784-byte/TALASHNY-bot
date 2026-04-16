@@ -1,6 +1,6 @@
-# play_engine.py — نظام التشغيل المركزي الجديد
-# يستبدل music.py + ar_music.py + ar_music2.py كلها
+# play_engine.py — نظام التشغيل المركزي
 # يدعم: بحث يوتيوب، رابط مباشر، ملف صوتي، صوت مرفق
+# الإصلاح: بيحمّل الأغنية كملف مؤقت بدل streaming مباشر (لأن يوتيوب بيمنعه)
 
 import asyncio
 import os
@@ -20,75 +20,25 @@ from driver.veez import call_py, user
 from program.utils.inline import stream_markup
 from program.ytsearch_core import search_youtube_async
 
+# نستخدم callsmusic queues لتتبع الملفات المؤقتة وحذفها تلقائياً
+from callsmusic import queues as cs_queues
+
 
 # ─────────────────────────────────────────
-# 1) استخراج رابط التشغيل المباشر من يوتيوب
+# 1) تحميل الأغنية كملف مؤقت
+#    (بدل streaming مباشر — يوتيوب بيرفضه)
 # ─────────────────────────────────────────
-
-_COOKIES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
-
-def _cookies_opt() -> dict:
-    if os.path.isfile(_COOKIES) and os.path.getsize(_COOKIES) > 0:
-        return {"cookiefile": _COOKIES}
-    return {}
-
-def _ydl_base() -> dict:
-    opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-        "quiet": True,
-        "no_warnings": True,
-        "nocheckcertificate": True,
-        "skip_download": True,
-        "http_headers": {
-            "User-Agent": (
-                "Mozilla/5.0 (Linux; Android 10; K) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Mobile Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-    }
-    opts.update(_cookies_opt())
-    return opts
-
-_STRATEGIES = [
-    {"extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios"]}}},
-    {"extractor_args": {"youtube": {"player_client": ["ios"]}},
-     "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"}},
-    {"extractor_args": {"youtube": {"player_client": ["android"]}},
-     "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14) gzip"}},
-    {"extractor_args": {"youtube": {"player_client": ["web_creator"]}}},
-    {},  # fallback بدون أي extractor_args
-]
-
-def _get_stream_url(link: str) -> tuple:
-    """يرجع (1, url) لو نجح، (0, error_msg) لو فشل"""
-    base = _ydl_base()
-    for strategy in _STRATEGIES:
-        opts = {**base, **strategy}
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(link, download=False)
-                # جرب تاخد أفضل رابط صوت مباشر
-                fmts = info.get("formats") or []
-                audio_fmts = [
-                    f for f in fmts
-                    if f.get("vcodec") == "none" and f.get("url")
-                    and not any(b in f["url"] for b in (".mpd", ".m3u8"))
-                ]
-                if audio_fmts:
-                    audio_fmts.sort(key=lambda f: f.get("abr") or f.get("tbr") or 0, reverse=True)
-                    return 1, audio_fmts[0]["url"]
-                # fallback: url المباشر من info
-                url = info.get("url", "")
-                if url and ".mpd" not in url and ".m3u8" not in url:
-                    return 1, url
-        except Exception as e:
-            print(f"[play_engine] strategy failed: {str(e)[:80]}")
-    return 0, "فشل استخراج رابط التشغيل — حاول لاحقاً"
 
 async def get_stream_url(link: str) -> tuple:
-    return await asyncio.to_thread(_get_stream_url, link)
+    """
+    يحمّل الأغنية كملف مؤقت ويرجع (1, filepath) أو (0, error_msg).
+    الملف يُحذف تلقائياً من callsmusic.py بعد انتهاء التشغيل.
+    """
+    from ytdl_utils import download_audio_file
+    path, err = await asyncio.to_thread(download_audio_file, link)
+    if path:
+        return 1, path
+    return 0, err or "فشل تحميل الأغنية — حاول لاحقاً"
 
 
 # ─────────────────────────────────────────
@@ -167,7 +117,7 @@ async def _do_play(
     chat_id: int,
     user_id: int,
     songname: str,
-    stream_source: str,   # مسار ملف أو رابط مباشر
+    stream_source: str,   # مسار ملف مؤقت محلي
     ref_url: str,         # رابط المرجع للعرض
     media_type: str,      # "Audio" أو "YouTube"
     duration,
@@ -205,8 +155,13 @@ async def _do_play(
     )
     buttons = stream_markup(user_id)
 
+    # ── في الطابور ──
     if chat_id in QUEUE:
         pos = add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+        # سجّل الملف في cs_queues عشان يُحذف تلقائياً لما يجي دوره
+        asyncio.ensure_future(cs_queues.put(
+            chat_id, file=stream_source, name=songname, ref=ref_url, type=media_type
+        ))
         if status_msg:
             await status_msg.delete()
         await m.reply_photo(
@@ -219,6 +174,8 @@ async def _do_play(
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
         )
+
+    # ── تشغيل فوري ──
     else:
         try:
             if status_msg:
@@ -233,6 +190,8 @@ async def _do_play(
                 ),
             )
             add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+            # سجّل الملف الحالي عشان callsmusic يحذفه لما ينتهي التشغيل
+            cs_queues.current_tracks[chat_id] = {"file": stream_source, "name": songname}
             if status_msg:
                 await status_msg.delete()
             await m.reply_photo(
@@ -248,6 +207,12 @@ async def _do_play(
         except Exception as e:
             if status_msg:
                 await status_msg.delete()
+            # لو فشل التشغيل امسح الملف المؤقت فوراً
+            if stream_source and stream_source.startswith("/tmp") and os.path.exists(stream_source):
+                try:
+                    os.remove(stream_source)
+                except Exception:
+                    pass
             await m.reply_text(f"خطأ أثناء التشغيل:\n\n`{e}`")
 
 
@@ -267,12 +232,10 @@ async def _handle_play(c: Client, m: Message):
     chat_id = m.chat.id
     user_id = m.from_user.id if m.from_user else 0
 
-    # تحقق من الصلاحيات
     err = await _check_bot_perms(c, chat_id)
     if err:
         return await m.reply_text(err)
 
-    # انضمام userbot
     try:
         await _ensure_userbot_joined(c, chat_id)
     except RuntimeError as e:
@@ -305,39 +268,38 @@ async def _handle_play(c: Client, m: Message):
     query = m.text.split(None, 1)[1].strip()
     suhu = await c.send_message(chat_id, "**🎶 جاري البحث...**")
 
-    # لو كان رابط يوتيوب مباشر
     is_yt_link = "youtube.com/watch" in query or "youtu.be/" in query
 
     if is_yt_link:
         url = query
-        # استخرج عنوان الفيديو بسرعة
         songname = "YouTube Audio"
         duration = "?"
         thumbnail = None
         try:
-            with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+            with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True, "nocheckcertificate": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 songname = (info.get("title") or "YouTube Audio")[:70]
                 secs = int(info.get("duration") or 0)
-                m_, s_ = divmod(secs, 60); h_, m__ = divmod(m_, 60)
+                m_, s_ = divmod(secs, 60)
+                h_, m__ = divmod(m_, 60)
                 duration = f"{h_}:{m__:02d}:{s_:02d}" if h_ else f"{m__}:{s_:02d}"
                 thumbnail = info.get("thumbnail")
         except Exception:
             pass
     else:
-        # بحث عادي
         search = await yt_search(query)
         if not search:
             await suhu.edit(f"**لم يتم العثور على نتائج للبحث:**\n`{query}`")
             return
         songname, url, duration, thumbnail = search
 
-    await suhu.edit("**جاري تحضير الصوت...**")
+    await suhu.edit("**📥 جاري تحميل الأغنية...**")
     veez, stream_url = await get_stream_url(url)
     if veez == 0:
         await suhu.edit(f"**مشكلة في تحميل الأغنية**\n\n» `{stream_url}`")
         return
 
+    await suhu.edit("**يتم التشغيل...**")
     await _do_play(c, m, chat_id, user_id, songname, stream_url, url, "YouTube", duration, thumbnail, suhu)
 
 
@@ -345,13 +307,11 @@ async def _handle_play(c: Client, m: Message):
 # 7) تسجيل الأوامر
 # ─────────────────────────────────────────
 
-# أوامر إنجليزية
 @Client.on_message(command(["play", "mplay"]) & other_filters)
 async def play_en(c: Client, m: Message):
     await _handle_play(c, m)
 
 
-# أوامر عربية
 @Client.on_message(command2(["تشغيل", "شغل", "تشغيل_موسيقى", "موسيقى"]) & other_filters)
 async def play_ar(c: Client, m: Message):
     await _handle_play(c, m)
