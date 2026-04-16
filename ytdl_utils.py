@@ -112,3 +112,56 @@ def stream_opts(fmt: str = "bestaudio[ext=m4a]/bestaudio/best") -> dict:
     }
     opts.update(_cookies_opt())
     return opts
+
+
+# ─────────────────────────────────────────
+# تحميل الأغنية كملف مؤقت (الحل الموثوق)
+# ─────────────────────────────────────────
+
+_DOWNLOAD_STRATEGIES = [
+    {"extractor_args": {"youtube": {"player_client": ["tv_embedded", "ios"]}}},
+    {"extractor_args": {"youtube": {"player_client": ["ios"]}},
+     "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"}},
+    {"extractor_args": {"youtube": {"player_client": ["android"]}},
+     "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14) gzip"}},
+    {"extractor_args": {"youtube": {"player_client": ["web_creator"]}}},
+    {},  # fallback بدون أي player_client
+]
+
+def download_audio_file(link: str, out_tpl: str = "/tmp/%(id)s.%(ext)s") -> tuple:
+    """
+    يحمّل الأغنية كملف مؤقت ويرجع (filepath, error_msg).
+    يجرب استراتيجيات متعددة تلقائياً لو فشل format معين.
+    """
+    import yt_dlp as _yt
+
+    base = {
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "outtmpl": out_tpl,
+        "nocheckcertificate": True,
+        "quiet": True,
+        "no_warnings": True,
+        "http_headers": _http_headers(),
+    }
+    base.update(_cookies_opt())
+
+    last_err = "فشل التحميل"
+    for strategy in _DOWNLOAD_STRATEGIES:
+        opts = {**base, **strategy}
+        try:
+            with _yt.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(link, download=True)
+                path = ydl.prepare_filename(info)
+                if os.path.exists(path):
+                    return path, None
+                # بعض الأحيان بيتغير الامتداد بعد postprocessing
+                import glob
+                vid_id = info.get("id", "")
+                matches = glob.glob(f"/tmp/{vid_id}.*") if vid_id else []
+                if matches:
+                    return matches[0], None
+        except Exception as e:
+            last_err = str(e)
+            print(f"[download_audio_file] strategy failed: {last_err[:100]}")
+
+    return None, last_err
