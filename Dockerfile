@@ -17,4 +17,4 @@ WORKDIR /app/
 RUN pip3 install --no-cache-dir --upgrade --requirement requirements.txt
 RUN pip3 install --no-cache-dir bgutil-ytdlp-pot-provider
 
-CMD ["python3", "main.py"]
+CMD ["sh", "-c", "node /bgutil/server/build/main.js & sleep 3 && python3 main.py"]
