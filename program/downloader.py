@@ -61,8 +61,7 @@ async def song(_, message: Message):
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["mweb", "ios", "tv_embedded", "web"],
-                "skip": ["hls", "dash"],
+                "player_client": ["tv_embedded", "web", "mweb", "ios"],
             }
         },
         "http_headers": {
@@ -142,8 +141,7 @@ async def vsong(client, message: Message):
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["mweb", "ios", "tv_embedded", "web"],
-                "skip": ["hls", "dash"],
+                "player_client": ["tv_embedded", "web", "mweb", "ios"],
             }
         },
         "http_headers": {
