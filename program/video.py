@@ -66,19 +66,46 @@ def _sc_download(link: str, out_tpl: str):
 
 
 def _ydl_get_url(link: str, fmt: str) -> tuple:
-    clients = ["mweb", "ios", "tv_embedded", "web", "android"]
-    for client in clients:
+    # Strategy 1: tv_embedded + mediaconnect (bypasses bot check without cookies)
+    # Strategy 2: ios client with proper mobile headers
+    # Strategy 3: web_creator client (often exempt from bot checks)
+    # Strategy 4: mweb with no skip flags
+    strategies = [
+        {
+            "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}},
+            "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
+        },
+        {
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
+            "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"},
+        },
+        {
+            "extractor_args": {"youtube": {"player_client": ["web_creator"]}},
+            "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
+        },
+        {
+            "extractor_args": {"youtube": {"player_client": ["android"], "skip": ["hls"]}},
+            "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"},
+        },
+        {
+            "extractor_args": {"youtube": {"player_client": ["mweb"]}},
+            "http_headers": {"User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"},
+        },
+    ]
+
+    # Use cookies.txt if it exists (place a YouTube cookies file at project root)
+    cookies_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
+    cookies_opt = {"cookiefile": cookies_file} if os.path.isfile(cookies_file) else {}
+
+    for i, strategy in enumerate(strategies):
         ydl_opts = {
             "format": fmt,
             "quiet": True,
             "no_warnings": True,
             "nocheckcertificate": True,
-            "extractor_args": {"youtube": {"player_client": [client], "skip": ["hls", "dash"]}},
             "skip_download": True,
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9",
-            },
+            **cookies_opt,
+            **strategy,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -92,11 +119,14 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
                             url = f["url"]
                             break
                 if url:
-                    print(f"[ydl_get_url] OK via client={client}")
+                    client_name = strategy["extractor_args"]["youtube"]["player_client"][0]
+                    print(f"[ydl_get_url] OK via strategy={i+1} client={client_name}")
                     return 1, url
         except Exception as e:
-            print(f"[ydl_get_url] client={client} failed: {str(e)[:120]}")
-    return 0, "all extraction methods failed"
+            client_name = strategy["extractor_args"]["youtube"]["player_client"][0]
+            print(f"[ydl_get_url] strategy={i+1} client={client_name} failed: {str(e)[:120]}")
+
+    return 0, "all extraction methods failed — YouTube may require cookies"
 
 
 async def ytdl_audio(link):
