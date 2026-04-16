@@ -1,40 +1,33 @@
 # ytdl_utils.py — مركزي لإعدادات yt_dlp مع fallback لإصلاح "Requested format is not available"
+# ✅ الإصلاح النهائي: format مرن + player clients محدّثة + دعم cookies
 
 import os
 import yt_dlp
 
 # ─────────────────────────────────────────
-# الفورمات الصحيحة — واسعة بحيث تشتغل دايماً
+# الفورمات المرنة — تقبل أي صيغة صوتية متاحة
 # ─────────────────────────────────────────
 
-# صوت فقط: يجرب أفضل صوت، وإلا ياخد best كاملة
 AUDIO_FORMAT = (
     "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=opus]"
-    "/bestaudio/best[acodec!=none]/best"
+    "/bestaudio/best[acodec!=none]/best/bestaudio*"
 )
 
 # ─────────────────────────────────────────
-# Player clients بالترتيب (fallback chain)
+# Player clients بالترتيب — الأسرع والأكثر نجاحاً أول
 # ─────────────────────────────────────────
 
 _STRATEGIES = [
     {
-        "label": "ios",
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        "http_headers": {
-            "User-Agent": (
-                "com.google.ios.youtube/19.29.1 "
-                "(iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
-            )
+        "label": "web_creator",
+        "extractor_args": {
+            "youtube": {"player_client": ["web_creator"]}
         },
-    },
-    {
-        "label": "android",
-        "extractor_args": {"youtube": {"player_client": ["android"]}},
         "http_headers": {
             "User-Agent": (
-                "com.google.android.youtube/19.29.37 "
-                "(Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
             )
         },
     },
@@ -54,26 +47,50 @@ _STRATEGIES = [
         },
     },
     {
-        "label": "web_creator",
-        "extractor_args": {"youtube": {"player_client": ["web_creator"]}},
-        "http_headers": {},
+        "label": "ios",
+        "extractor_args": {
+            "youtube": {"player_client": ["ios"]}
+        },
+        "http_headers": {
+            "User-Agent": (
+                "com.google.ios.youtube/19.29.1 "
+                "(iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
+            )
+        },
+    },
+    {
+        "label": "android",
+        "extractor_args": {
+            "youtube": {"player_client": ["android"]}
+        },
+        "http_headers": {
+            "User-Agent": (
+                "com.google.android.youtube/19.29.37 "
+                "(Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"
+            )
+        },
     },
     {
         "label": "mweb",
-        "extractor_args": {"youtube": {"player_client": ["mweb"]}},
+        "extractor_args": {
+            "youtube": {"player_client": ["mweb"]}
+        },
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Linux; Android 10; K) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Mobile Safari/537.36"
+                "Chrome/124.0.0.0 Mobile Safari/537.36"
             )
         },
     },
 ]
 
 
+def _get_cookies_path():
+    return os.path.join(os.path.dirname(__file__), "cookies.txt")
+
+
 def _base_opts(outtmpl: str, fmt: str) -> dict:
-    """إعدادات أساسية مشتركة"""
     opts = {
         "format": fmt,
         "outtmpl": outtmpl,
@@ -81,6 +98,7 @@ def _base_opts(outtmpl: str, fmt: str) -> dict:
         "no_warnings": True,
         "nocheckcertificate": True,
         "geo_bypass": True,
+        "format_sort": ["abr", "asr", "ext"],
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -89,33 +107,33 @@ def _base_opts(outtmpl: str, fmt: str) -> dict:
             }
         ],
     }
-    # أضف cookies لو موجودة
-    cookies_file = os.path.join(os.path.dirname(__file__), "cookies.txt")
+    cookies_file = _get_cookies_path()
     if os.path.isfile(cookies_file):
         opts["cookiefile"] = cookies_file
     return opts
 
 
-# ─────────────────────────────────────────
-# audio_opts — للاستخدام في downloader.py
-# يرجع dict جاهز مع أفضل strategy
-# ─────────────────────────────────────────
+def _base_info_opts(fmt: str) -> dict:
+    opts = {
+        "format": fmt,
+        "quiet": True,
+        "no_warnings": True,
+        "nocheckcertificate": True,
+        "skip_download": True,
+        "format_sort": ["abr", "asr", "ext"],
+    }
+    cookies_file = _get_cookies_path()
+    if os.path.isfile(cookies_file):
+        opts["cookiefile"] = cookies_file
+    return opts
+
 
 def audio_opts(outtmpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
-    """
-    يرجع dict إعدادات yt_dlp للصوت.
-    يستخدم ios كـ default strategy (الأفضل حالياً).
-    """
     opts = _base_opts(outtmpl, AUDIO_FORMAT)
     opts["extractor_args"] = _STRATEGIES[0]["extractor_args"]
     opts["http_headers"] = _STRATEGIES[0]["http_headers"]
     return opts
 
-
-# ─────────────────────────────────────────
-# download_audio_file — للاستخدام في play_engine.py
-# يحمّل الملف ويرجع (filepath, None) أو (None, error)
-# ─────────────────────────────────────────
 
 def download_audio_file(link: str, outtmpl: str = "/tmp/%(title)s.%(ext)s"):
     """
@@ -135,7 +153,6 @@ def download_audio_file(link: str, outtmpl: str = "/tmp/%(title)s.%(ext)s"):
                 info = ydl.extract_info(link, download=True)
                 filepath = ydl.prepare_filename(info)
 
-                # لو الملف اتحول لـ mp3 بعد الـ postprocessor
                 if not os.path.exists(filepath):
                     base = os.path.splitext(filepath)[0]
                     for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
@@ -160,50 +177,30 @@ def download_audio_file(link: str, outtmpl: str = "/tmp/%(title)s.%(ext)s"):
     return None, last_error
 
 
-# ─────────────────────────────────────────
-# get_audio_url — يرجع رابط stream مباشر (بدون تحميل)
-# ─────────────────────────────────────────
-
 def get_audio_url(link: str):
-    """
-    يرجع (1, stream_url) أو (0, error_msg).
-    مفيد للـ voice chat streaming بدون تحميل ملف.
-    """
+    """يرجع (1, stream_url) أو (0, error_msg)."""
     last_error = "فشل الحصول على الرابط"
 
     for strategy in _STRATEGIES:
-        opts = {
-            "format": AUDIO_FORMAT,
-            "quiet": True,
-            "no_warnings": True,
-            "nocheckcertificate": True,
-            "skip_download": True,
-            "extractor_args": strategy["extractor_args"],
-        }
+        opts = _base_info_opts(AUDIO_FORMAT)
+        opts["extractor_args"] = strategy["extractor_args"]
         if strategy["http_headers"]:
             opts["http_headers"] = strategy["http_headers"]
-
-        cookies_file = os.path.join(os.path.dirname(__file__), "cookies.txt")
-        if os.path.isfile(cookies_file):
-            opts["cookiefile"] = cookies_file
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(link, download=False)
 
-                # ابحث عن URL مباشر (مش manifest)
                 url = info.get("url", "")
                 if _is_direct_url(url):
                     print(f"[ytdl_utils] ✅ URL عبر {strategy['label']}")
                     return 1, url
 
-                # جرب requested_formats
                 for rf in (info.get("requested_formats") or []):
                     u = rf.get("url", "")
                     if _is_direct_url(u):
                         return 1, u
 
-                # جرب formats قائمة كاملة
                 formats = info.get("formats") or []
                 audio_only = [
                     f for f in formats
@@ -212,6 +209,10 @@ def get_audio_url(link: str):
                 if audio_only:
                     audio_only.sort(key=lambda f: f.get("abr") or f.get("tbr") or 0, reverse=True)
                     return 1, audio_only[0]["url"]
+
+                all_formats = [f for f in formats if _is_direct_url(f.get("url", ""))]
+                if all_formats:
+                    return 1, all_formats[-1]["url"]
 
         except Exception as e:
             last_error = str(e)[:200]
@@ -222,7 +223,6 @@ def get_audio_url(link: str):
 
 
 def _is_direct_url(u: str) -> bool:
-    """True لو الـ URL مباشر (مش manifest أو mpd)"""
     if not u:
         return False
     bad = (".mpd", ".m3u8", "googlevideo.com/initplayback", "manifest")
