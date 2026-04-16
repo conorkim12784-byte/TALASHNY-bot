@@ -112,22 +112,30 @@ def _build_ydl_opts(fmt: str, use_pot: bool = False, extra: dict = None) -> dict
     return base
 
 
+def _is_direct_url(u: str) -> bool:
+    """True if the URL is a direct stream, not a manifest"""
+    if not u:
+        return False
+    bad = (".mpd", ".m3u8", "googlevideo.com/initplayback")
+    return not u.startswith("manifest") and not any(b in u for b in bad)
+
+
 def _pick_best_audio_url(info: dict):
     url = info.get("url")
-    if url and not url.startswith("manifest"):
+    if _is_direct_url(url):
         return url
     for rf in (info.get("requested_formats") or []):
         u = rf.get("url", "")
-        if u and not u.startswith("manifest"):
+        if _is_direct_url(u):
             return u
     formats = info.get("formats") or []
-    audio_only = [f for f in formats if f.get("vcodec") == "none" and f.get("url") and not f["url"].startswith("manifest")]
+    audio_only = [f for f in formats if f.get("vcodec") == "none" and _is_direct_url(f.get("url", ""))]
     if audio_only:
         audio_only.sort(key=lambda f: f.get("abr") or f.get("tbr") or 0, reverse=True)
         return audio_only[0]["url"]
     for f in reversed(formats):
         u = f.get("url", "")
-        if u and not u.startswith("manifest"):
+        if _is_direct_url(u):
             return u
     return None
 
@@ -136,7 +144,11 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
     _start_bgutil_server()
 
     is_audio = "height" not in fmt and "width" not in fmt
-    audio_fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]" if is_audio else fmt
+    # استخدم fallback واسع — "best" في النهاية يمنع خطأ "format not available"
+    audio_fmt = (
+        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=opus]"
+        "/bestaudio/best[acodec!=none]/best"
+    ) if is_audio else (fmt + "/best")
 
     strategies = [
         {

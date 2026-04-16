@@ -53,21 +53,9 @@ async def song(_, message: Message):
         return await message.reply("» **أرسل اسم الأغنية بعد الأمر**\nمثال: /song فيروز")
 
     m = await message.reply("🎶")
-    ydl_ops = {
-        "format": "bestaudio/best",
-        "outtmpl": "/tmp/%(title)s.%(ext)s",
-        "nocheckcertificate": True,
-        "quiet": True,
-        "no_warnings": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "web", "mweb", "ios"],
-            }
-        },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-        },
-    }
+    # استخدم ytdl_utils المركزية لضمان نفس الإعدادات والـ fallback
+    from ytdl_utils import audio_opts as _audio_opts
+    ydl_ops = _audio_opts("/tmp/%(title)s.%(ext)s")
 
     audio_file = None
     thumb_name = None
