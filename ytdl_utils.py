@@ -2,12 +2,11 @@ import os
 
 COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
 
+# تعطيل bgutil نهائيًا
 def _is_bgutil_running() -> bool:
-    # تعطيل bgutil بالكامل لتجنب مشاكل canvas
     return False
 
-def _extractor_args(use_pot: bool = False) -> dict:
-    # استخدام clients آمنة بدون POT
+def _extractor_args() -> dict:
     return {
         "youtube": {
             "player_client": ["android", "web"],
@@ -25,7 +24,7 @@ def _cookies_opt() -> dict:
     return {}
 
 def audio_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
-    opts = {
+    return {
         "format": "bestaudio/best",
         "outtmpl": out_tpl,
         "quiet": True,
@@ -33,26 +32,24 @@ def audio_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
         "nocheckcertificate": True,
         "extractor_args": _extractor_args(),
         "http_headers": _http_headers(),
+        **_cookies_opt(),
     }
-    opts.update(_cookies_opt())
-    return opts
 
-def video_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s", height: int = 720) -> dict:
-    opts = {
+def video_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
+    return {
         "format": "best",
         "outtmpl": out_tpl,
         "quiet": True,
         "no_warnings": True,
-        "nocheckcertificate": True,
         "merge_output_format": "mp4",
+        "nocheckcertificate": True,
         "extractor_args": _extractor_args(),
         "http_headers": _http_headers(),
+        **_cookies_opt(),
     }
-    opts.update(_cookies_opt())
-    return opts
 
 def stream_opts(fmt: str = "bestaudio/best") -> dict:
-    opts = {
+    return {
         "format": fmt,
         "quiet": True,
         "no_warnings": True,
@@ -60,6 +57,5 @@ def stream_opts(fmt: str = "bestaudio/best") -> dict:
         "nocheckcertificate": True,
         "extractor_args": _extractor_args(),
         "http_headers": _http_headers(),
+        **_cookies_opt(),
     }
-    opts.update(_cookies_opt())
-    return opts
