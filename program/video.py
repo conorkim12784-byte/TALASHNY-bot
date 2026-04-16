@@ -65,68 +65,146 @@ def _sc_download(link: str, out_tpl: str):
         return str(e)
 
 
+def _start_bgutil_server():
+    """تشغيل bgutil PO token server في الخلفية لو مش شغال"""
+    import subprocess, time
+    try:
+        import urllib.request as _ur
+        _ur.urlopen("http://localhost:4416/get_visitor_data", timeout=2)
+        return  # شغال بالفعل
+    except Exception:
+        pass
+    try:
+        bgutil_path = "/bgutil/server/build/main.js"
+        if os.path.isfile(bgutil_path):
+            subprocess.Popen(
+                ["node", bgutil_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            time.sleep(3)
+            print("[bgutil] server started")
+    except Exception as e:
+        print(f"[bgutil] failed to start: {e}")
+
+
+def _build_ydl_opts(fmt: str, use_pot: bool = False) -> dict:
+    """بناء ydl_opts الأساسية مع دعم PO Token و cookies"""
+    base = {
+        "format": fmt,
+        "quiet": True,
+        "no_warnings": True,
+        "nocheckcertificate": True,
+        "skip_download": True,
+    }
+
+    # cookies.txt لو موجود
+    cookies_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
+    if os.path.isfile(cookies_file):
+        base["cookiefile"] = cookies_file
+
+    # bgutil PO Token provider
+    if use_pot:
+        try:
+            base["extractor_args"] = {
+                "youtube": {
+                    "player_client": ["web"],
+                    "po_token": ["web+https://bgutil-ytdlp-pot-provider.korkmazgokhan.workers.dev/get_po_token"],
+                }
+            }
+        except Exception:
+            pass
+
+    return base
+
+
+def _extract_url_from_info(info: dict) -> str | None:
+    url = info.get("url")
+    if not url and info.get("requested_formats"):
+        url = info["requested_formats"][0].get("url")
+    if not url and info.get("formats"):
+        for f in reversed(info["formats"]):
+            if f.get("url") and not f["url"].startswith("manifest"):
+                url = f["url"]
+                break
+    return url
+
+
 def _ydl_get_url(link: str, fmt: str) -> tuple:
-    # Strategy 1: tv_embedded + mediaconnect (bypasses bot check without cookies)
-    # Strategy 2: ios client with proper mobile headers
-    # Strategy 3: web_creator client (often exempt from bot checks)
-    # Strategy 4: mweb with no skip flags
+    # تشغيل bgutil server تلقائياً
+    _start_bgutil_server()
+
+    # قائمة الاستراتيجيات بالترتيب
     strategies = [
+        # الأولوية: web مع bgutil PO token (الأقوى ضد الحجب)
         {
-            "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}},
-            "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
+            "use_pot": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web"],
+                }
+            },
+            "label": "web+bgutil_pot",
         },
+        # ios مع User-Agent الحقيقي
         {
-            "extractor_args": {"youtube": {"player_client": ["ios"]}},
-            "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"},
+            "use_pot": False,
+            "extractor_args": {
+                "youtube": {"player_client": ["ios"]}
+            },
+            "http_headers": {
+                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
+            },
+            "label": "ios",
         },
+        # android مع User-Agent الحقيقي
         {
-            "extractor_args": {"youtube": {"player_client": ["web_creator"]}},
-            "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
+            "use_pot": False,
+            "extractor_args": {
+                "youtube": {"player_client": ["android"]}
+            },
+            "http_headers": {
+                "User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"
+            },
+            "label": "android",
         },
+        # tv_embedded
         {
-            "extractor_args": {"youtube": {"player_client": ["android"], "skip": ["hls"]}},
-            "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"},
+            "use_pot": False,
+            "extractor_args": {
+                "youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}
+            },
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"
+            },
+            "label": "tv_embedded",
         },
+        # web_creator
         {
-            "extractor_args": {"youtube": {"player_client": ["mweb"]}},
-            "http_headers": {"User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"},
+            "use_pot": False,
+            "extractor_args": {
+                "youtube": {"player_client": ["web_creator"]}
+            },
+            "label": "web_creator",
         },
     ]
 
-    # Use cookies.txt if it exists (place a YouTube cookies file at project root)
-    cookies_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
-    cookies_opt = {"cookiefile": cookies_file} if os.path.isfile(cookies_file) else {}
-
-    for i, strategy in enumerate(strategies):
-        ydl_opts = {
-            "format": fmt,
-            "quiet": True,
-            "no_warnings": True,
-            "nocheckcertificate": True,
-            "skip_download": True,
-            **cookies_opt,
-            **strategy,
-        }
+    for strategy in strategies:
+        label = strategy.pop("label")
+        use_pot = strategy.pop("use_pot")
+        ydl_opts = _build_ydl_opts(fmt, use_pot=use_pot)
+        ydl_opts.update(strategy)
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(link, download=False)
-                url = info.get("url")
-                if not url and info.get("requested_formats"):
-                    url = info["requested_formats"][0].get("url")
-                if not url and info.get("formats"):
-                    for f in reversed(info["formats"]):
-                        if f.get("url") and not f["url"].startswith("manifest"):
-                            url = f["url"]
-                            break
+                url = _extract_url_from_info(info)
                 if url:
-                    client_name = strategy["extractor_args"]["youtube"]["player_client"][0]
-                    print(f"[ydl_get_url] OK via strategy={i+1} client={client_name}")
+                    print(f"[ydl_get_url] ✓ OK via {label}")
                     return 1, url
         except Exception as e:
-            client_name = strategy["extractor_args"]["youtube"]["player_client"][0]
-            print(f"[ydl_get_url] strategy={i+1} client={client_name} failed: {str(e)[:120]}")
+            print(f"[ydl_get_url] ✗ {label} failed: {str(e)[:120]}")
 
-    return 0, "all extraction methods failed — YouTube may require cookies"
+    return 0, "فشل تحميل الأغنية — الـ IP محجوب من YouTube، جرب تضيف cookies.txt"
 
 
 async def ytdl_audio(link):
