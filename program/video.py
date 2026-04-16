@@ -147,19 +147,24 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
     # استخدم fallback واسع — "best" في النهاية يمنع خطأ "format not available"
     audio_fmt = (
         "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=opus]"
-        "/bestaudio/best[acodec!=none]/best"
+        "/bestaudio/best[acodec!=none]/best/bestaudio*"
     ) if is_audio else (fmt + "/best")
 
     strategies = [
         {
-            "label": "web+pot",
-            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, use_pot=True),
+            "label": "tv_embedded",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}},
+                "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
+                "format_sort": ["abr", "asr", "ext"],
+            }),
         },
         {
             "label": "ios",
             "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
                 "extractor_args": {"youtube": {"player_client": ["ios"]}},
                 "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"},
+                "format_sort": ["abr", "asr", "ext"],
             }),
         },
         {
@@ -167,19 +172,23 @@ def _ydl_get_url(link: str, fmt: str) -> tuple:
             "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
                 "extractor_args": {"youtube": {"player_client": ["android"]}},
                 "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"},
-            }),
-        },
-        {
-            "label": "tv_embedded",
-            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
-                "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}},
-                "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
+                "format_sort": ["abr", "asr", "ext"],
             }),
         },
         {
             "label": "web_creator",
             "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
                 "extractor_args": {"youtube": {"player_client": ["web_creator"]}},
+                "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
+                "format_sort": ["abr", "asr", "ext"],
+            }),
+        },
+        {
+            "label": "mweb",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["mweb"]}},
+                "http_headers": {"User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"},
+                "format_sort": ["abr", "asr", "ext"],
             }),
         },
     ]
