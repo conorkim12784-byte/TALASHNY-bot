@@ -119,7 +119,7 @@ async def song(_, message: Message):
 async def vsong(client, message: Message):
     await message.delete()
     ydl_opts = {
-        "format": "bestvideo[height<=720]+bestaudio/best",
+        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
         "keepvideo": True,
         "geo_bypass": True,
         "outtmpl": "/tmp/%(title)s.%(ext)s",
@@ -129,11 +129,11 @@ async def vsong(client, message: Message):
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "web", "mweb", "ios"],
+                "player_client": ["ios", "android", "tv_embedded", "mweb"],
             }
         },
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+            "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)",
         },
     }
 
