@@ -10,13 +10,29 @@ COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies
 # helpers داخلية
 # ─────────────────────────────────────────
 
-def _extractor_args() -> dict:
-    # ملاحظة مهمة: لا تضف skip: ["hls", "dash"]
-    # tv_embedded و mweb و ios كلهم بيرجعوا HLS/DASH فقط —
-    # لو حذفتهم مش هيلاقي أي فورمات!
+def _is_bgutil_running() -> bool:
+    """تحقق إذا bgutil server شغال على port 4416"""
+    try:
+        import urllib.request
+        urllib.request.urlopen("http://localhost:4416/get_visitor_data", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+def _extractor_args(use_pot: bool = False) -> dict:
+    if use_pot and _is_bgutil_running():
+        return {
+            "youtube": {
+                "player_client": ["web"],
+                "po_token": ["web+http://localhost:4416/get_po_token"],
+                "visitor_data": ["http://localhost:4416/get_visitor_data"],
+            }
+        }
+    # tv_embedded + ios بيرجعوا streams مباشرة بدون DASH/HLS manifest
     return {
         "youtube": {
-            "player_client": ["tv_embedded", "web", "mweb", "ios"],
+            "player_client": ["tv_embedded", "ios", "web"],
         }
     }
 
@@ -44,14 +60,16 @@ def _cookies_opt() -> dict:
 # ─────────────────────────────────────────
 
 def audio_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
-    """Options لتحميل أفضل صوت"""
+    """Options لتحميل أفضل صوت — مع fallback تلقائي"""
+    use_pot = _is_bgutil_running()
     opts = {
-        "format": "bestaudio/best",
+        # bestaudio[ext=m4a] أو webm أو أي صوت، ثم best كـ fallback نهائي
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "outtmpl": out_tpl,
         "nocheckcertificate": True,
         "quiet": True,
         "no_warnings": True,
-        "extractor_args": _extractor_args(),
+        "extractor_args": _extractor_args(use_pot=use_pot),
         "http_headers": _http_headers(),
     }
     opts.update(_cookies_opt())
@@ -59,7 +77,8 @@ def audio_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s") -> dict:
 
 
 def video_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s", height: int = 720) -> dict:
-    """Options لتحميل أفضل فيديو"""
+    """Options لتحميل أفضل فيديو — مع fallback تلقائي"""
+    use_pot = _is_bgutil_running()
     opts = {
         "format": (
             f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]"
@@ -72,22 +91,23 @@ def video_opts(out_tpl: str = "/tmp/%(title)s.%(ext)s", height: int = 720) -> di
         "quiet": True,
         "no_warnings": True,
         "merge_output_format": "mp4",
-        "extractor_args": _extractor_args(),
+        "extractor_args": _extractor_args(use_pot=use_pot),
         "http_headers": _http_headers(),
     }
     opts.update(_cookies_opt())
     return opts
 
 
-def stream_opts(fmt: str = "bestaudio/best") -> dict:
+def stream_opts(fmt: str = "bestaudio[ext=m4a]/bestaudio/best") -> dict:
     """Options لاستخراج رابط مباشر بدون تحميل"""
+    use_pot = _is_bgutil_running()
     opts = {
         "format": fmt,
         "nocheckcertificate": True,
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "extractor_args": _extractor_args(),
+        "extractor_args": _extractor_args(use_pot=use_pot),
         "http_headers": _http_headers(),
     }
     opts.update(_cookies_opt())
