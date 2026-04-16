@@ -88,8 +88,7 @@ def _start_bgutil_server():
         print(f"[bgutil] failed to start: {e}")
 
 
-def _build_ydl_opts(fmt: str, use_pot: bool = False) -> dict:
-    """بناء ydl_opts الأساسية مع دعم PO Token و cookies"""
+def _build_ydl_opts(fmt: str, use_pot: bool = False, extra: dict = None) -> dict:
     base = {
         "format": fmt,
         "quiet": True,
@@ -97,114 +96,94 @@ def _build_ydl_opts(fmt: str, use_pot: bool = False) -> dict:
         "nocheckcertificate": True,
         "skip_download": True,
     }
-
-    # cookies.txt لو موجود
     cookies_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
     if os.path.isfile(cookies_file):
         base["cookiefile"] = cookies_file
-
-    # bgutil PO Token provider
     if use_pot:
-        try:
-            base["extractor_args"] = {
-                "youtube": {
-                    "player_client": ["web"],
-                    "po_token": ["web+https://bgutil-ytdlp-pot-provider.korkmazgokhan.workers.dev/get_po_token"],
-                }
+        base["extractor_args"] = {
+            "youtube": {
+                "player_client": ["web"],
+                "po_token": ["web+http://localhost:4416/get_po_token"],
+                "visitor_data": ["http://localhost:4416/get_visitor_data"],
             }
-        except Exception:
-            pass
-
+        }
+    if extra:
+        base.update(extra)
     return base
 
 
-def _extract_url_from_info(info: dict) -> str | None:
+def _pick_best_audio_url(info: dict):
     url = info.get("url")
-    if not url and info.get("requested_formats"):
-        url = info["requested_formats"][0].get("url")
-    if not url and info.get("formats"):
-        for f in reversed(info["formats"]):
-            if f.get("url") and not f["url"].startswith("manifest"):
-                url = f["url"]
-                break
-    return url
+    if url and not url.startswith("manifest"):
+        return url
+    for rf in (info.get("requested_formats") or []):
+        u = rf.get("url", "")
+        if u and not u.startswith("manifest"):
+            return u
+    formats = info.get("formats") or []
+    audio_only = [f for f in formats if f.get("vcodec") == "none" and f.get("url") and not f["url"].startswith("manifest")]
+    if audio_only:
+        audio_only.sort(key=lambda f: f.get("abr") or f.get("tbr") or 0, reverse=True)
+        return audio_only[0]["url"]
+    for f in reversed(formats):
+        u = f.get("url", "")
+        if u and not u.startswith("manifest"):
+            return u
+    return None
 
 
 def _ydl_get_url(link: str, fmt: str) -> tuple:
-    # تشغيل bgutil server تلقائياً
     _start_bgutil_server()
 
-    # قائمة الاستراتيجيات بالترتيب
+    is_audio = "height" not in fmt and "width" not in fmt
+    audio_fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]" if is_audio else fmt
+
     strategies = [
-        # الأولوية: web مع bgutil PO token (الأقوى ضد الحجب)
         {
-            "use_pot": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["web"],
-                }
-            },
-            "label": "web+bgutil_pot",
+            "label": "web+pot",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, use_pot=True),
         },
-        # ios مع User-Agent الحقيقي
         {
-            "use_pot": False,
-            "extractor_args": {
-                "youtube": {"player_client": ["ios"]}
-            },
-            "http_headers": {
-                "User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
-            },
             "label": "ios",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["ios"]}},
+                "http_headers": {"User-Agent": "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"},
+            }),
         },
-        # android مع User-Agent الحقيقي
         {
-            "use_pot": False,
-            "extractor_args": {
-                "youtube": {"player_client": ["android"]}
-            },
-            "http_headers": {
-                "User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"
-            },
             "label": "android",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["android"]}},
+                "http_headers": {"User-Agent": "com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US; Pixel 8; Build/UQ1A.240605.004;) gzip"},
+            }),
         },
-        # tv_embedded
         {
-            "use_pot": False,
-            "extractor_args": {
-                "youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}
-            },
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"
-            },
             "label": "tv_embedded",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage"]}},
+                "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
+            }),
         },
-        # web_creator
         {
-            "use_pot": False,
-            "extractor_args": {
-                "youtube": {"player_client": ["web_creator"]}
-            },
             "label": "web_creator",
+            "opts": _build_ydl_opts(audio_fmt if is_audio else fmt, extra={
+                "extractor_args": {"youtube": {"player_client": ["web_creator"]}},
+            }),
         },
     ]
 
-    for strategy in strategies:
-        label = strategy.pop("label")
-        use_pot = strategy.pop("use_pot")
-        ydl_opts = _build_ydl_opts(fmt, use_pot=use_pot)
-        ydl_opts.update(strategy)
+    for s in strategies:
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(s["opts"]) as ydl:
                 info = ydl.extract_info(link, download=False)
-                url = _extract_url_from_info(info)
+                url = _pick_best_audio_url(info)
                 if url:
-                    print(f"[ydl_get_url] ✓ OK via {label}")
+                    print(f"[ydl_get_url] OK via {s['label']}")
                     return 1, url
         except Exception as e:
-            print(f"[ydl_get_url] ✗ {label} failed: {str(e)[:120]}")
+            print(f"[ydl_get_url] {s['label']} failed: {str(e)[:120]}")
 
-    return 0, "فشل تحميل الأغنية — الـ IP محجوب من YouTube، جرب تضيف cookies.txt"
+    return 0, "فشل تحميل الأغنية — تأكد من تشغيل bgutil server"
 
 
 async def ytdl_audio(link):
