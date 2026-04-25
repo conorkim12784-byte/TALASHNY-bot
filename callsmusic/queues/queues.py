@@ -2,7 +2,7 @@ from typing import Dict
 from asyncio import Queue, QueueEmpty as Empty
 
 queues: Dict[int, Queue] = {}
-# نحتفظ بالأغنية الحالية لكل شات عشان نقدر نمسح ملفها
+# نحتفظ بالأغنية الحالية لكل شات عشان نقدر نمسح ملفها بعد انتهاء التشغيل
 current_tracks: Dict[int, dict] = {}
 
 
@@ -21,6 +21,7 @@ def get(chat_id: int):
             return track
         except Empty:
             return None
+    return None
 
 
 def get_current(chat_id: int):
@@ -42,9 +43,13 @@ def task_done(chat_id: int):
 
 
 def clear(chat_id: int):
+    """🔧 إصلاح: الإصدار القديم كان بيرفع Empty حتى لو الـ queue موجودة"""
     if chat_id in queues:
-        if queues[chat_id].empty():
-            raise Empty
-        else:
-            queues[chat_id].queue = []
-    raise Empty
+        try:
+            # نفرّغ كل العناصر بأمان
+            while not queues[chat_id].empty():
+                queues[chat_id].get_nowait()
+        except Empty:
+            pass
+        # امسح الـ current track كمان
+        current_tracks.pop(chat_id, None)
