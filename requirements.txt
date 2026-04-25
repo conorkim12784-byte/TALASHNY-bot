@@ -1,7 +1,9 @@
 tgcrypto
 py-tgcalls==2.2.11
 pyrofork
-yt-dlp
+# ✅ خلي yt-dlp محدّث دايماً — هو اللي بيتعامل مع تغييرات يوتيوب
+# في كل deploy: pip install -U yt-dlp
+yt-dlp>=2025.1.15
 speedtest-cli
 youtube-search
 python-dotenv
