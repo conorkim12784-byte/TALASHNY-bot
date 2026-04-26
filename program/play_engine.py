@@ -268,25 +268,18 @@ async def _handle_play(c: Client, m: Message):
     query = m.text.split(None, 1)[1].strip()
     suhu = await c.send_message(chat_id, "**🎶 جاري البحث...**")
 
-    is_yt_link = "youtube.com/watch" in query or "youtu.be/" in query
+    from ytdl_utils import extract_video_id, get_video_info
+    is_yt_link = bool(extract_video_id(query))
 
     if is_yt_link:
-        url = query
-        songname = "YouTube Audio"
-        duration = "?"
-        thumbnail = None
-        try:
-            from ytdl_utils import extract_info_no_download
-            info, _ = await asyncio.to_thread(extract_info_no_download, url)
-            if info:
-                songname = (info.get("title") or "YouTube Audio")[:70]
-                secs = int(info.get("duration") or 0)
-                m_, s_ = divmod(secs, 60)
-                h_, m__ = divmod(m_, 60)
-                duration = f"{h_}:{m__:02d}:{s_:02d}" if h_ else f"{m__}:{s_:02d}"
-                thumbnail = info.get("thumbnail")
-        except Exception:
-            pass
+        info = await asyncio.to_thread(get_video_info, query)
+        if not info:
+            await suhu.edit("**لم أقدر أقرأ رابط YouTube ده — جرب اسم الأغنية بدل الرابط.**")
+            return
+        url = info["url"]
+        songname = info["title"]
+        duration = info["duration"]
+        thumbnail = info["thumbnail"]
     else:
         search = await yt_search(query)
         if not search:

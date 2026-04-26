@@ -91,36 +91,10 @@ async def song(_, message: Message):
 # /تحميل_فيديو — تحميل فيديو من يوتيوب
 # ─────────────────────────────────────────
 
-_VIDEO_DL_OPTS_BASE = {
-    "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
-    "keepvideo": True,
-    "geo_bypass": True,
-    "outtmpl": "/tmp/%(title).70s.%(ext)s",
-    "quiet": True,
-    "merge_output_format": "mp4",
-    "nocheckcertificate": True,
-    "no_warnings": True,
-    "cachedir": False,
-    "retries": 3,
-    "extractor_retries": 2,
-}
-
-_VIDEO_FALLBACK = [
-    ({"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage", "configs"]}},
-     "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"),
-    ({"youtube": {"player_client": ["ios"]}},
-     "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"),
-    ({"youtube": {"player_client": ["mweb"]}},
-     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"),
-    ({"youtube": {"player_client": ["web_safari"]}},
-     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"),
-]
-
-
 def _download_video(link: str):
-    """تحميل الفيديو بدون cookies عبر ytdl_utils المركزي و PO Token provider."""
+    """تحميل الفيديو عبر محرك Piped الجديد بدون cookies."""
     from ytdl_utils import download_video_file
-    return download_video_file(link, "/tmp/%(title).70s.%(ext)s", _VIDEO_DL_OPTS_BASE["format"])
+    return download_video_file(link, quality=720)
 
 
 @Client.on_message(command2(["تحميل_فيديو", "تحميل فيديو"]))
@@ -152,7 +126,7 @@ async def vsong(client, message: Message):
             except Exception:
                 preview = None
         await msg.edit("📤 **جاري رفع الفيديو...**")
-        await message.reply_video(file_name, duration=int(ytdl_data.get("duration", 0)),
+        await message.reply_video(file_name, duration=int((ytdl_data or {}).get("duration_seconds") or (ytdl_data or {}).get("duration") or 0),
                                    thumb=preview, caption=title_v)
         await msg.delete()
     except Exception as e:

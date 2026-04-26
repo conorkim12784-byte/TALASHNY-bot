@@ -29,89 +29,8 @@ os.makedirs(AUDIO_DIR, exist_ok=True)
 
 
 # ─────────────────────────────────────────
-# strategies للحصول على رابط الفيديو/الصوت بدون cookies
+# محرك YouTube الجديد: Piped أولاً، yt-dlp احتياطي فقط
 # ─────────────────────────────────────────
-
-_VIDEO_STRATEGIES = [
-    {
-        "label": "tv_embedded",
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded"], "skip": ["webpage", "configs"]}},
-        "http_headers": {"User-Agent": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"},
-    },
-    {
-        "label": "ios",
-        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-        "http_headers": {"User-Agent": "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"},
-    },
-    {
-        "label": "mweb",
-        "extractor_args": {"youtube": {"player_client": ["mweb"]}},
-        "http_headers": {"User-Agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"},
-    },
-    {
-        "label": "web_safari",
-        "extractor_args": {"youtube": {"player_client": ["web_safari"]}},
-        "http_headers": {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"},
-    },
-    {
-        "label": "android_vr",
-        "extractor_args": {"youtube": {"player_client": ["android_vr"]}},
-        "http_headers": {"User-Agent": "com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 3) gzip"},
-    },
-]
-
-
-def _build_ydl_opts(fmt: str, strategy: dict) -> dict:
-    return {
-        "format": fmt,
-        "quiet": True,
-        "no_warnings": True,
-        "nocheckcertificate": True,
-        "skip_download": True,
-        "geo_bypass": True,
-        "cachedir": False,
-        "retries": 3,
-        "extractor_retries": 2,
-        "format_sort": ["abr", "asr", "ext"],
-        "extractor_args": strategy["extractor_args"],
-        "http_headers": strategy["http_headers"],
-    }
-
-
-def _is_direct_url(u: str) -> bool:
-    if not u:
-        return False
-    bad = (".mpd", ".m3u8", "googlevideo.com/initplayback", "manifest")
-    return not any(b in u for b in bad)
-
-
-def _pick_best_audio_url(info: dict):
-    url = info.get("url")
-    if _is_direct_url(url):
-        return url
-    for rf in (info.get("requested_formats") or []):
-        u = rf.get("url", "")
-        if _is_direct_url(u):
-            return u
-    formats = info.get("formats") or []
-    audio_only = [f for f in formats if f.get("vcodec") == "none" and _is_direct_url(f.get("url", ""))]
-    if audio_only:
-        audio_only.sort(key=lambda f: f.get("abr") or f.get("tbr") or 0, reverse=True)
-        return audio_only[0]["url"]
-    for f in reversed(formats):
-        u = f.get("url", "")
-        if _is_direct_url(u):
-            return u
-    return None
-
-
-def _ydl_get_url(link: str, fmt: str) -> tuple:
-    """استخراج رابط مباشر بدون cookies عبر ytdl_utils المركزي."""
-    from ytdl_utils import get_audio_url, get_video_url, quality_from_format
-    is_audio = "height" not in fmt and "width" not in fmt
-    if is_audio:
-        return get_audio_url(link)
-    return get_video_url(link, quality_from_format(fmt, 720))
 
 
 def _parse_duration(seconds) -> str:
@@ -124,12 +43,17 @@ def _parse_duration(seconds) -> str:
 
 
 async def ytdl_audio(link):
-    return await asyncio.to_thread(_ydl_get_url, link, "bestaudio/best")
+    from ytdl_utils import get_audio_url
+    return await asyncio.to_thread(get_audio_url, link)
 
 ytdl = ytdl_audio
 
 async def ytdl_video(link, quality=720):
-    return await asyncio.to_thread(_ydl_get_url, link, f"best[height<=?{quality}][width<=?1280]/best")
+    from ytdl_utils import download_video_file
+    file_name, info, err = await asyncio.to_thread(download_video_file, link, quality)
+    if file_name:
+        return 1, file_name
+    return 0, err or "فشل تحميل الفيديو"
 
 
 def multisearch_video(query: str):
