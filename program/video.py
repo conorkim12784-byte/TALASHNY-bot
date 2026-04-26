@@ -106,28 +106,12 @@ def _pick_best_audio_url(info: dict):
 
 
 def _ydl_get_url(link: str, fmt: str) -> tuple:
+    """استخراج رابط مباشر بدون cookies عبر ytdl_utils المركزي."""
+    from ytdl_utils import get_audio_url, get_video_url, quality_from_format
     is_audio = "height" not in fmt and "width" not in fmt
-    audio_fmt = (
-        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=opus]"
-        "/bestaudio/best[acodec!=none]/best/bestaudio*"
-    ) if is_audio else (fmt + "/best")
-
-    last_err = "فشل تحميل الفيديو/الصوت"
-    for s in _VIDEO_STRATEGIES:
-        try:
-            opts = _build_ydl_opts(audio_fmt if is_audio else fmt, s)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(link, download=False)
-                url = _pick_best_audio_url(info)
-                if url:
-                    print(f"[ydl_get_url] ✅ {s['label']}")
-                    return 1, url
-        except Exception as e:
-            last_err = str(e)[:200]
-            print(f"[ydl_get_url] ❌ {s['label']}: {last_err}")
-            continue
-
-    return 0, last_err
+    if is_audio:
+        return get_audio_url(link)
+    return get_video_url(link, quality_from_format(fmt, 720))
 
 
 def _parse_duration(seconds) -> str:

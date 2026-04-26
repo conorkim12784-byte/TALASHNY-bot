@@ -276,8 +276,9 @@ async def _handle_play(c: Client, m: Message):
         duration = "?"
         thumbnail = None
         try:
-            with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True, "nocheckcertificate": True}) as ydl:
-                info = ydl.extract_info(url, download=False)
+            from ytdl_utils import extract_info_no_download
+            info, _ = await asyncio.to_thread(extract_info_no_download, url)
+            if info:
                 songname = (info.get("title") or "YouTube Audio")[:70]
                 secs = int(info.get("duration") or 0)
                 m_, s_ = divmod(secs, 60)
