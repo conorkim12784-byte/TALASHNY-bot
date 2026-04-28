@@ -1,5 +1,6 @@
 from driver.admins import get_administrators, refresh_administrators
 # الادمن.py - اوامر الادمن العربية فقط (الانجليزية موجودة في admins.py)
+import re
 from driver.veez import call_py
 from pyrogram import Client
 from driver.queues import QUEUE, clear_queue
@@ -11,6 +12,17 @@ from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
 from pyrogram.types import InlineKeyboardMarkup, Message, ChatPermissions
+
+
+def _yt_thumb_from_link(link: str) -> str:
+    """نطلع رابط صورة الأغنية من لينك يوتيوب — لو فشل نرجع IMG_5"""
+    if not link or not isinstance(link, str):
+        return IMG_5
+    m = re.search(r"(?:v=|youtu\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})", link)
+    if m:
+        vid = m.group(1)
+        return f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
+    return IMG_5
 
 
 @Client.on_message(command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
@@ -30,8 +42,7 @@ async def skip_ar(c: Client, m: Message):
     if len(m.command) < 2:
         op = await skip_current_song(chat_id)
         if op == 0:
-            # القائمة فارغة (مفيش أغنية حالية، أو الحالية بس من غير تالي)
-            # → بنبعت رسالة فقط ومش بننهي التشغيل
+            # القائمة فارغة — رسالة بس بدون إنهاء التشغيل
             await c.send_message(chat_id, "✘ **قائمة التشغيل فارغه** — مفيش مقطع تالي للتخطي إليه")
         elif op == 2:
             await c.send_message(chat_id, "🗑️ مسح قوائم الانتظار\n\n• مغادرة المستخدم الآلي للدردشة الصوتية")
@@ -39,7 +50,9 @@ async def skip_ar(c: Client, m: Message):
             buttons = stream_markup(user_id)
             gcname = m.chat.title
             ctitle = await CHAT_TITLE(gcname)
-            image = await thumb(f"{IMG_5}", f"{op[0]}", m.from_user.id, ctitle)
+            # نجيب صورة الأغنية الجديدة من لينك يوتيوب
+            song_thumb_url = _yt_thumb_from_link(op[1])
+            image = await thumb(song_thumb_url, f"{op[0]}", m.from_user.id, ctitle)
             await c.send_photo(
                 chat_id,
                 photo=image,
@@ -171,7 +184,7 @@ async def volume_ar(client, m: Message):
 
 
 # ══════════════════════════════════════════════════════════
-# أمر: كتم مستخدم (منع الكتابة) — رد على رسالته
+# أمر: كتم مستخدم
 # ══════════════════════════════════════════════════════════
 @Client.on_message(command2(["كتم", "اسكت_المستخدم", "كتم_مستخدم"]) & other_filters)
 @admin_only
