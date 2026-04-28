@@ -36,50 +36,69 @@ keyboard = InlineKeyboardMarkup(
 
 
 async def skip_current_song(chat_id):
-    """تستخدم في أمر /تخطي — تشغل المقطع التالي يدوياً"""
-    if chat_id in QUEUE:
-        chat_queue = get_queue(chat_id)
-        if len(chat_queue) == 1:
-            await call_py.leave_call(chat_id)
-            clear_queue(chat_id)
-            return 1
-        else:
-            try:
-                songname = chat_queue[1][0]
-                url = chat_queue[1][1]
-                link = chat_queue[1][2]
-                type_ = chat_queue[1][3]
-                Q = chat_queue[1][4]
-                if type_ == "Audio":
-                    await call_py.play(
-                        chat_id,
-                        MediaStream(url, AudioQuality.HIGH),
-                    )
-                elif type_ == "Video":
-                    if Q == 720:
-                        vq = VideoQuality.HD_720p
-                    elif Q == 480:
-                        vq = VideoQuality.SD_480p
-                    elif Q == 360:
-                        vq = VideoQuality.SD_360p
-                    else:
-                        vq = VideoQuality.HD_720p
-                    await call_py.play(
-                        chat_id,
-                        MediaStream(url, AudioQuality.HIGH, vq)
-                    )
-                pop_an_item(chat_id)
-                return [songname, link, type_]
-            except Exception as e:
-                print(f"[skip_current_song error] {e}")
-                try:
-                    await call_py.leave_call(chat_id)
-                except Exception:
-                    pass
-                clear_queue(chat_id)
-                return 2
-    else:
+    """تستخدم في أمر /تخطي — تشغل المقطع التالي يدوياً.
+
+    التعديل المهم:
+    - لو القائمة مفيهاش غير الأغنية الحالية فقط (مفيش تالي) → نرجّع 0
+      (= القائمة فارغة) من غير ما نغلق المكالمة. المستخدم اللي يقرر ينهي
+      التشغيل بأمر "انهاء" بنفسه.
+    - بنستبدل الستريم الحالي بستريم جديد بشكل واضح (نفس play لكن مضمون
+      يقاطع الأغنية الحالية لأن pytgcalls.play() على نفس chat_id بيحل
+      محل الستريم النشط).
+    """
+    if chat_id not in QUEUE:
         return 0
+
+    chat_queue = get_queue(chat_id)
+
+    # مفيش أغنية تالية — مانعملش leave، بس نبلّغ إن القائمة فارغة
+    if len(chat_queue) <= 1:
+        return 0
+
+    try:
+        songname = chat_queue[1][0]
+        url      = chat_queue[1][1]
+        link     = chat_queue[1][2]
+        type_    = chat_queue[1][3]
+        Q        = chat_queue[1][4]
+
+        # شيل الأغنية الحالية من القائمة الأول عشان الـ stream-end handler
+        # ميلخبطش الترتيب لو خلصت الأغنية الجديدة بعد كده.
+        pop_an_item(chat_id)
+
+        if type_ == "Audio":
+            await call_py.play(
+                chat_id,
+                MediaStream(url, AudioQuality.HIGH),
+            )
+        elif type_ == "Video":
+            if Q == 720:
+                vq = VideoQuality.HD_720p
+            elif Q == 480:
+                vq = VideoQuality.SD_480p
+            elif Q == 360:
+                vq = VideoQuality.SD_360p
+            else:
+                vq = VideoQuality.HD_720p
+            await call_py.play(
+                chat_id,
+                MediaStream(url, AudioQuality.HIGH, vq),
+            )
+        else:
+            await call_py.play(
+                chat_id,
+                MediaStream(url, AudioQuality.HIGH),
+            )
+
+        return [songname, link, type_]
+    except Exception as e:
+        print(f"[skip_current_song error] {e}")
+        try:
+            await call_py.leave_call(chat_id)
+        except Exception:
+            pass
+        clear_queue(chat_id)
+        return 2
 
 
 async def skip_item(chat_id, h):
