@@ -6,9 +6,19 @@ import asyncio
 import os
 
 from pyrogram import Client
-from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdInvalid
+from pyrogram.errors import (
+    UserAlreadyParticipant,
+    UserNotParticipant,
+    PeerIdInvalid,
+    InviteHashExpired,
+    InviteHashInvalid,
+    InviteRequestSent,
+    ChatAdminRequired,
+)
+from pyrogram.raw import functions as raw_functions
 from pyrogram.types import InlineKeyboardMarkup, Message
 from pytgcalls.types import MediaStream, AudioQuality
+from pytgcalls.exceptions import NoActiveGroupCall
 
 from config import BOT_USERNAME, IMG_5
 from driver.design.chatname import CHAT_TITLE
@@ -87,24 +97,76 @@ async def _check_bot_perms(c: Client, chat_id: int) -> str | None:
 # 4) انضمام الـ userbot للجروب
 # ─────────────────────────────────────────
 
+async def _fresh_invite_and_join(c: Client, chat_id: int):
+    """ينشئ رابط دعوة جديد لحظياً ويضم الـ userbot. يتعامل مع روابط منتهية."""
+    try:
+        # ننشئ رابط جديد بدل export_chat_invite_link اللي ممكن يرجع رابط متخزن منتهي
+        new_invite = await c.create_chat_invite_link(chat_id)
+        link = new_invite.invite_link
+    except ChatAdminRequired:
+        raise RuntimeError(
+            "البوت محتاج صلاحية **دعوة المستخدمين** عشان يضم الحساب المساعد."
+        )
+    except Exception as e:
+        raise RuntimeError(f"تعذر إنشاء رابط دعوة جديد\n\nالسبب: `{e}`")
+
+    try:
+        await user.join_chat(link)
+    except (InviteHashExpired, InviteHashInvalid):
+        # نحاول نعمل رابط جديد تاني
+        try:
+            new_invite = await c.create_chat_invite_link(chat_id)
+            await user.join_chat(new_invite.invite_link)
+        except UserAlreadyParticipant:
+            return
+        except Exception as e:
+            raise RuntimeError(
+                "رابط الدعوة منتهي/غير صالح. اطلب من المالك إعادة المحاولة.\n\n"
+                f"السبب: `{e}`"
+            )
+    except UserAlreadyParticipant:
+        return
+    except InviteRequestSent:
+        raise RuntimeError(
+            "تم إرسال طلب انضمام للمساعد — اقبل الطلب أو فعّل القبول التلقائي."
+        )
+
+
 async def _ensure_userbot_joined(c: Client, chat_id: int):
     try:
         ubot_id = (await user.get_me()).id
         member = await c.get_chat_member(chat_id, ubot_id)
         if member.status.value == "banned":
             await c.unban_chat_member(chat_id, ubot_id)
-            link = await c.export_chat_invite_link(chat_id)
-            link = link.replace("https://t.me/+", "https://t.me/joinchat/")
-            await user.join_chat(link)
+            await _fresh_invite_and_join(c, chat_id)
     except (UserNotParticipant, PeerIdInvalid):
         try:
-            link = await c.export_chat_invite_link(chat_id)
-            link = link.replace("https://t.me/+", "https://t.me/joinchat/")
-            await user.join_chat(link)
-        except UserAlreadyParticipant:
-            pass
+            await _fresh_invite_and_join(c, chat_id)
+        except RuntimeError:
+            raise
         except Exception as e:
             raise RuntimeError(f"فشل المساعد في الانضمام\n\nالسبب: `{e}`")
+
+
+# ─────────────────────────────────────────
+# 4.b) فتح الدردشة الصوتية لو مش موجودة
+# ─────────────────────────────────────────
+
+async def _ensure_group_call_started(c: Client, chat_id: int):
+    """
+    لو مفيش دردشة صوتية شغالة، البوت يفتح واحدة جديدة عشان
+    الحساب المساعد يقدر يدخل بدون مشاكل.
+    """
+    try:
+        peer = await c.resolve_peer(chat_id)
+        rid = c.rnd_id() if hasattr(c, "rnd_id") else int.from_bytes(os.urandom(4), "big", signed=True)
+        await c.invoke(
+            raw_functions.phone.CreateGroupCall(peer=peer, random_id=rid)
+        )
+        await asyncio.sleep(1.5)
+    except Exception as e:
+        # GROUPCALL_ALREADY_STARTED أو ANONYMOUS_CALLS_DISABLED — نتجاهل
+        return
 
 
 # ─────────────────────────────────────────
@@ -175,15 +237,18 @@ async def _do_play(
     try:
         if status_msg:
             await status_msg.edit("**يتم التشغيل...**")
-        await call_py.play(
-            chat_id,
-            MediaStream(
-                stream_source,
-                audio_parameters=AudioQuality.HIGH,
-                audio_flags=MediaStream.Flags.AUTO_DETECT,
-                video_flags=MediaStream.Flags.IGNORE,
-            ),
+        media_stream = MediaStream(
+            stream_source,
+            audio_parameters=AudioQuality.HIGH,
+            audio_flags=MediaStream.Flags.AUTO_DETECT,
+            video_flags=MediaStream.Flags.IGNORE,
         )
+        try:
+            await call_py.play(chat_id, media_stream)
+        except NoActiveGroupCall:
+            # مفيش دردشة صوتية شغالة — نفتح واحدة ونحاول تاني
+            await _ensure_group_call_started(c, chat_id)
+            await call_py.play(chat_id, media_stream)
         add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
         if status_msg:
             await status_msg.delete()
@@ -232,6 +297,11 @@ async def _handle_play(c: Client, m: Message):
         await _ensure_userbot_joined(c, chat_id)
     except RuntimeError as e:
         return await m.reply_text(str(e))
+
+    # نفتح الدردشة الصوتية لو مكنش فيها واحدة شغالة (عشان المساعد يدخل بسلاسة)
+    from driver.queues import QUEUE as _Q
+    if chat_id not in _Q:
+        await _ensure_group_call_started(c, chat_id)
 
     replied = m.reply_to_message
 
