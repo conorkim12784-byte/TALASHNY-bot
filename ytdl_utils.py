@@ -24,6 +24,17 @@ import shlex
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
+# دعم البروكسيات (Webshare rotation)
+try:
+    from proxies import iter_proxies, mark_failed, mark_success
+except Exception:
+    # fallback آمن لو ملف proxies مش موجود
+    def iter_proxies(include_no_proxy_fallback: bool = True):
+        if include_no_proxy_fallback:
+            yield None
+    def mark_failed(p): pass
+    def mark_success(p): pass
+
 # ─────────────────────────────────────────
 # إعدادات yt-dlp (player_clients غير web — نفس فكرة النسخة القديمة لكن أحدث)
 # ─────────────────────────────────────────
@@ -188,22 +199,32 @@ def get_video_info(url_or_id: str) -> dict | None:
     target = _to_url(url_or_id)
     vid = extract_video_id(target)
 
-    # حاول yt-dlp metadata-only (سريع وبيتجاوز bot detection)
+    # حاول yt-dlp metadata-only (مع rotation للبروكسيات)
     try:
         import yt_dlp
-        opts = {**_COMMON_OPTS, "skip_download": True, "format": "best"}
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(target, download=False) or {}
-            return {
-                "id": info.get("id") or vid or "",
-                "title": info.get("title") or "Unknown",
-                "url": target,
-                "duration": _duration_text(info.get("duration")),
-                "thumbnail": info.get("thumbnail")
-                or (f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else ""),
-            }
+        for proxy in iter_proxies(include_no_proxy_fallback=True):
+            opts = {**_COMMON_OPTS, "skip_download": True, "format": "best"}
+            if proxy:
+                opts["proxy"] = proxy
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(target, download=False) or {}
+                    mark_success(proxy)
+                    return {
+                        "id": info.get("id") or vid or "",
+                        "title": info.get("title") or "Unknown",
+                        "url": target,
+                        "duration": _duration_text(info.get("duration")),
+                        "thumbnail": info.get("thumbnail")
+                        or (f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else ""),
+                    }
+            except Exception as e:
+                if proxy:
+                    mark_failed(proxy)
+                print(f"[get_video_info/proxy={'Y' if proxy else 'N'}] {str(e)[:150]}")
+                continue
     except Exception as e:
-        print(f"[get_video_info/yt-dlp] {e}")
+        print(f"[get_video_info/yt-dlp outer] {e}")
 
     if vid:
         return {
@@ -221,23 +242,24 @@ def get_video_info(url_or_id: str) -> dict | None:
 #    هذا هو القلب: بنرجع stream_url مباشرة لـ py-tgcalls بدون تحميل.
 # ─────────────────────────────────────────
 
-def _ytdlp_g(url: str, fmt: str, client: str | None = None) -> str | None:
-    """ينفذ `yt-dlp -g -f <fmt>` ويرجع أول URL أو None."""
+def _ytdlp_g(url: str, fmt: str, client: str | None = None, proxy: str | None = None) -> str | None:
+    """ينفذ `yt-dlp -g -f <fmt>` (مع proxy اختياري) ويرجع أول URL أو None."""
     cmd = ["yt-dlp", "-g", "--no-warnings", "--no-playlist", "-f", fmt]
     if client:
         cmd += ["--extractor-args", f"youtube:player_client={client}"]
+    if proxy:
+        cmd += ["--proxy", proxy]
     cmd.append(url)
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=45,
+            cmd, capture_output=True, text=True, timeout=60,
         )
         out = (proc.stdout or "").strip()
         err = (proc.stderr or "").strip()
         if proc.returncode == 0 and out:
-            # ياخد أول سطر (الصوت أو الفيديو الرئيسي)
             return out.splitlines()[0].strip()
         if err:
-            print(f"[yt-dlp -g {client or 'default'}] {err[:200]}")
+            print(f"[yt-dlp -g {client or 'default'} proxy={'Y' if proxy else 'N'}] {err[:200]}")
     except subprocess.TimeoutExpired:
         print(f"[yt-dlp -g {client or 'default'}] timeout")
     except FileNotFoundError:
@@ -249,70 +271,85 @@ def _ytdlp_g(url: str, fmt: str, client: str | None = None) -> str | None:
 
 def get_audio_url(url_or_id: str) -> tuple[int, str]:
     """
-    يرجع رابط بث صوتي مباشر — نفس فكرة النسخة القديمة بالضبط.
+    يرجع رابط بث صوتي مباشر — يجرب كل البروكسيات + كل player_clients.
     (1, stream_url) عند النجاح، (0, error_msg) عند الفشل.
     """
     target = _to_url(url_or_id)
     fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
 
-    # جرّب عدة player_clients بالترتيب (الأكثر استقراراً ضد bot detection)
     last_err = ""
-    for client in [None] + _PLAYER_CLIENTS:
-        url = _ytdlp_g(target, fmt, client)
-        if url:
-            return 1, url
-        last_err = client or "default"
+    for proxy in iter_proxies(include_no_proxy_fallback=True):
+        for client in [None] + _PLAYER_CLIENTS:
+            url = _ytdlp_g(target, fmt, client, proxy=proxy)
+            if url:
+                mark_success(proxy)
+                return 1, url
+            last_err = f"client={client or 'default'} proxy={'Y' if proxy else 'N'}"
+        # كل clients فشلوا مع البروكسي ده → علّمه
+        if proxy:
+            mark_failed(proxy)
 
     return 0, f"تعذر استخراج رابط الصوت (آخر محاولة: {last_err})"
 
 
 def get_video_url(url_or_id: str, quality: int = 720) -> tuple[int, str]:
-    """نفس get_audio_url لكن للفيديو — يرجع رابط بث فيديو مدمج."""
+    """نفس get_audio_url لكن للفيديو — يجرب كل البروكسيات."""
     target = _to_url(url_or_id)
     fmt = f"best[height<=?{quality}][width<=?1280]/best"
     last_err = ""
-    for client in [None] + _PLAYER_CLIENTS:
-        url = _ytdlp_g(target, fmt, client)
-        if url:
-            return 1, url
-        last_err = client or "default"
+    for proxy in iter_proxies(include_no_proxy_fallback=True):
+        for client in [None] + _PLAYER_CLIENTS:
+            url = _ytdlp_g(target, fmt, client, proxy=proxy)
+            if url:
+                mark_success(proxy)
+                return 1, url
+            last_err = f"client={client or 'default'} proxy={'Y' if proxy else 'N'}"
+        if proxy:
+            mark_failed(proxy)
     return 0, f"تعذر استخراج رابط الفيديو (آخر محاولة: {last_err})"
 
 
 # ─────────────────────────────────────────
-# 4) تحميل ملف صوتي/فيديو (لأوامر /song /vsong فقط)
-#    التشغيل المباشر مش بيستخدم الدوال دي.
+# 4) تحميل ملف صوتي/فيديو (لأوامر /song /vsong فقط) — مع دعم proxies
 # ─────────────────────────────────────────
 
 def _download_with_ydl(url: str, opts_base: dict) -> tuple[str | None, dict | None, str | None]:
-    """يحاول التحميل بكل player_clients واحد تلو الآخر."""
+    """يحاول التحميل بكل proxy + كل player_client."""
     import yt_dlp
     last_err = None
-    for client in _PLAYER_CLIENTS:
-        opts = dict(opts_base)
-        opts["extractor_args"] = {"youtube": {"player_client": [client]}}
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                if not info:
-                    continue
-                fname = ydl.prepare_filename(info)
-                # لو yt-dlp غيّر الامتداد بعد التحويل
-                if not os.path.exists(fname):
-                    base, _ = os.path.splitext(fname)
-                    for ext in (".m4a", ".webm", ".mp3", ".mp4", ".mkv"):
-                        cand = base + ext
-                        if os.path.exists(cand):
-                            fname = cand
-                            break
-                if os.path.exists(fname):
-                    return fname, info, None
-                last_err = f"file not found after download ({client})"
-        except Exception as e:
-            last_err = f"{client}: {str(e)[:200]}"
-            print(f"[_download_with_ydl/{client}] {e}")
-            continue
-    return None, None, last_err or "all player_clients failed"
+    for proxy in iter_proxies(include_no_proxy_fallback=True):
+        proxy_failed_for_all_clients = True
+        for client in _PLAYER_CLIENTS:
+            opts = dict(opts_base)
+            opts["extractor_args"] = {"youtube": {"player_client": [client]}}
+            if proxy:
+                opts["proxy"] = proxy
+            else:
+                opts.pop("proxy", None)
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    if not info:
+                        continue
+                    fname = ydl.prepare_filename(info)
+                    if not os.path.exists(fname):
+                        base, _ = os.path.splitext(fname)
+                        for ext in (".m4a", ".webm", ".mp3", ".mp4", ".mkv"):
+                            cand = base + ext
+                            if os.path.exists(cand):
+                                fname = cand
+                                break
+                    if os.path.exists(fname):
+                        mark_success(proxy)
+                        return fname, info, None
+                    last_err = f"file not found after download ({client})"
+            except Exception as e:
+                last_err = f"{client} proxy={'Y' if proxy else 'N'}: {str(e)[:200]}"
+                print(f"[_download_with_ydl/{client}/proxy={'Y' if proxy else 'N'}] {e}")
+                continue
+        if proxy and proxy_failed_for_all_clients:
+            mark_failed(proxy)
+    return None, None, last_err or "all proxies + player_clients failed"
 
 
 def download_audio_file(url_or_id: str, outtmpl: str | None = None) -> tuple[str | None, str | None]:
