@@ -8,6 +8,16 @@ from config import (
 )
 
 
+@Client.on_callback_query(filters.regex("^progress_noop$"))
+async def _progress_noop(_, query: CallbackQuery):
+    # شريط التقدم — مجرد عرض، الضغط عليه لا يفعل شيء
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+
+
 @Client.on_callback_query(filters.regex("cbstart"))
 async def cbstart(_, query: CallbackQuery):
     await query.answer("الصفحه الرئيسيه")

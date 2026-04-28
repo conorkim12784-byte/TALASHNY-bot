@@ -8,6 +8,7 @@ from driver.filters import command2, other_filters
 from driver.decorators import authorized_users_only, admin_only, owner_only, target_rank_check
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup
+from program.utils.progress_bar import stop_progress
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
@@ -82,6 +83,7 @@ async def stop_ar(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
+            stop_progress(chat_id)
             await m.reply("✔ **تم ايقاف التشغيل**")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")
@@ -98,6 +100,7 @@ async def skt_ar(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
+            stop_progress(chat_id)
             await m.reply("هـسكت بس اوعا تـضرب")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")

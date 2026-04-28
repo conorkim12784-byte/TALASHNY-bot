@@ -28,6 +28,7 @@ from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
 from driver.nowplaying import current_requester
 from program.utils.inline import stream_markup
+from program.utils.progress_bar import start_progress, stop_progress
 from program.ytsearch_core import search_youtube_async
 
 
@@ -164,10 +165,29 @@ async def _ensure_group_call_started(c: Client, chat_id: int):
         await c.invoke(
             raw_functions.phone.CreateGroupCall(peer=peer, random_id=rid)
         )
-        await asyncio.sleep(1.5)
-    except Exception as e:
+        await asyncio.sleep(2.0)
+    except Exception:
         # GROUPCALL_ALREADY_STARTED أو ANONYMOUS_CALLS_DISABLED — نتجاهل
         return
+
+
+async def _force_userbot_rejoin(c: Client, chat_id: int):
+    """
+    يخرج الحساب المساعد من الجروب ويعيد ضمه — يُستخدم كحل أخير
+    عندما يكون 'عضو' لكن جلسته في الكول معطّلة بعد leave_call سابق.
+    """
+    try:
+        ubot_id = (await user.get_me()).id
+        try:
+            await user.leave_chat(chat_id)
+        except Exception:
+            pass
+        await asyncio.sleep(1.0)
+        await _fresh_invite_and_join(c, chat_id)
+        await asyncio.sleep(1.0)
+    except Exception as e:
+        print(f"[force_userbot_rejoin error] {e}")
+
 
 
 # ─────────────────────────────────────────
@@ -244,12 +264,27 @@ async def _do_play(
             audio_flags=MediaStream.Flags.AUTO_DETECT,
             video_flags=MediaStream.Flags.IGNORE,
         )
+        # نوقف أي شريط تقدم قديم لنفس الدردشة قبل ما نبدأ تشغيل جديد
+        stop_progress(chat_id)
+
+        async def _try_play():
+            try:
+                await call_py.play(chat_id, media_stream)
+            except NoActiveGroupCall:
+                # مفيش دردشة صوتية شغالة — نفتح واحدة ونحاول تاني
+                await _ensure_group_call_started(c, chat_id)
+                await call_py.play(chat_id, media_stream)
+
         try:
-            await call_py.play(chat_id, media_stream)
-        except NoActiveGroupCall:
-            # مفيش دردشة صوتية شغالة — نفتح واحدة ونحاول تاني
+            await _try_play()
+        except Exception as play_err:
+            # غالباً المساعد طلع من الكول السابق (leave_call) ولسه عضو في الجروب
+            # فـ pytgcalls مش لاقي session نشطة. نعيد ضمه بقوة ونحاول تاني.
+            print(f"[play retry] {play_err} — forcing userbot rejoin")
+            await _force_userbot_rejoin(c, chat_id)
             await _ensure_group_call_started(c, chat_id)
-            await call_py.play(chat_id, media_stream)
+            await _try_play()
+
         add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
         # نسجل مين طلب الأغنية الحالية عشان أمر "مين مشغل"
         current_requester[chat_id] = {
@@ -258,7 +293,7 @@ async def _do_play(
         }
         if status_msg:
             await status_msg.delete()
-        await m.reply_photo(
+        sent = await m.reply_photo(
             photo=image,
             reply_markup=InlineKeyboardMarkup(buttons),
             caption=(
@@ -268,6 +303,12 @@ async def _do_play(
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
         )
+
+        # ── شريط التقدم: زر يتحدّث تلقائياً فوق أزرار التحكم ──
+        try:
+            await start_progress(c, chat_id, sent, dur_secs, user_id)
+        except Exception as e:
+            print(f"[start_progress error] {e}")
     except Exception as e:
         if status_msg:
             await status_msg.delete()
@@ -278,6 +319,7 @@ async def _do_play(
             except Exception:
                 pass
         await m.reply_text(f"خطأ أثناء التشغيل:\n\n`{e}`")
+
 
 
 # ─────────────────────────────────────────
