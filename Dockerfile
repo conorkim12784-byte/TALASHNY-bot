@@ -1,3 +1,6 @@
+# ✅ نمط النسخة القديمة (World) — تشغيل بـ yt-dlp -g مباشر بدون cookies/POT
+# الـ Dockerfile ده يشيل أي اعتمادات قديمة على bgutil-provider/POT server.
+
 FROM nikolaik/python-nodejs:latest
 
 RUN apt-get update \
