@@ -3,6 +3,7 @@ import asyncio
 from pyrogram.errors import FloodWait
 from pytgcalls.types import Update, StreamEnded, MediaStream, AudioQuality
 from . import queues
+from program.utils.progress_bar import stop_progress
 
 
 async def register_stream_end_handler(call_py):
@@ -26,6 +27,9 @@ async def register_stream_end_handler(call_py):
             pass
 
         queues.task_done(chat_id)
+
+        # وقف شريط التقدم الخاص بالأغنية المنتهية
+        stop_progress(chat_id)
 
         if queues.is_empty(chat_id):
             try:
