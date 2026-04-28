@@ -26,6 +26,7 @@ from driver.design.thumbnail import thumb
 from driver.filters import command, command2, other_filters
 from driver.queues import QUEUE, add_to_queue
 from driver.veez import call_py, user
+from driver.nowplaying import current_requester
 from program.utils.inline import stream_markup
 from program.ytsearch_core import search_youtube_async
 
@@ -226,7 +227,7 @@ async def _do_play(
             reply_markup=InlineKeyboardMarkup(buttons),
             caption=(
                 f"**تمت إضافة المقطع إلى قائمة الانتظار »** `{pos}`\n\n"
-                f"**الاسم:** [{songname}]({ref_url})\n"
+                f"**الاسم:** {songname}\n"
                 f"**المدة:** `{duration}`\n"
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
@@ -250,6 +251,11 @@ async def _do_play(
             await _ensure_group_call_started(c, chat_id)
             await call_py.play(chat_id, media_stream)
         add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+        # نسجل مين طلب الأغنية الحالية عشان أمر "مين مشغل"
+        current_requester[chat_id] = {
+            "first_name": requester or "غير معروف",
+            "user_id": user_id,
+        }
         if status_msg:
             await status_msg.delete()
         await m.reply_photo(
@@ -257,7 +263,7 @@ async def _do_play(
             reply_markup=InlineKeyboardMarkup(buttons),
             caption=(
                 f"**تم تشغيل الموسيقى.**\n\n"
-                f"**الاسم:** [{songname}]({ref_url})\n"
+                f"**الاسم:** {songname}\n"
                 f"**المدة:** `{duration}`\n"
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
