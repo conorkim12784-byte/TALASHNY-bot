@@ -147,6 +147,9 @@ def make_neon_background(color):
             gd.point((x, y), fill=(255, 255, 255, 18))
     canvas.alpha_composite(grid)
 
+    # تأثير بلور (frosted glass) على الخلفية بالكامل قبل ما البطاقة ترسم فوقها
+    canvas = canvas.filter(ImageFilter.GaussianBlur(8))
+
     return canvas
 
 
@@ -172,9 +175,29 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
     color = dominant_color(cover) if cover else (80, 160, 255)
 
     # ══════════════════════════════════════
-    #  الخلفية: قالب نيون كامل بلون صورة الأغنية
+    #  الخلفية: صورة الأغنية مكبّرة مع بلور قوي + تظليل داكن
     # ══════════════════════════════════════
-    canvas = make_neon_background(color)
+    if cover:
+        bg_src = cover.convert("RGB")
+        # نملأ الكانفس بالكامل (cover-fit) مع الحفاظ على النسبة
+        bw, bh = bg_src.size
+        ratio = max(W / bw, H / bh)
+        new_w, new_h = int(bw * ratio), int(bh * ratio)
+        bg_src = bg_src.resize((new_w, new_h), Image.LANCZOS)
+        left = (new_w - W) // 2
+        top = (new_h - H) // 2
+        bg_src = bg_src.crop((left, top, left + W, top + H))
+        # بلور قوي (frosted glass)
+        bg_src = bg_src.filter(ImageFilter.GaussianBlur(45))
+        canvas = bg_src.convert("RGBA")
+        # طبقة داكنة فوق البلور عشان الكتابة تبان
+        dark = Image.new("RGBA", (W, H), (0, 0, 0, 130))
+        canvas.alpha_composite(dark)
+        # لمسة من اللون المهيمن
+        tint = Image.new("RGBA", (W, H), (*color, 35))
+        canvas.alpha_composite(tint)
+    else:
+        canvas = make_neon_background(color)
     draw = ImageDraw.Draw(canvas)
 
     # ══════════════════════════════════════
@@ -200,9 +223,16 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
     shadow2 = shadow2.filter(ImageFilter.GaussianBlur(16))
     canvas.alpha_composite(shadow2)
 
-    # جسم البطاقة — داكن شفاف
+    # جسم البطاقة — مشتق من اللون المهيمن للأغنية (داكن مع شفافية)
+    r, g, b = color
+    card_fill = (
+        max(int(r * 0.18), 10),
+        max(int(g * 0.18), 12),
+        max(int(b * 0.22), 18),
+        235,
+    )
     draw.rounded_rectangle([CARD_X1, CARD_Y1, CARD_X2, CARD_Y2],
-                           radius=CARD_R, fill=(12, 16, 36, 235))
+                           radius=CARD_R, fill=card_fill)
     # إطار نيون خارجي (سميك)
     draw.rounded_rectangle([CARD_X1, CARD_Y1, CARD_X2, CARD_Y2],
                            radius=CARD_R, outline=(*color, 255), width=3)
