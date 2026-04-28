@@ -1,6 +1,6 @@
 """
 ytsearch_core.py
-بحث YouTube عبر ytdl_utils/Piped API بدل scraping مباشر من youtube.com.
+بحث YouTube عبر youtube-search-python (نمط النسخة القديمة) — مباشر بدون APIs خارجية.
 """
 
 import asyncio
@@ -12,6 +12,7 @@ async def search_youtube_async(query: str, limit: int = 1) -> list:
 
 
 def ytsearch(query: str):
+    """يرجع [title, url, duration, thumbnail] أو None — متوافق مع النسخة القديمة."""
     results = search_youtube(query, limit=1)
     if not results:
         print(f"[ytsearch] no results for: {query}")

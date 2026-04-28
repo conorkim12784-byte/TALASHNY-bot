@@ -1,11 +1,10 @@
-# play_engine.py — نظام التشغيل المركزي
-# يدعم: بحث يوتيوب، رابط مباشر، ملف صوتي، صوت مرفق
-# الإصلاح: بيحمّل الأغنية كملف مؤقت بدل streaming مباشر (لأن يوتيوب بيمنعه)
+# play_engine.py — نظام التشغيل المركزي (نمط النسخة القديمة World)
+# الفلسفة: نمرر رابط بث مباشر لـ py-tgcalls، بدون تحميل ملف على القرص.
+# يدعم: بحث يوتيوب، رابط مباشر، ملف صوتي/صوت مرفق.
 
 import asyncio
 import os
 
-import yt_dlp
 from pyrogram import Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, PeerIdInvalid
 from pyrogram.types import InlineKeyboardMarkup, Message
@@ -20,25 +19,21 @@ from driver.veez import call_py, user
 from program.utils.inline import stream_markup
 from program.ytsearch_core import search_youtube_async
 
-# نستخدم callsmusic queues لتتبع الملفات المؤقتة وحذفها تلقائياً
-from callsmusic import queues as cs_queues
-
 
 # ─────────────────────────────────────────
-# 1) تحميل الأغنية كملف مؤقت
-#    (بدل streaming مباشر — يوتيوب بيرفضه)
+# 1) استخراج رابط البث المباشر (نمط النسخة القديمة: yt-dlp -g)
 # ─────────────────────────────────────────
 
 async def get_stream_url(link: str) -> tuple:
     """
-    يحمّل الأغنية كملف مؤقت ويرجع (1, filepath) أو (0, error_msg).
-    الملف يُحذف تلقائياً من callsmusic.py بعد انتهاء التشغيل.
+    يرجع (1, stream_url) أو (0, error_msg).
+    رابط بث مباشر يُمرَّر لـ py-tgcalls فوراً — مفيش تحميل ملف.
     """
-    from ytdl_utils import download_audio_file
-    path, err = await asyncio.to_thread(download_audio_file, link)
-    if path:
-        return 1, path
-    return 0, err or "فشل تحميل الأغنية — حاول لاحقاً"
+    from ytdl_utils import get_audio_url
+    code, data = await asyncio.to_thread(get_audio_url, link)
+    if code == 1 and data:
+        return 1, data
+    return 0, data or "فشل استخراج رابط الأغنية — حاول لاحقاً"
 
 
 # ─────────────────────────────────────────
@@ -59,7 +54,6 @@ async def yt_search(query: str):
 # ─────────────────────────────────────────
 
 async def _check_bot_perms(c: Client, chat_id: int) -> str | None:
-    """يرجع رسالة خطأ لو في مشكلة، None لو كل شيء تمام"""
     try:
         me = await c.get_me()
         a = await c.get_chat_member(chat_id, me.id)
@@ -117,14 +111,13 @@ async def _do_play(
     chat_id: int,
     user_id: int,
     songname: str,
-    stream_source: str,   # مسار ملف مؤقت محلي
+    stream_source: str,   # رابط بث مباشر (URL) أو مسار ملف محلي
     ref_url: str,         # رابط المرجع للعرض
     media_type: str,      # "Audio" أو "YouTube"
     duration,
     thumbnail=None,
     status_msg=None,
 ):
-    """يشغل أو يضيف في الطابور — يُستخدم من كل الأوامر"""
     gcname = m.chat.title or ""
     ctitle = await CHAT_TITLE(gcname)
     requester = (m.from_user.first_name or "") if m.from_user else ""
@@ -158,10 +151,6 @@ async def _do_play(
     # ── في الطابور ──
     if chat_id in QUEUE:
         pos = add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
-        # سجّل الملف في cs_queues عشان يُحذف تلقائياً لما يجي دوره
-        asyncio.ensure_future(cs_queues.put(
-            chat_id, file=stream_source, name=songname, ref=ref_url, type=media_type
-        ))
         if status_msg:
             await status_msg.delete()
         await m.reply_photo(
@@ -174,46 +163,44 @@ async def _do_play(
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
         )
+        return
 
     # ── تشغيل فوري ──
-    else:
-        try:
-            if status_msg:
-                await status_msg.edit("**يتم التشغيل...**")
-            await call_py.play(
-                chat_id,
-                MediaStream(
-                    stream_source,
-                    audio_parameters=AudioQuality.HIGH,
-                    audio_flags=MediaStream.Flags.AUTO_DETECT,
-                    video_flags=MediaStream.Flags.IGNORE,
-                ),
-            )
-            add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
-            # سجّل الملف الحالي عشان callsmusic يحذفه لما ينتهي التشغيل
-            cs_queues.current_tracks[chat_id] = {"file": stream_source, "name": songname}
-            if status_msg:
-                await status_msg.delete()
-            await m.reply_photo(
-                photo=image,
-                reply_markup=InlineKeyboardMarkup(buttons),
-                caption=(
-                    f"**تم تشغيل الموسيقى.**\n\n"
-                    f"**الاسم:** [{songname}]({ref_url})\n"
-                    f"**المدة:** `{duration}`\n"
-                    f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
-                ),
-            )
-        except Exception as e:
-            if status_msg:
-                await status_msg.delete()
-            # لو فشل التشغيل امسح الملف المؤقت فوراً
-            if stream_source and stream_source.startswith("/tmp") and os.path.exists(stream_source):
-                try:
-                    os.remove(stream_source)
-                except Exception:
-                    pass
-            await m.reply_text(f"خطأ أثناء التشغيل:\n\n`{e}`")
+    try:
+        if status_msg:
+            await status_msg.edit("**يتم التشغيل...**")
+        await call_py.play(
+            chat_id,
+            MediaStream(
+                stream_source,
+                audio_parameters=AudioQuality.HIGH,
+                audio_flags=MediaStream.Flags.AUTO_DETECT,
+                video_flags=MediaStream.Flags.IGNORE,
+            ),
+        )
+        add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+        if status_msg:
+            await status_msg.delete()
+        await m.reply_photo(
+            photo=image,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            caption=(
+                f"**تم تشغيل الموسيقى.**\n\n"
+                f"**الاسم:** [{songname}]({ref_url})\n"
+                f"**المدة:** `{duration}`\n"
+                f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
+            ),
+        )
+    except Exception as e:
+        if status_msg:
+            await status_msg.delete()
+        # نظّف ملف محلي لو في
+        if isinstance(stream_source, str) and stream_source.startswith("/tmp") and os.path.exists(stream_source):
+            try:
+                os.remove(stream_source)
+            except Exception:
+                pass
+        await m.reply_text(f"خطأ أثناء التشغيل:\n\n`{e}`")
 
 
 # ─────────────────────────────────────────
@@ -221,7 +208,6 @@ async def _do_play(
 # ─────────────────────────────────────────
 
 async def _handle_play(c: Client, m: Message):
-    """المنطق المشترك: يدعم ملف مرفق أو نص بحث أو رابط"""
     await m.delete()
 
     if m.sender_chat:
@@ -243,7 +229,7 @@ async def _handle_play(c: Client, m: Message):
 
     replied = m.reply_to_message
 
-    # ── حالة 1: ملف صوتي أو رسالة صوتية مرفقة ──
+    # ── حالة 1: ملف صوتي مرفق ──
     if replied and (replied.audio or replied.voice):
         suhu = await replied.reply("**جاري تنزيل الصوت...**")
         dl = await replied.download()
@@ -261,12 +247,12 @@ async def _handle_play(c: Client, m: Message):
         await _do_play(c, m, chat_id, user_id, songname, dl, link, "Audio", duration, status_msg=suhu)
         return
 
-    # ── حالة 2: نص/رابط ──
+    # ── حالة 2: نص أو رابط ──
     if len(m.command) < 2:
         return await m.reply("» أرسل **اسم أغنية للبحث** أو **ارد على ملف صوتي**")
 
     query = m.text.split(None, 1)[1].strip()
-    suhu = await c.send_message(chat_id, "**🎶 جاري البحث...**")
+    suhu = await c.send_message(chat_id, "**🔎 جاري البحث...**")
 
     from ytdl_utils import extract_video_id, get_video_info
     is_yt_link = bool(extract_video_id(query))
@@ -287,14 +273,16 @@ async def _handle_play(c: Client, m: Message):
             return
         songname, url, duration, thumbnail = search
 
-    await suhu.edit("**📥 جاري تحميل الأغنية...**")
+    # ✨ نمط النسخة القديمة: نطلع رابط بث مباشر بدل تحميل
     veez, stream_url = await get_stream_url(url)
     if veez == 0:
-        await suhu.edit(f"**مشكلة في تحميل الأغنية**\n\n» `{stream_url}`")
+        await suhu.edit(f"**تعذر تشغيل الأغنية**\n\n» `{stream_url}`")
         return
 
-    await suhu.edit("**يتم التشغيل...**")
-    await _do_play(c, m, chat_id, user_id, songname, stream_url, url, "YouTube", duration, thumbnail, suhu)
+    await _do_play(
+        c, m, chat_id, user_id, songname, stream_url, url,
+        "YouTube", duration, thumbnail, suhu,
+    )
 
 
 # ─────────────────────────────────────────
