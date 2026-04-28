@@ -10,17 +10,22 @@ from config import UPDATES_CHANNEL, BOT_USERNAME
 
 
 def stream_markup(user_id):
+  """أزرار التحكم تظهر مباشرة في رسالة التشغيل — بدون زر قائمة منفصل."""
   channel_url = f"https://t.me/{UPDATES_CHANNEL}" if UPDATES_CHANNEL else "https://t.me/"
   bot_username = BOT_USERNAME or "WorldMusicly_Bot"
   buttons = [
     [
-      InlineKeyboardButton(text="الـقـائـمـه", callback_data=f'cbmenu | {user_id}'),
-      InlineKeyboardButton(text="الـتـحـديـثـات", url=channel_url),
+      InlineKeyboardButton(text="⏹", callback_data=f'cbstop | {user_id}'),
+      InlineKeyboardButton(text="⏸", callback_data=f'cbpause | {user_id}'),
+      InlineKeyboardButton(text="▶️", callback_data=f'cbresume | {user_id}'),
+      InlineKeyboardButton(text="🔇", callback_data=f'cbmute | {user_id}'),
+      InlineKeyboardButton(text="🔊", callback_data=f'cbunmute | {user_id}'),
     ],
     [
-    InlineKeyboardButton(
-                        "اضـف الـبـوت لـمـجـمـوعـتـك",
-                        url=f'https://t.me/{bot_username}?startgroup=true'),
+      InlineKeyboardButton(text="الـتـحـديـثـات", url=channel_url),
+      InlineKeyboardButton(
+        "اضـف الـبـوت لـمـجـمـوعـتـك",
+        url=f'https://t.me/{bot_username}?startgroup=true'),
     ],
   ]
   return buttons
