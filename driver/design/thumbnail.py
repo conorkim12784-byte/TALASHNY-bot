@@ -71,8 +71,14 @@ def draw_progress(draw, color, x, y, width, percent=0.52):
 
 
 def rounded_image(img, size, radius=999):
-    """صورة دائرية"""
-    img = img.resize((size, size)).convert("RGBA")
+    """صورة دائرية — بنعمل crop مربع من المنتصف الأول عشان متبقاش مشوهة"""
+    img = img.convert("RGBA")
+    w, h = img.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top  = (h - side) // 2
+    img  = img.crop((left, top, left + side, top + side))
+    img  = img.resize((size, size), Image.LANCZOS)
     mask = Image.new("L", (size, size), 0)
     d = ImageDraw.Draw(mask)
     d.ellipse([0, 0, size, size], fill=255)
@@ -104,16 +110,28 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
     color = dominant_color(cover) if cover else (80, 140, 255)
 
     # ══════════════════════════════════════
-    #  الخلفية الرئيسية — داكن navy مثل الصورة
+    #  الخلفية الرئيسية — نفس صورة الأغنية مع blur (بدل النيون الأزرق)
     # ══════════════════════════════════════
-    canvas = Image.new("RGBA", (W, H), (8, 10, 28))
-
-    # glow زرقاوي خلف الدائرة على اليسار
-    glow = Image.new("RGBA", (W, H), (0,0,0,0))
-    gd   = ImageDraw.Draw(glow)
-    gd.ellipse([-60, 80, 560, 640], fill=(30, 60, 180, 90))
-    glow = glow.filter(ImageFilter.GaussianBlur(70))
-    canvas.alpha_composite(glow)
+    if cover:
+        # نملأ الكانفاس بالغلاف بنسبة "cover" (نقص الزيادة) عشان يغطي كله
+        bg = cover.convert("RGB").copy()
+        bw, bh = bg.size
+        scale = max(W / bw, H / bh)
+        nw, nh = int(bw * scale), int(bh * scale)
+        bg = bg.resize((nw, nh), Image.LANCZOS)
+        # قص للوسط
+        left = (nw - W) // 2
+        top  = (nh - H) // 2
+        bg = bg.crop((left, top, left + W, top + H))
+        # تطبيق الـ blur
+        bg = bg.filter(ImageFilter.GaussianBlur(38))
+        canvas = bg.convert("RGBA")
+        # طبقة تعتيم خفيفة عشان النصوص تبان
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 110))
+        canvas.alpha_composite(overlay)
+    else:
+        # fallback لو مفيش غلاف — خلفية داكنة بسيطة
+        canvas = Image.new("RGBA", (W, H), (8, 10, 28))
 
     draw = ImageDraw.Draw(canvas)
 
@@ -124,20 +142,29 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
     CARD_X2, CARD_Y2 = 1220, 665
     CARD_R = 28
 
-    # ظل البطاقة
+    # ظل البطاقة + glow نيون بلون صورة الأغنية
     shadow = Image.new("RGBA", (W, H), (0,0,0,0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle([CARD_X1+6, CARD_Y1+8, CARD_X2+6, CARD_Y2+8],
-                         radius=CARD_R, fill=(0,0,0,80))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(12))
+    # glow ملوّن بلون الصورة (بيشع برّه الكارد)
+    sd.rounded_rectangle([CARD_X1-6, CARD_Y1-6, CARD_X2+6, CARD_Y2+6],
+                         radius=CARD_R+6, fill=(*color, 130))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(22))
     canvas.alpha_composite(shadow)
+
+    # ظل داكن أسفل الكارد (عمق)
+    shadow2 = Image.new("RGBA", (W, H), (0,0,0,0))
+    sd2 = ImageDraw.Draw(shadow2)
+    sd2.rounded_rectangle([CARD_X1+6, CARD_Y1+10, CARD_X2+6, CARD_Y2+10],
+                          radius=CARD_R, fill=(0,0,0,110))
+    shadow2 = shadow2.filter(ImageFilter.GaussianBlur(14))
+    canvas.alpha_composite(shadow2)
 
     # جسم البطاقة
     draw.rounded_rectangle([CARD_X1, CARD_Y1, CARD_X2, CARD_Y2],
                            radius=CARD_R, fill=(20, 26, 52, 210))
-    # إطار البطاقة
+    # إطار البطاقة — نيون بلون صورة الأغنية
     draw.rounded_rectangle([CARD_X1, CARD_Y1, CARD_X2, CARD_Y2],
-                           radius=CARD_R, outline=(60, 80, 160, 120), width=1)
+                           radius=CARD_R, outline=(*color, 230), width=2)
 
     # ══════════════════════════════════════
     #  صورة الغلاف — دائرة على اليسار
@@ -146,12 +173,12 @@ async def thumb(thumbnail, title, userid, ctitle, requester=None, duration=0, **
     CIR_X     = 105
     CIR_Y     = CARD_Y1 + (CARD_Y2 - CARD_Y1)//2 - CIR_SIZE//2  # مركزة عمودياً
 
-    # حلقة خارجية
+    # حلقة خارجية — بلون صورة الأغنية
     draw.ellipse([CIR_X-12, CIR_Y-12, CIR_X+CIR_SIZE+12, CIR_Y+CIR_SIZE+12],
-                 outline=(50, 80, 180, 140), width=2)
-    # حلقة داخلية
+                 outline=(*color, 220), width=3)
+    # حلقة داخلية رفيعة
     draw.ellipse([CIR_X-4, CIR_Y-4, CIR_X+CIR_SIZE+4, CIR_Y+CIR_SIZE+4],
-                 outline=(*color, 100), width=1)
+                 outline=(*color, 140), width=1)
 
     if cover:
         cimg = rounded_image(cover, CIR_SIZE)
