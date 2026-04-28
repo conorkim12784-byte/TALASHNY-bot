@@ -30,9 +30,9 @@ async def skip_ar(c: Client, m: Message):
     if len(m.command) < 2:
         op = await skip_current_song(chat_id)
         if op == 0:
-            await c.send_message(chat_id, "✘ قائمة التشغيل فارغه")
-        elif op == 1:
-            await c.send_message(chat_id, "✔ قوائم الانتظار **فارغة.**\n\n• خروج المستخدم من الدردشة الصوتية")
+            # القائمة فارغة (مفيش أغنية حالية، أو الحالية بس من غير تالي)
+            # → بنبعت رسالة فقط ومش بننهي التشغيل
+            await c.send_message(chat_id, "✘ **قائمة التشغيل فارغه** — مفيش مقطع تالي للتخطي إليه")
         elif op == 2:
             await c.send_message(chat_id, "🗑️ مسح قوائم الانتظار\n\n• مغادرة المستخدم الآلي للدردشة الصوتية")
         else:
