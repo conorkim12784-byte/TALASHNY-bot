@@ -21,19 +21,25 @@ from program.ytsearch_core import search_youtube_async
 
 
 # ─────────────────────────────────────────
-# 1) استخراج رابط البث المباشر (نمط النسخة القديمة: yt-dlp -g)
+# 1) تنزيل الملف الصوتي (عبر البروكسي) بدلاً من رابط البث المباشر
 # ─────────────────────────────────────────
+# السبب: لما نستخدم بروكسي، YouTube بيربط الـ stream URL بـ IP البروكسي.
+# py-tgcalls/ffmpeg بيفتح الرابط من IP السيرفر مباشرةً (مش عبر البروكسي)،
+# فـ YouTube يرفض → الستريم يبقى فاضي → المساعد يدخل الكول صامت.
+# الحل: ننزّل الملف بالكامل عبر البروكسي لـ /tmp ثم نمرّر مساره المحلي
+# لـ py-tgcalls. كده مفيش طلب يخرج لـ YouTube وقت التشغيل.
+# (الملف بيتمسح تلقائياً بعد الأغنية في _do_play على السطر اللي فيه os.remove)
 
 async def get_stream_url(link: str) -> tuple:
     """
-    يرجع (1, stream_url) أو (0, error_msg).
-    رابط بث مباشر يُمرَّر لـ py-tgcalls فوراً — مفيش تحميل ملف.
+    يرجع (1, file_path_local) أو (0, error_msg).
+    بنحمّل الملف عبر البروكسي ونرجع مساره المحلي (مش URL).
     """
-    from ytdl_utils import get_audio_url
-    code, data = await asyncio.to_thread(get_audio_url, link)
-    if code == 1 and data:
-        return 1, data
-    return 0, data or "فشل استخراج رابط الأغنية — حاول لاحقاً"
+    from ytdl_utils import download_audio_file
+    file_path, err = await asyncio.to_thread(download_audio_file, link)
+    if file_path and os.path.exists(file_path):
+        return 1, file_path
+    return 0, err or "فشل تنزيل الأغنية — حاول لاحقاً"
 
 
 # ─────────────────────────────────────────
