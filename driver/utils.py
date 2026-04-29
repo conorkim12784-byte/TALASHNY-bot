@@ -61,6 +61,7 @@ async def skip_current_song(chat_id):
         link     = chat_queue[1][2]
         type_    = chat_queue[1][3]
         Q        = chat_queue[1][4]
+        duration = chat_queue[1][5] if len(chat_queue[1]) > 5 else 0
 
         # شيل الأغنية الحالية من القائمة الأول عشان الـ stream-end handler
         # ميلخبطش الترتيب لو خلصت الأغنية الجديدة بعد كده.
@@ -90,7 +91,7 @@ async def skip_current_song(chat_id):
                 MediaStream(url, AudioQuality.HIGH),
             )
 
-        return [songname, link, type_]
+        return [songname, link, type_, duration]
     except Exception as e:
         print(f"[skip_current_song error] {e}")
         try:
