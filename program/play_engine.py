@@ -347,9 +347,20 @@ async def _handle_play(c: Client, m: Message):
         return await m.reply_text(str(e))
 
     # نفتح الدردشة الصوتية لو مكنش فيها واحدة شغالة (عشان المساعد يدخل بسلاسة)
+    # ونتأكد إن المساعد فعلاً داخل الكول — مش بس عضو في الجروب — لأن
+    # بعد ما الأغنية بتخلص py-tgcalls بيخرج المساعد من الكول لكنه بيفضل عضو
+    # في الجروب، وده بيخلي التشغيل التالي ميشتغلش لحد ما نعمل rejoin قسري.
     from driver.queues import QUEUE as _Q
     if chat_id not in _Q:
         await _ensure_group_call_started(c, chat_id)
+        # تأكيد دخول المساعد للكول الجديد
+        try:
+            active_calls = getattr(call_py, "calls", {}) or {}
+            if chat_id not in active_calls:
+                await _force_userbot_rejoin(c, chat_id)
+                await _ensure_group_call_started(c, chat_id)
+        except Exception as _e:
+            print(f"[ensure userbot in call] {_e}")
 
     replied = m.reply_to_message
 
