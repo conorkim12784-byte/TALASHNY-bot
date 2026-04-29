@@ -1,6 +1,8 @@
 from driver.queues import QUEUE
-from pyrogram import Client, filters
+from driver.veez import call_py
 from program.utils.inline import menu_markup
+from program.utils.progress_bar import stop_progress
+from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from config import (
     BOT_PHOTO, ASSISTANT_NAME, BOT_NAME, BOT_USERNAME,
@@ -15,6 +17,97 @@ async def _progress_noop(_, query: CallbackQuery):
         await query.answer()
     except Exception:
         pass
+
+
+# ========================================================================
+# أزرار التحكم في التشغيل (كتم / إلغاء الكتم / إيقاف مؤقت / استئناف / إيقاف)
+# ========================================================================
+
+async def _check_admin(client, query: CallbackQuery) -> bool:
+    """يتأكد إن الضاغط على الزر مشرف وله صلاحية إدارة المكالمات."""
+    try:
+        member = await client.get_chat_member(
+            query.message.chat.id, query.from_user.id
+        )
+        if member.privileges and member.privileges.can_manage_video_chats:
+            return True
+        await query.answer(
+            "💡 يجب أن تكون مشرفاً لاستخدام هذا الزر!", show_alert=True
+        )
+        return False
+    except Exception:
+        await query.answer("✘ تعذر التحقق من صلاحياتك", show_alert=True)
+        return False
+
+
+@Client.on_callback_query(filters.regex(r"^cbmute"))
+async def cb_mute(client, query: CallbackQuery):
+    if not await _check_admin(client, query):
+        return
+    chat_id = query.message.chat.id
+    if chat_id not in QUEUE:
+        return await query.answer("✘ لا يوجد تشغيل حالياً", show_alert=True)
+    try:
+        await call_py.mute(chat_id)
+        await query.answer("🔇 تم كتم الصوت", show_alert=False)
+    except Exception as e:
+        await query.answer(f"✘ تعذر الكتم: {e}", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r"^cbunmute"))
+async def cb_unmute(client, query: CallbackQuery):
+    if not await _check_admin(client, query):
+        return
+    chat_id = query.message.chat.id
+    if chat_id not in QUEUE:
+        return await query.answer("✘ لا يوجد تشغيل حالياً", show_alert=True)
+    try:
+        await call_py.unmute(chat_id)
+        await query.answer("🔊 تم إلغاء الكتم", show_alert=False)
+    except Exception as e:
+        await query.answer(f"✘ تعذر إلغاء الكتم: {e}", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r"^cbpause"))
+async def cb_pause(client, query: CallbackQuery):
+    if not await _check_admin(client, query):
+        return
+    chat_id = query.message.chat.id
+    if chat_id not in QUEUE:
+        return await query.answer("✘ لا يوجد تشغيل حالياً", show_alert=True)
+    try:
+        await call_py.pause(chat_id)
+        await query.answer("⏸ تم الإيقاف المؤقت", show_alert=False)
+    except Exception as e:
+        await query.answer(f"✘ تعذر الإيقاف: {e}", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r"^cbresume"))
+async def cb_resume(client, query: CallbackQuery):
+    if not await _check_admin(client, query):
+        return
+    chat_id = query.message.chat.id
+    if chat_id not in QUEUE:
+        return await query.answer("✘ لا يوجد تشغيل حالياً", show_alert=True)
+    try:
+        await call_py.resume(chat_id)
+        await query.answer("▶️ تم الاستئناف", show_alert=False)
+    except Exception as e:
+        await query.answer(f"✘ تعذر الاستئناف: {e}", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r"^cbstop"))
+async def cb_stop(client, query: CallbackQuery):
+    if not await _check_admin(client, query):
+        return
+    chat_id = query.message.chat.id
+    try:
+        stop_progress(chat_id)
+        await call_py.leave_call(chat_id)
+        QUEUE.pop(chat_id, None)
+        await query.answer("⏹ تم إيقاف التشغيل", show_alert=False)
+    except Exception as e:
+        await query.answer(f"✘ تعذر الإيقاف: {e}", show_alert=True)
 
 
 
