@@ -8,7 +8,7 @@ from driver.filters import command2, other_filters
 from driver.decorators import authorized_users_only, admin_only, owner_only, target_rank_check
 from driver.utils import skip_current_song, skip_item
 from program.utils.inline import stream_markup
-from program.utils.progress_bar import stop_progress
+from program.utils.progress_bar import stop_progress, start_progress, hide_buttons
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from config import BOT_USERNAME, GROUP_SUPPORT, IMG_5, UPDATES_CHANNEL
@@ -41,6 +41,8 @@ async def skip_ar(c: Client, m: Message):
     user_id = m.from_user.id
     chat_id = m.chat.id
     if len(m.command) < 2:
+        # نخفي أزرار الأغنية الحالية قبل ما نشغل التالي
+        await hide_buttons(chat_id)
         op = await skip_current_song(chat_id)
         if op == 0:
             # القائمة فارغة — رسالة بس بدون إنهاء التشغيل
@@ -49,17 +51,30 @@ async def skip_ar(c: Client, m: Message):
             await c.send_message(chat_id, "🗑️ مسح قوائم الانتظار\n\n• مغادرة المستخدم الآلي للدردشة الصوتية")
         else:
             buttons = stream_markup(user_id)
-            gcname = m.chat.title
+            gcname = m.chat.title or ""
             ctitle = await CHAT_TITLE(gcname)
+            requester = m.from_user.first_name or ""
             # نجيب صورة الأغنية الجديدة من لينك يوتيوب
             song_thumb_url = _yt_thumb_from_link(op[1])
-            image = await thumb(song_thumb_url, f"{op[0]}", m.from_user.id, ctitle)
-            await c.send_photo(
+            image = await thumb(
+                song_thumb_url, f"{op[0]}", m.from_user.id, ctitle,
+                requester=requester,
+            )
+            sent = await c.send_photo(
                 chat_id,
                 photo=image,
                 reply_markup=InlineKeyboardMarkup(buttons),
-                caption=f"⏭ **تم التخطي الئ المسار التالي**\n\n🏷 **الاسم:** [{op[0]}]({op[1]})\n💭 **المجموعة:** `{chat_id}`\n💡 **الحالة:** `شغال`\n🎧 **طلب بواسطة:** {m.from_user.mention()}",
+                caption=(
+                    f"**تم تشغيل الموسيقى.**\n\n"
+                    f"**الاسم:** [{op[0]}]({op[1]})\n"
+                    f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
+                ),
             )
+            # شغّل شريط التقدم للأغنية الجديدة (مدة غير معروفة → LIVE)
+            try:
+                await start_progress(c, chat_id, sent, 0, user_id)
+            except Exception as e:
+                print(f"[skip start_progress error] {e}")
     else:
         skip_text = m.text.split(None, 1)[1]
         OP = "🗑 **تمت إزالة الأغنية من قائمة الانتظار:**"
@@ -83,7 +98,7 @@ async def stop_ar(client, m: Message):
         try:
             await call_py.leave_call(chat_id)
             clear_queue(chat_id)
-            stop_progress(chat_id)
+            await hide_buttons(chat_id)
             await m.reply("✔ **تم ايقاف التشغيل**")
         except Exception as e:
             await m.reply(f"🚫 **خطأ:**\n\n`{e}`")

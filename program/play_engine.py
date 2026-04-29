@@ -298,7 +298,7 @@ async def _do_play(
             reply_markup=InlineKeyboardMarkup(buttons),
             caption=(
                 f"**تم تشغيل الموسيقى.**\n\n"
-                f"**الاسم:** {songname}\n"
+                f"**الاسم:** [{songname}]({ref_url})\n"
                 f"**المدة:** `{duration}`\n"
                 f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
             ),
