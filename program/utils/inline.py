@@ -30,8 +30,8 @@ def stream_markup(user_id):
   bot_username = BOT_USERNAME or "WorldMusicly_Bot"
   buttons = [
     [
-      _btn("🔇 كتم", style="danger",  callback_data=f'cbmute | {user_id}'),
-      _btn("🔊 إلغاء الكتم", style="success", callback_data=f'cbunmute | {user_id}'),
+      _btn("🔇", style="danger",  callback_data=f'cbmute | {user_id}'),
+      _btn("🔊", style="success", callback_data=f'cbunmute | {user_id}'),
     ],
     [
       _btn("الـتـحـديـثـات", style="primary", url=channel_url),

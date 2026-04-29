@@ -24,9 +24,11 @@ from .inline import stream_markup
 _TASKS: Dict[int, asyncio.Task] = {}
 # وقت بداية الأغنية (chat_id -> epoch seconds)
 _STARTED_AT: Dict[int, float] = {}
+# مرجع الرسالة الحالية لكل دردشة (chat_id -> (client, chat_id, message_id))
+_MESSAGES: Dict[int, tuple] = {}
 
 
-BAR_LEN = 12  # عدد الخانات في الشريط
+BAR_LEN = 14  # عدد الخانات في الشريط
 
 
 def _fmt_time(secs: int) -> str:
@@ -40,15 +42,19 @@ def _fmt_time(secs: int) -> str:
 
 
 def _build_bar(elapsed: int, total: int) -> str:
+    """شريط أنيق على نمط Spotify:  ●━━━━━━○─────  مع توقيت من الجانبين."""
     if total <= 0:
-        # مفيش مدة معروفة — نعرض شريط متحرك بسيط
-        idx = (elapsed // 2) % BAR_LEN
-        cells = ["▱"] * BAR_LEN
-        cells[idx] = "▰"
-        return f"{_fmt_time(elapsed)} {''.join(cells)} LIVE"
-    filled = int(BAR_LEN * min(elapsed, total) / total)
-    bar = "▰" * filled + "▱" * (BAR_LEN - filled)
-    return f"{_fmt_time(elapsed)} {bar} {_fmt_time(total)}"
+        idx = (elapsed // 1) % BAR_LEN
+        cells = ["─"] * BAR_LEN
+        cells[idx] = "●"
+        return f"{_fmt_time(elapsed)}  {''.join(cells)}  ◉ LIVE"
+    ratio = min(elapsed, total) / total
+    pos = int(BAR_LEN * ratio)
+    if pos >= BAR_LEN:
+        pos = BAR_LEN - 1
+    cells = ["━"] * pos + ["●"] + ["─"] * (BAR_LEN - pos - 1)
+    return f"{_fmt_time(elapsed)}  {''.join(cells)}  {_fmt_time(total)}"
+
 
 
 def _build_markup(user_id: int, elapsed: int, total: int) -> InlineKeyboardMarkup:
@@ -71,11 +77,12 @@ async def _runner(client: Client, chat_id: int, message: Message,
         while True:
             elapsed = int(time.time() - _STARTED_AT.get(chat_id, time.time()))
             if duration > 0 and elapsed >= duration:
+                # خلصت الأغنية → نخفي كل الأزرار (يشمل شريط التقدم)
                 try:
                     await client.edit_message_reply_markup(
                         chat_id=message.chat.id,
                         message_id=message.id,
-                        reply_markup=_build_markup(user_id, duration, duration),
+                        reply_markup=None,
                     )
                 except Exception:
                     pass
@@ -105,6 +112,7 @@ async def _runner(client: Client, chat_id: int, message: Message,
     finally:
         _TASKS.pop(chat_id, None)
         _STARTED_AT.pop(chat_id, None)
+        _MESSAGES.pop(chat_id, None)
 
 
 async def start_progress(client: Client, chat_id: int, message: Message,
@@ -112,6 +120,7 @@ async def start_progress(client: Client, chat_id: int, message: Message,
     """يبدأ شريط التقدم لأغنية جديدة. يلغي أي شريط سابق على نفس الدردشة."""
     stop_progress(chat_id)
     _STARTED_AT[chat_id] = time.time()
+    _MESSAGES[chat_id] = (client, message.chat.id, message.id)
     # عرض فوري بالقيم الابتدائية
     try:
         await client.edit_message_reply_markup(
@@ -133,3 +142,21 @@ def stop_progress(chat_id: int):
     _STARTED_AT.pop(chat_id, None)
     if task and not task.done():
         task.cancel()
+
+
+async def hide_buttons(chat_id: int):
+    """يوقف شريط التقدم ويخفي كل الأزرار من الرسالة الحالية."""
+    info = _MESSAGES.pop(chat_id, None)
+    stop_progress(chat_id)
+    if not info:
+        return
+    client, msg_chat_id, msg_id = info
+    try:
+        await client.edit_message_reply_markup(
+            chat_id=msg_chat_id,
+            message_id=msg_id,
+            reply_markup=None,
+        )
+    except Exception:
+        pass
+
