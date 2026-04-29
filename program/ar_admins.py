@@ -56,9 +56,12 @@ async def skip_ar(c: Client, m: Message):
             requester = m.from_user.first_name or ""
             # نجيب صورة الأغنية الجديدة من لينك يوتيوب
             song_thumb_url = _yt_thumb_from_link(op[1])
+            # المدة لو موجودة من القائمة (عنصر رقم 3 في الإرجاع)
+            duration = op[3] if len(op) > 3 else 0
+            dur_secs = duration if isinstance(duration, int) else 0
             image = await thumb(
                 song_thumb_url, f"{op[0]}", m.from_user.id, ctitle,
-                requester=requester,
+                requester=requester, duration=dur_secs,
             )
             sent = await c.send_photo(
                 chat_id,
@@ -67,12 +70,13 @@ async def skip_ar(c: Client, m: Message):
                 caption=(
                     f"**تم تشغيل الموسيقى.**\n\n"
                     f"**الاسم:** [{op[0]}]({op[1]})\n"
+                    f"**المدة:** `{duration if duration else 'غير معروف'}`\n"
                     f"**طلب بواسطة:** [{requester}](tg://user?id={user_id})"
                 ),
             )
-            # شغّل شريط التقدم للأغنية الجديدة (مدة غير معروفة → LIVE)
+            # شغّل شريط التقدم للأغنية الجديدة بمدتها الحقيقية
             try:
-                await start_progress(c, chat_id, sent, 0, user_id)
+                await start_progress(c, chat_id, sent, dur_secs, user_id)
             except Exception as e:
                 print(f"[skip start_progress error] {e}")
     else:

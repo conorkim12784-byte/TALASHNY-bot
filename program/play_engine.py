@@ -239,7 +239,7 @@ async def _do_play(
 
     # ── في الطابور ──
     if chat_id in QUEUE:
-        pos = add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+        pos = add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0, dur_secs)
         if status_msg:
             await status_msg.delete()
         await m.reply_photo(
@@ -285,7 +285,7 @@ async def _do_play(
             await _ensure_group_call_started(c, chat_id)
             await _try_play()
 
-        add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0)
+        add_to_queue(chat_id, songname, stream_source, ref_url, media_type, 0, dur_secs)
         # نسجل مين طلب الأغنية الحالية عشان أمر "مين مشغل"
         current_requester[chat_id] = {
             "first_name": requester or "غير معروف",
@@ -352,15 +352,13 @@ async def _handle_play(c: Client, m: Message):
     # في الجروب، وده بيخلي التشغيل التالي ميشتغلش لحد ما نعمل rejoin قسري.
     from driver.queues import QUEUE as _Q
     if chat_id not in _Q:
-        await _ensure_group_call_started(c, chat_id)
-        # تأكيد دخول المساعد للكول الجديد
+        # تشغيل جديد بالكامل — اعمل rejoin قسري للحساب المساعد لضمان دخوله للكول
+        # حتى لو كان عضو في الجروب من جلسة سابقة (بعد leave_call).
         try:
-            active_calls = getattr(call_py, "calls", {}) or {}
-            if chat_id not in active_calls:
-                await _force_userbot_rejoin(c, chat_id)
-                await _ensure_group_call_started(c, chat_id)
+            await _force_userbot_rejoin(c, chat_id)
         except Exception as _e:
-            print(f"[ensure userbot in call] {_e}")
+            print(f"[force rejoin on new play] {_e}")
+        await _ensure_group_call_started(c, chat_id)
 
     replied = m.reply_to_message
 
