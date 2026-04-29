@@ -35,6 +35,8 @@ def stream_markup(user_id):
     ],
     [
       _btn("الـتـحـديـثـات", style="primary", url=channel_url),
+    ],
+    [
       _btn("اضـف الـبـوت لـمـجـمـوعـتـك", style="primary",
            url=f'https://t.me/{bot_username}?startgroup=true'),
     ],
