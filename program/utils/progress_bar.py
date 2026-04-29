@@ -63,13 +63,14 @@ def _build_markup(user_id: int, elapsed: int, total: int) -> InlineKeyboardMarku
 
 async def _runner(client: Client, chat_id: int, message: Message,
                   duration: int, user_id: int):
-    """يحدّث الأزرار كل 5 ثوانٍ حتى تنتهي الأغنية أو يتم الإيقاف."""
-    interval = 5
+    """يحدّث الأزرار كل 3 ثوانٍ حتى تنتهي الأغنية أو يتم الإيقاف."""
+    interval = 3
+    last_text = None
+    fail_count = 0
     try:
         while True:
             elapsed = int(time.time() - _STARTED_AT.get(chat_id, time.time()))
             if duration > 0 and elapsed >= duration:
-                # عرض النهاية مرة أخيرة ثم خروج
                 try:
                     await client.edit_message_reply_markup(
                         chat_id=message.chat.id,
@@ -80,15 +81,23 @@ async def _runner(client: Client, chat_id: int, message: Message,
                     pass
                 break
 
-            try:
-                await client.edit_message_reply_markup(
-                    chat_id=message.chat.id,
-                    message_id=message.id,
-                    reply_markup=_build_markup(user_id, elapsed, duration),
-                )
-            except Exception:
-                # الرسالة اتحذفت أو تيليجرام رفض — نوقف بهدوء
-                break
+            new_markup = _build_markup(user_id, elapsed, duration)
+            # تحقق إن الشريط فعلاً اتغيّر قبل الإرسال (تيليجرام يرفض نفس المحتوى)
+            current_text = new_markup.inline_keyboard[0][0].text
+            if current_text != last_text:
+                try:
+                    await client.edit_message_reply_markup(
+                        chat_id=message.chat.id,
+                        message_id=message.id,
+                        reply_markup=new_markup,
+                    )
+                    last_text = current_text
+                    fail_count = 0
+                except Exception as e:
+                    fail_count += 1
+                    print(f"[progress_bar] edit failed ({fail_count}): {e}")
+                    if fail_count >= 5:
+                        break
 
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
