@@ -1,4 +1,4 @@
-# promote.py — رفع مشرف + مراقبة حظر تلقائي
+# promote.py — رفع مشرف + مراقبة حظر تلقائي + عزل من يتخطى الحد
 
 from collections import defaultdict
 
@@ -10,7 +10,7 @@ from pyrogram.types import (
 from pyrogram.errors import ChatAdminRequired
 
 from driver.filters import command, command2, other_filters
-from driver.decorators import authorized_users_only
+from driver.permissions import get_rank, can_target
 from config import SUDO_USERS
 
 # ═══════════════════════════════════════
@@ -26,21 +26,29 @@ def get_ban_limit(chat_id: int) -> int:
     return ban_limits[chat_id]
 
 
+def _status_str(status) -> str:
+    if status is None:
+        return ""
+    return getattr(status, "value", str(status)).lower()
+
+
 # ═══════════════════════════════════════
 # التحقق من الصلاحية — مالك الجروب أو السوبر يوزر فقط
 # ═══════════════════════════════════════
 async def is_allowed(c: Client, chat_id: int, user_id: int) -> bool:
+    if user_id is None:
+        return False
     if user_id in SUDO_USERS or user_id == SUPER_USER_ID:
         return True
     try:
         member = await c.get_chat_member(chat_id, user_id)
-        return member.status.value in ["creator", "administrator"]
+        return _status_str(member.status) in ("creator", "owner", "administrator")
     except Exception:
         return False
 
 
 # ═══════════════════════════════════════
-# بناء أزرار الصلاحيات — نفس ترتيب تيليجرام
+# بناء أزرار الصلاحيات
 # ═══════════════════════════════════════
 def build_keyboard(user_id: int, perms: dict) -> InlineKeyboardMarkup:
     def btn(label, key):
@@ -67,15 +75,22 @@ def build_keyboard(user_id: int, perms: dict) -> InlineKeyboardMarkup:
     ])
 
 
+pending_titles: dict = {}
+
+
 # ═══════════════════════════════════════
-# أمر رفع مشرف
-# الاستخدام: رفع @username لقبه
-#         أو رد على مستخدم: رفع لقبه
+# أمر رفع مشرف — مع منع تخطي الرتب
 # ═══════════════════════════════════════
 @Client.on_message((command(["promote"]) | command2(["رفع مشرف", "رفع_مشرف"])) & other_filters)
 async def promote_user(c: Client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
+
+    if not m.from_user:
+        return
     user_id = m.from_user.id
 
     if not await is_allowed(c, chat_id, user_id):
@@ -84,9 +99,8 @@ async def promote_user(c: Client, m: Message):
     target = None
     title = ""
 
-    if m.reply_to_message:
+    if m.reply_to_message and m.reply_to_message.from_user:
         target = m.reply_to_message.from_user
-        # اللقب هو باقي النص بعد الأمر
         parts = m.text.split(None, 1)
         title = parts[1].strip() if len(parts) > 1 else ""
     elif len(m.command) >= 2:
@@ -95,7 +109,6 @@ async def promote_user(c: Client, m: Message):
             target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
         except Exception:
             return await m.reply("✘ **لم يتم العثور على المستخدم**")
-        # اللقب بعد المعرف
         parts = m.text.split(None, 2)
         title = parts[2].strip() if len(parts) > 2 else ""
     else:
@@ -112,6 +125,12 @@ async def promote_user(c: Client, m: Message):
     if target.is_bot:
         return await m.reply("✘ **لا يمكن رفع البوتات**")
 
+    # منع تخطي الرتب
+    actor_rank = await get_rank(c, chat_id, user_id)
+    target_rank = await get_rank(c, chat_id, target.id)
+    if not can_target(actor_rank, target_rank):
+        return await m.reply("❌ لا يمكنك رفع شخص رتبته أعلى أو مساوية لك")
+
     perms = {
         "change_info": True,
         "delete_messages": True,
@@ -123,8 +142,6 @@ async def promote_user(c: Client, m: Message):
         "add_admins": False,
     }
 
-    # حفظ اللقب مؤقتاً في callback_data مش ممكن (محدود)
-    # نحفظه في رسالة منسقة
     await m.reply(
         f"👤 **رفع مشرف**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
@@ -134,17 +151,9 @@ async def promote_user(c: Client, m: Message):
         reply_markup=build_keyboard(target.id, perms)
     )
 
-    # تخزين اللقب في dict مؤقت
     pending_titles[target.id] = title
 
 
-# dict مؤقت لحفظ الألقاب
-pending_titles: dict = {}
-
-
-# ═══════════════════════════════════════
-# callback — تبديل صلاحية
-# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex(r"^prm\|"))
 async def toggle_permission(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
@@ -153,7 +162,6 @@ async def toggle_permission(c: Client, query: CallbackQuery):
     _, user_id, key, current = query.data.split("|")
     user_id = int(user_id)
 
-    # استخراج الصلاحيات الحالية من الأزرار
     perms = {}
     for row in query.message.reply_markup.inline_keyboard:
         for btn in row:
@@ -166,9 +174,6 @@ async def toggle_permission(c: Client, query: CallbackQuery):
     await query.answer()
 
 
-# ═══════════════════════════════════════
-# callback — تأكيد الرفع
-# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex(r"^prm_confirm\|"))
 async def confirm_promote(c: Client, query: CallbackQuery):
     if not await is_allowed(c, query.message.chat.id, query.from_user.id):
@@ -232,9 +237,6 @@ async def confirm_promote(c: Client, query: CallbackQuery):
         await query.answer(f"✘ خطأ: {e}", show_alert=True)
 
 
-# ═══════════════════════════════════════
-# callback — إلغاء
-# ═══════════════════════════════════════
 @Client.on_callback_query(filters.regex("^prm_cancel$"))
 async def cancel_promote(c: Client, query: CallbackQuery):
     await query.edit_message_text("✘ **تم إلغاء العملية**")
@@ -243,19 +245,22 @@ async def cancel_promote(c: Client, query: CallbackQuery):
 # ═══════════════════════════════════════
 # أمر تغيير حد الحظر
 # ═══════════════════════════════════════
-@Client.on_message((command(["setbanlimit"]) | command2(["حد_الحظر"])) & other_filters)
+@Client.on_message((command(["setbanlimit"]) | command2(["حد الحظر", "حد_الحظر"])) & other_filters)
 async def set_ban_limit(c: Client, m: Message):
-    await m.delete()
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
 
-    if not await is_allowed(c, chat_id, m.from_user.id):
+    if not m.from_user or not await is_allowed(c, chat_id, m.from_user.id):
         return await m.reply("✘ **هذا الأمر لمالك المجموعة فقط**")
 
     if len(m.command) < 2 or not m.command[1].isdigit():
         return await m.reply(
-            f"**الاستخدام:** `حد_الحظر [رقم]`\n\n"
+            f"**الاستخدام:** `حد الحظر [رقم]`\n\n"
             f"**الحد الحالي:** `{get_ban_limit(chat_id)}` حظر\n"
-            f"**مثال:** `حد_الحظر 10`"
+            f"**مثال:** `حد الحظر 10`"
         )
 
     new_limit = int(m.command[1])
@@ -274,72 +279,103 @@ async def set_ban_limit(c: Client, m: Message):
 
 
 # ═══════════════════════════════════════
-# مراقبة تغييرات الأعضاء تلقائياً
+# مراقبة تغييرات الأعضاء + عزل المتخطي للحد
 # ═══════════════════════════════════════
-@Client.on_chat_member_updated(filters.group)
+@Client.on_chat_member_updated(filters.group, group=-1)
 async def watch_member_changes(c: Client, update):
+    """
+    ملاحظة مهمة:
+    لازم البوت يكون أدمن في الجروب علشان Telegram يبعت ChatMemberUpdated.
+    """
     try:
         old = update.old_chat_member
         new = update.new_chat_member
         if not old or not new:
             return
 
-        old_status = old.status.value if old.status else ""
-        new_status = new.status.value if new.status else ""
+        old_status = _status_str(old.status)
+        new_status = _status_str(new.status)
         chat_id = update.chat.id
-        user = new.user
+        target_user = new.user or old.user
+        if not target_user:
+            return
 
-        # ── عضو اتحظر يدوياً ──
-        if new_status == "banned" and update.from_user:
-            admin_id = update.from_user.id
-            me = await c.get_me()
-            if admin_id == me.id:
-                return
+        actor = update.from_user  # المشرف اللي عمل الحدث
+
+        # ── عضو اتحظر يدوياً (kicked == banned في pyrogram v2) ──
+        if new_status in ("banned", "kicked") and old_status not in ("banned", "kicked") and actor:
+            admin_id = actor.id
+            try:
+                me = await c.get_me()
+            except Exception:
+                me = None
+            if me and admin_id == me.id:
+                return  # البوت بنفسه
+
+            # نتأكد إن الفاعل مشرف فعلاً (مش creator، عشان مينعزلش المالك)
             try:
                 adm = await c.get_chat_member(chat_id, admin_id)
-                if adm.status.value not in ("administrator", "creator"):
-                    return
+                adm_status = _status_str(adm.status)
             except Exception:
                 return
+            if adm_status not in ("administrator",):
+                return  # المالك لا يُعاقب
 
             ban_counter[chat_id][admin_id] += 1
             count = ban_counter[chat_id][admin_id]
             limit = get_ban_limit(chat_id)
 
-            await c.send_message(
-                chat_id,
-                f"🚫 **إشعار حظر**\n\n"
-                f"👤 **المحظور:** [{user.first_name}](tg://user?id={user.id})\n"
-                f"👮 **بواسطة:** [{update.from_user.first_name}](tg://user?id={admin_id})\n"
-                f"📊 **عداد الحظر:** `{count}/{limit}`"
-            )
+            try:
+                await c.send_message(
+                    chat_id,
+                    f"🚫 **إشعار حظر**\n\n"
+                    f"👤 **المحظور:** [{target_user.first_name}](tg://user?id={target_user.id})\n"
+                    f"👮 **بواسطة:** [{actor.first_name}](tg://user?id={admin_id})\n"
+                    f"📊 **عداد الحظر:** `{count}/{limit}`"
+                )
+            except Exception:
+                pass
 
             if count >= limit:
                 await _auto_demote(c, chat_id, admin_id, count, limit)
+            return
 
         # ── مشرف اتنزّل ──
-        elif old_status == "administrator" and new_status not in ("administrator", "creator"):
-            who = f"\n👮 **بواسطة:** [{update.from_user.first_name}](tg://user?id={update.from_user.id})" if update.from_user else ""
-            await c.send_message(
-                chat_id,
-                f"📢 **إشعار: نزول مشرف**\n\n"
-                f"👤 **المشرف:** [{user.first_name}](tg://user?id={user.id}){who}"
-            )
+        if old_status == "administrator" and new_status not in ("administrator", "creator", "owner"):
+            who = ""
+            if actor:
+                who = f"\n👮 **بواسطة:** [{actor.first_name}](tg://user?id={actor.id})"
+            try:
+                await c.send_message(
+                    chat_id,
+                    f"📢 **إشعار: نزول مشرف**\n\n"
+                    f"👤 **المشرف:** [{target_user.first_name}](tg://user?id={target_user.id}){who}"
+                )
+            except Exception:
+                pass
+            return
 
         # ── عضو اترفّع مشرف ──
-        elif old_status not in ("administrator", "creator") and new_status == "administrator":
-            who = f"\n👮 **بواسطة:** [{update.from_user.first_name}](tg://user?id={update.from_user.id})" if update.from_user else ""
-            await c.send_message(
-                chat_id,
-                f"📢 **إشعار: رفع مشرف جديد**\n\n"
-                f"👤 **المشرف الجديد:** [{user.first_name}](tg://user?id={user.id}){who}"
-            )
+        if old_status not in ("administrator", "creator", "owner") and new_status == "administrator":
+            who = ""
+            if actor:
+                who = f"\n👮 **بواسطة:** [{actor.first_name}](tg://user?id={actor.id})"
+            try:
+                await c.send_message(
+                    chat_id,
+                    f"📢 **إشعار: رفع مشرف جديد**\n\n"
+                    f"👤 **المشرف الجديد:** [{target_user.first_name}](tg://user?id={target_user.id}){who}"
+                )
+            except Exception:
+                pass
+            return
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[watch_member_changes] {e}")
 
 
 async def _auto_demote(c: Client, chat_id: int, admin_id: int, count: int, limit: int):
+    """يعزل المشرف اللي تخطى الحد — يشيل كل صلاحياته."""
     try:
         admin = await c.get_users(admin_id)
         await c.promote_chat_member(
@@ -360,8 +396,11 @@ async def _auto_demote(c: Client, chat_id: int, admin_id: int, count: int, limit
             f"✔ **تم نزوله من الإشراف تلقائياً** — الحد المسموح: `{limit}`"
         )
     except Exception as e:
-        await c.send_message(
-            chat_id,
-            f"⚠️ المشرف [{admin_id}](tg://user?id={admin_id}) تجاوز الحد "
-            f"لكن فشل النزول التلقائي: `{e}`"
-        )
+        try:
+            await c.send_message(
+                chat_id,
+                f"⚠️ المشرف [{admin_id}](tg://user?id={admin_id}) تجاوز الحد "
+                f"لكن فشل النزول التلقائي: `{e}`"
+            )
+        except Exception:
+            pass

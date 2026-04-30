@@ -9,10 +9,9 @@ from time import time
 from io import StringIO
 from sys import version as pyver
 from inspect import getfullargspec
-from driver.filters import command2, other_filters
+from driver.filters import command, command2, other_filters
 from config import BOT_USERNAME as bname
 from driver.veez import bot
-from driver.filters import command
 from pyrogram import Client, filters
 from driver.decorators import sudo_users_only, errors
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
@@ -31,7 +30,7 @@ async def edit_or_reply(msg: Message, **kwargs):
     await func(**{k: v for k, v in kwargs.items() if k in spec})
 
 
-@Client.on_message(command(["eval", f"eval{bname}"]))
+@Client.on_message(command(["eval", f"eval{bname}"]) | command2(["ايفال", "تنفيذ"]))
 @sudo_users_only
 async def executor(client, message):
     await message.delete()
@@ -108,7 +107,7 @@ async def runtime_func_cq(_, cq):
     await cq.answer(runtime, show_alert=True)
 
 
-@Client.on_message(command(["sh", f"sh{bname}"]))
+@Client.on_message(command(["sh", f"sh{bname}"]) | command2(["شيل", "بش"]))
 @sudo_users_only
 async def shellrunner(client, message):
     if len(message.command) < 2:
@@ -171,7 +170,7 @@ async def shellrunner(client, message):
         await edit_or_reply(message, text="`OUTPUT:`\n`no output`")
 
 
-@Client.on_message(command(["leavebot"]))
+@Client.on_message(command(["leavebot"]) | command2(["مغادره", "مغادرة البوت", "مغادره البوت"]))
 @sudo_users_only
 async def bot_leave_group(_, message):
     if len(message.command) != 2:

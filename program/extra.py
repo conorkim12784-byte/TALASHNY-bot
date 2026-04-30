@@ -1,6 +1,6 @@
-"""broadcast & statistic collector"""
+"""broadcast & statistic collector — مُصلَّح: يقبل الأوامر العربية بدون برفكس."""
 import asyncio
-from pyrogram import Client, filters
+from pyrogram import Client
 from pyrogram.types import Message
 from driver.decorators import sudo_users_only
 from driver.database.dbchat import get_served_chats
@@ -8,7 +8,7 @@ from driver.filters import command, command2, other_filters
 from config import BOT_USERNAME as bn
 
 
-@Client.on_message(command(["اذاعه"]))
+@Client.on_message(command(["اذاعه", "اذاعة"]) | command2(["اذاعه", "اذاعة"]))
 @sudo_users_only
 async def broadcast(c: Client, message: Message):
     if message.reply_to_message:
@@ -30,7 +30,7 @@ async def broadcast(c: Client, message: Message):
         return
     if len(message.command) < 2:
         await message.reply_text(
-            "**مثال**:\n\n/اذاعه (`رسالتك`) او (`الرد على رساله`)"
+            "**مثال**:\n\n`اذاعه رسالتك` أو رد على رساله بـ `اذاعه`"
         )
         return
     text = message.text.split(None, 1)[1]
@@ -49,7 +49,7 @@ async def broadcast(c: Client, message: Message):
     await message.reply_text(f"✅ تمت الاذاعه إلى {sent} جروب.")
 
 
-@Client.on_message(command(["ذت", "اذت", "اذع"]))
+@Client.on_message(command(["ذت", "اذت", "اذع"]) | command2(["ذت", "اذت", "اذع", "اذاعه بالتثبيت"]))
 @sudo_users_only
 async def broadcast_pin(c: Client, message: Message):
     if message.reply_to_message:
@@ -77,7 +77,7 @@ async def broadcast_pin(c: Client, message: Message):
         return
     if len(message.command) < 2:
         await message.reply_text(
-            "**مثال**:\n\n/اذاعه بالتثبيت (`رسالتك`) او (`الرد على رساله`)"
+            "**مثال**:\n\n`ذت رسالتك` أو رد على رساله بـ `ذت`"
         )
         return
     text = message.text.split(None, 1)[1]
