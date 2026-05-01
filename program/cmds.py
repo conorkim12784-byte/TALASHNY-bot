@@ -164,8 +164,18 @@ OWNER_AR = """**أوامر المالك — عربي**
 `تحديث الادمن` — نفس اعاده
 
 **▸ إدارة المالك:**
+`المالك` — عرض بيانات المالك الحالي
 `تغيير يوزر المالك` — تغيير المالك الظاهر للبوت
 `تحديث المالك` — إرجاع المالك للمالك الرسمي
+
+**▸ الاشتراك الإجباري (لأصحاب البوت):**
+`اشتراك اجباري` — لوحة التحكم بأزرار (تفعيل/تعطيل/ضبط القناة)
+`ضبط قناة الاشتراك` — تحديد القناة المطلوب الاشتراك فيها
+
+**▸ نظام الهمس (للمشرفين/المالك):**
+`الهمس` — لوحة التحكم بأزرار
+`تفعيل الهمس` / `تعطيل الهمس`
+الاستخدام: `@BotUsername @user رسالتك`
 
 **▸ متنوع:**
 `تحديث` — تحديث البوت
@@ -181,8 +191,19 @@ OWNER_EN = """**Owner Commands — English**
 `rmbotadmin` — demote a bot manager
 `botadmins` — list bot managers
 `setbanlimit` — set auto-ban limit
+
+**▸ Owner Management:**
+`owner` — show current owner info
 `change_owner` — change displayed owner
 `reset_owner` — reset displayed owner to the real one
+
+**▸ Force Subscribe (sudo only):**
+`fsub` / `force_sub` — control panel (toggle / set channel)
+
+**▸ Whisper:**
+`whisper` — control panel (admins+)
+`enable_whisper` / `disable_whisper`
+Usage: `@BotUsername @user your secret message`
 
 **▸ Misc:**
 `update` — update the bot
@@ -197,8 +218,9 @@ DEV_AR = """**أوامر المطور — عربي**
 `sh` — تنفيذ أمر Shell
 
 **▸ إدارة البوت:**
-`اذاعه` — إرسال رسالة لكل الجروبات
-`ذت` — إذاعة مع تثبيت
+`اذاعه` / `اذاعة` — إذاعة نص أو رد على رسالة لكل الجروبات
+`اذاعه فوروورد` — إذاعة بالفوروارد
+`ذت` / `اذت` — إذاعة مع تثبيت
 `leaveall` — مغادرة كل الجروبات
 `مغادره البوت` — مغادرة جروب معين
 
@@ -215,6 +237,7 @@ DEV_EN = """**Developer Commands — English**
 
 **▸ Bot Management:**
 `broadcast` / `gcast` — broadcast to all groups
+`pcast` / `pgcast` — broadcast + pin
 `leaveall` — leave all groups
 `leavebot` — leave a specific group
 
