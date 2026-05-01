@@ -118,7 +118,7 @@ def bot_admin_check(perm: str):
                 if perm in ADMIN_DEFAULT_PERMS:
                     return await func(client, message)
                 else:
-                    return await message.reply("❌ الصلاحية دي للبوت ادمن بس")
+                    return await message.reply("❌ الصلاحية دي للمدير بس")
 
             if has_permission(chat_id, user_id, perm):
                 return await func(client, message)

@@ -155,15 +155,17 @@ ADMINS_EN = """**Admins Commands — English**
 
 OWNER_AR = """**أوامر المالك — عربي**
 
-**▸ إدارة المشرفين:**
-`رفع` — رفع عضو مشرف (رد أو ذكر)
-`رفع مشرف` — نفس رفع
-`رفع بوت` — رفع البوت مشرف
-`بوت ادمن` — نفس رفع بوت
-`شيل بوت ادمن` — تنزيل البوت من المشرفين
-`قايمة الادمنز` — عرض قائمة المديرين
+**▸ إدارة المشرفين والمديرين:**
+`رفع مشرف` — رفع عضو مشرف للجروب (صلاحيات الجروب)
+`رفع مدير` — رفع عضو مدير في البوت (صلاحيات البوت)
+`تنزيل مدير` — تنزيل المدير من البوت
+`قائمة المديرين` — عرض قائمة المديرين
 `اعاده` — تحديث قائمة المشرفين
 `تحديث الادمن` — نفس اعاده
+
+**▸ إدارة المالك:**
+`تغيير يوزر المالك` — تغيير المالك الظاهر للبوت
+`تحديث المالك` — إرجاع المالك للمالك الرسمي
 
 **▸ متنوع:**
 `تحديث` — تحديث البوت
@@ -174,11 +176,13 @@ OWNER_AR = """**أوامر المالك — عربي**
 OWNER_EN = """**Owner Commands — English**
 
 **▸ Admin Management:**
-`promote` — promote a member to admin
-`botadmin` — promote bot to admin
-`rmbotadmin` — demote bot from admins
-`botadmins` — list admins
+`promote` — promote a member to group admin
+`botadmin` — promote a member to bot manager
+`rmbotadmin` — demote a bot manager
+`botadmins` — list bot managers
 `setbanlimit` — set auto-ban limit
+`change_owner` — change displayed owner
+`reset_owner` — reset displayed owner to the real one
 
 **▸ Misc:**
 `update` — update the bot

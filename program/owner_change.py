@@ -1,10 +1,18 @@
 """
-أمر «تغيير يوزر المالك»
-- ينفذه: المالك الرسمي (OWNER_ID) وأصحاب البوت (SUDO_USERS) فقط
-- المالك «الظاهر» اللي اتغير قبل كده مش يقدر يغيره (إلا لو هو سودو أصلاً)
-- لما يتنفذ الأمر، البوت يطلب من اللي طلبه يبعت يوزر/آيدي المالك الجديد
-- يستنى رسالة جديدة (مش يقرأ نص الأمر نفسه)
-- يحفظ في owner_state.json
+أوامر المالك:
+- «تغيير يوزر المالك» / «تغيير المالك» / «change_owner»
+    → يغيّر المالك الظاهر للبوت
+- «تحديث المالك» / «ارجاع المالك» / «reset_owner»
+    → يرجّع المالك الظاهر للمالك الرسمي (OWNER_ID)
+
+ملاحظات مهمة:
+- الصلاحية لتنفيذ الأوامر دي محصورة على:
+    • OWNER_ID (المالك الرسمي)
+    • SUDO_USERS (أصحاب البوت)
+  حتى لو حد تاني اتعمله "مالك ظاهر" قبل كده، مش يقدر يستخدم الأوامر دي.
+- الأوامر تشتغل في أي وضع (خاص أو جروب أو قناة).
+- ينتظر رسالة جديدة فيها يوزر/آيدي المالك الجديد (أو رد على المستخدم).
+- يحفظ الحالة في owner_state.json
 """
 
 import os
@@ -14,7 +22,7 @@ from pyrogram.types import Message
 
 from driver.filters import command2
 
-# استيراد آمن — كل قيمة لوحدها عشان لو واحدة ناقصة الباقي يفضل شغال
+# استيراد آمن — كل قيمة لوحدها
 try:
     from config import SUDO_USERS  # type: ignore
 except Exception:
@@ -63,7 +71,12 @@ def _sudo_list() -> list:
 
 
 def _is_real_owner(user_id: int) -> bool:
-    """المالك الرسمي من config أو ضمن أصحاب البوت."""
+    """
+    المالك الرسمي = OWNER_ID من config أو ضمن SUDO_USERS.
+    ملاحظة: هذا الفحص لا يعتمد إطلاقاً على المالك «الظاهر»
+    المخزن في owner_state.json — وده عشان لو حد اتعمله مالك ظاهر
+    مايقدرش يغير الإعداد ده.
+    """
     if not user_id:
         return False
     try:
@@ -85,11 +98,15 @@ def _is_command_like(text: str) -> bool:
     if t.startswith(_PREFIXES):
         return True
     first = t.split()[0]
-    if first in {"تغيير", "المالك"}:
+    if first in {"تغيير", "المالك", "تحديث", "ارجاع", "إرجاع"}:
         return True
     return False
 
 
+# ═══════════════════════════════════════
+# أمر: تغيير يوزر المالك
+# يشتغل في أي وضع (خاص/جروب/قناة) بدون filters.group
+# ═══════════════════════════════════════
 @Client.on_message(command2(["تغيير يوزر المالك", "تغيير المالك", "change_owner"]))
 async def change_owner_cmd(client: Client, message: Message):
     if not message.from_user:
@@ -97,11 +114,9 @@ async def change_owner_cmd(client: Client, message: Message):
 
     uid = message.from_user.id
     if not _is_real_owner(uid):
-        # رسالة تشخيصية مفيدة
         return await message.reply_text(
             "• الأمر ده للمالك الرسمي / أصحاب البوت بس.\n"
-            f"• آيدي حضرتك: <code>{uid}</code>\n"
-            f"• أصحاب البوت الحاليين: <code>{_sudo_list()}</code>"
+            f"• آيدي حضرتك: <code>{uid}</code>"
         )
 
     key = (message.chat.id, uid)
@@ -115,6 +130,35 @@ async def change_owner_cmd(client: Client, message: Message):
     )
 
 
+# ═══════════════════════════════════════
+# أمر: تحديث / ارجاع المالك للمالك الرسمي
+# ═══════════════════════════════════════
+@Client.on_message(command2(["تحديث المالك", "ارجاع المالك", "إرجاع المالك", "reset_owner"]))
+async def reset_owner_cmd(client: Client, message: Message):
+    if not message.from_user:
+        return
+
+    uid = message.from_user.id
+    if not _is_real_owner(uid):
+        return await message.reply_text(
+            "• الأمر ده للمالك الرسمي / أصحاب البوت بس.\n"
+            f"• آيدي حضرتك: <code>{uid}</code>"
+        )
+
+    data = _load_state()
+    data.pop("display_owner_id", None)
+    data.pop("display_owner_username", None)
+    _save_state(data)
+
+    await message.reply_text(
+        "✅ تم إرجاع المالك للمالك الرسمي.\n"
+        f"• آيدي المالك الرسمي: <code>{int(OWNER_ID) if OWNER_ID else 0}</code>"
+    )
+
+
+# ═══════════════════════════════════════
+# التقاط رسالة المالك الجديد
+# ═══════════════════════════════════════
 @Client.on_message(filters.text & ~filters.via_bot, group=51)
 async def _capture_new_owner(client: Client, message: Message):
     if not message.from_user:

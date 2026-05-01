@@ -1,4 +1,9 @@
 # botadmin_cmd.py
+# أوامر "المدير" — صلاحيات داخل البوت (مش صلاحيات الجروب)
+# تم فصل الأوامر تماماً عن "رفع مشرف":
+#   • "رفع مشرف"  → صلاحيات الجروب (ملف promote.py)
+#   • "رفع مدير"  → صلاحيات البوت (الملف ده)
+# وتم تغيير المسمى من "بوت ادمن" إلى "مدير" في كل الواجهة.
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -58,9 +63,13 @@ def _extract_perms(markup) -> set:
 
 
 # ═══════════════════════════════════════
-# رفع بوت ادمن
+# رفع مدير  (صلاحيات البوت فقط)
+# ملاحظة: تم حذف "رفع" و "رفع بوت" و "بوت ادمن" من المطابقات
+# عشان ما يحصلش تضارب مع أمر "رفع مشرف" بتاع صلاحيات الجروب.
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmin"]) | command2(["رفع", "رفع بوت", "بوت ادمن", "رفع مدير", "رفع_مدير"])) & other_filters)
+@Client.on_message(
+    (command(["botadmin"]) | command2(["رفع مدير", "رفع_مدير"])) & other_filters
+)
 async def promote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -92,15 +101,17 @@ async def promote_bot_admin(c: Client, m: Message):
         f"👤 **رفع مدير**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
         f"**الايدي:** `{target.id}`\n\n"
-        f"اختار الصلاحيات:",
+        f"اختار صلاحيات المدير داخل البوت:",
         reply_markup=keyboard
     )
 
 
 # ═══════════════════════════════════════
-# شيل بوت ادمن
+# تنزيل مدير
 # ═══════════════════════════════════════
-@Client.on_message((command(["rmbotadmin"]) | command2(["شيل بوت ادمن", "تنزل مدير"])) & other_filters)
+@Client.on_message(
+    (command(["rmbotadmin"]) | command2(["تنزيل مدير", "تنزل مدير", "شيل مدير"])) & other_filters
+)
 async def demote_bot_admin(c: Client, m: Message):
     await m.delete()
     chat_id = m.chat.id
@@ -125,20 +136,22 @@ async def demote_bot_admin(c: Client, m: Message):
         return await m.reply("✘ الشخص ده مش مدير")
 
     remove_bot_admin(chat_id, target.id)
-    await m.reply(f"✔ تم شيل [{target.first_name}](tg://user?id={target.id}) من مديرن")
+    await m.reply(f"✔ تم شيل [{target.first_name}](tg://user?id={target.id}) من المديرين")
 
 
 # ═══════════════════════════════════════
-# قايمة مديرن
+# قائمة المديرين
 # ═══════════════════════════════════════
-@Client.on_message((command(["botadmins"]) | command2(["قايمة الادمنز", "مديرن"])) & other_filters)
+@Client.on_message(
+    (command(["botadmins"]) | command2(["قائمة المديرين", "قايمة المديرين", "المديرين"])) & other_filters
+)
 async def list_bot_admins(c: Client, m: Message):
     await m.delete()
     admins = get_bot_admins(m.chat.id)
     if not admins:
-        return await m.reply("✘ مفيش مديرن في الجروب ده")
+        return await m.reply("✘ مفيش مديرين في الجروب ده")
 
-    text = "**⚙️ مديرن:**\n\n"
+    text = "**⚙️ المديرين:**\n\n"
     for user_id, perms in admins.items():
         try:
             user = await c.get_users(user_id)
@@ -195,7 +208,7 @@ async def confirm_bot_admin(c: Client, query: CallbackQuery):
     )
 
     await query.message.edit_text(
-        f"✔ **تم الرفع بنجاح**\n\n"
+        f"✔ **تم رفع المدير بنجاح**\n\n"
         f"👤 **المستخدم:** [{target.first_name}](tg://user?id={user_id})\n"
         f"🏠 **المجموعة:** `{chat_id}`\n\n"
         f"**الصلاحيات:**\n{perms_text}"
