@@ -1,15 +1,14 @@
-# talashny_keyboard.py — أمر "كيبورد تلاشاني"
-#
-# كيف يعمل؟
-# 1) يكتب أي مشرف/صاحب بوت: "كيبورد تلاشاني"
-#    -> البوت يرد: "اكتب اسم الكيبورد"
-# 2) المستخدم يكتب الاسم
-#    -> البوت يرسل ReplyKeyboard فيه زرّان:
-#         [اسم اللي كتبه]   و   [حذف الكيبورد]
-# 3) لما يضغط "حذف الكيبورد" -> يختفي الـ ReplyKeyboard.
-#
-# مسموح: SUDO_USERS + creator + administrators (مش الأعضاء العاديين).
+"""
+أمر «كيبورد تلاشاني»
+- أي مشرف أو سودو/مالك يقدر يستخدمه (الأعضاء العاديين لأ)
+- البوت يطلب اسم الكيبورد
+- يستنى رسالة جديدة من نفس المستخدم (مش رسالة الأمر نفسها)
+- يرد بـ ReplyKeyboardMarkup فيه الاسم + زر "حذف الكيبورد"
+- الكيبورد selective=True عشان يظهر للطالب فقط
+- زر "حذف الكيبورد" يشيل الـ ReplyKeyboard فقط
+"""
 
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import (
     Message,
@@ -18,80 +17,90 @@ from pyrogram.types import (
     ReplyKeyboardRemove,
 )
 
-from driver.filters import command, command2, other_filters
-from config import SUDO_USERS
+from driver.filters import command2
+from driver.permissions import member_permissions
 
-# user_id -> True (في انتظار اسم الكيبورد)
-_pending_kb: dict = {}
+# ذاكرة مؤقتة: { (chat_id, user_id): asyncio.Event/placeholder }
+# بنخزن "بانتظار اسم" + الرسالة الأصلية
+_pending: dict[tuple[int, int], dict] = {}
+
+# بريفكسات الأوامر اللي لازم نتجاهلها لو المستخدم بعت أمر تاني بدل الاسم
+_PREFIXES = ("/", "!", ".", "؟", "?", "#")
+# كلمات لو الرسالة بدأت بيها يبقى دي أمر ثاني، نلغي الجلسة
+_CANCEL_WORDS = {"الغاء", "إلغاء", "كنسل", "cancel", "خلاص"}
 
 
-def _status_str(status) -> str:
-    if status is None:
-        return ""
-    return getattr(status, "value", str(status)).lower()
-
-
-async def _is_admin_or_sudo(c: Client, chat_id: int, user_id: int) -> bool:
-    if user_id is None:
-        return False
-    if user_id in SUDO_USERS:
+def _is_command_like(text: str) -> bool:
+    if not text:
         return True
-    try:
-        member = await c.get_chat_member(chat_id, user_id)
-        return _status_str(member.status) in ("administrator", "creator", "owner")
-    except Exception:
-        return False
+    t = text.strip()
+    if not t:
+        return True
+    if t.startswith(_PREFIXES):
+        return True
+    # لو فيها كلمة "كيبورد" في الأول يبقى ده استدعاء جديد للأمر
+    first = t.split()[0].lower()
+    if first in {"كيبورد", "keyboard"}:
+        return True
+    return False
 
 
-# ─────────────────────────────────────────────
-# 1) الأمر "كيبورد تلاشاني"
-# ─────────────────────────────────────────────
-@Client.on_message(
-    (command(["talashny_kb", "tkb"])
-     | command2(["كيبورد تلاشاني", "كيبورد_تلاشاني", "كيبورد"]))
-    & filters.group
-)
-async def talashny_keyboard_start(c: Client, m: Message):
-    if not m.from_user:
+@Client.on_message(command2(["كيبورد", "كيبورد تلاشاني", "keyboard"]) & ~filters.private)
+async def talashny_keyboard_cmd(client: Client, message: Message):
+    if not message.from_user:
         return
-    if not await _is_admin_or_sudo(c, m.chat.id, m.from_user.id):
-        return await m.reply("❌ هذا الأمر للمشرفين وأصحاب البوت فقط")
 
-    _pending_kb[m.from_user.id] = m.chat.id
-    await m.reply(
-        "⌨️ **اكتب اسم الكيبورد**\n\n"
-        "_(للإلغاء اكتب: `الغاء`)_"
+    # تحقق صلاحية: مشرف أو سودو
+    try:
+        perms = await member_permissions(message.chat.id, message.from_user.id)
+    except Exception:
+        perms = []
+
+    from config import SUDO_USERS  # type: ignore
+    is_sudo = message.from_user.id in SUDO_USERS
+
+    if not is_sudo and "can_restrict_members" not in perms and "can_promote_members" not in perms and "can_change_info" not in perms:
+        # عضو عادي
+        return await message.reply_text("• الأمر ده للمشرفين فقط.")
+
+    key = (message.chat.id, message.from_user.id)
+    _pending[key] = {"await_name": True, "request_msg_id": message.id}
+
+    await message.reply_text(
+        "✏️ ابعت دلوقتي اسم الكيبورد اللي عايزه.\n"
+        "اكتب «الغاء» للإلغاء.",
+        reply_to_message_id=message.id,
     )
 
 
-# ─────────────────────────────────────────────
-# 2) التقاط الاسم اللي بعتُه المستخدم بعد الأمر
-# ─────────────────────────────────────────────
-@Client.on_message(filters.text & filters.group & ~filters.via_bot, group=9)
-async def _capture_kb_name(c: Client, m: Message):
-    if not m.from_user:
+@Client.on_message(filters.group & filters.text & ~filters.via_bot, group=50)
+async def _capture_keyboard_name(client: Client, message: Message):
+    if not message.from_user:
         return
-    uid = m.from_user.id
-    if _pending_kb.get(uid) != m.chat.id:
+    key = (message.chat.id, message.from_user.id)
+    state = _pending.get(key)
+    if not state or not state.get("await_name"):
         return
 
-    txt = (m.text or "").strip()
-    if not txt:
+    # تجاهل لو الرسالة دي هي نفس رسالة الأمر
+    if message.id == state.get("request_msg_id"):
         return
 
-    # تجاهل أوامر تانية
-    if txt.startswith(("/", "!", ".")):
+    text = (message.text or "").strip()
+
+    # لو المستخدم بعت أمر تاني، نلغي الجلسة بدون رد
+    if _is_command_like(text):
+        _pending.pop(key, None)
         return
-    if txt in ("حذف الكيبورد", "إخفاء الكيبورد"):
-        return  # هندلر تاني هيتعامل معاها
 
-    if txt.lower() in ("الغاء", "إلغاء", "cancel"):
-        _pending_kb.pop(uid, None)
-        return await m.reply("✘ تم الإلغاء", reply_markup=ReplyKeyboardRemove())
+    if text.lower() in _CANCEL_WORDS:
+        _pending.pop(key, None)
+        return await message.reply_text("• تم الإلغاء.")
 
-    # خلاص — هنبني الكيبورد
-    name = txt[:40]  # حد أقصى للاسم
-    _pending_kb.pop(uid, None)
+    # حد أقصى للاسم
+    name = text[:40]
+
+    _pending.pop(key, None)
 
     kb = ReplyKeyboardMarkup(
         [
@@ -99,20 +108,22 @@ async def _capture_kb_name(c: Client, m: Message):
             [KeyboardButton("حذف الكيبورد")],
         ],
         resize_keyboard=True,
-        selective=True,  # يظهر فقط للشخص اللي كتب الأمر
+        selective=True,  # يظهر للطالب فقط
     )
-    await m.reply(
-        f"✔ **تم إنشاء الكيبورد**: `{name}`",
+
+    await message.reply_text(
+        f"✅ اتفضل كيبوردك: {name}",
         reply_markup=kb,
+        reply_to_message_id=message.id,
     )
 
 
-# ─────────────────────────────────────────────
-# 3) زر "حذف الكيبورد" -> يشيل الـ ReplyKeyboard
-# ─────────────────────────────────────────────
-@Client.on_message(filters.regex(r"^حذف الكيبورد$") & filters.group)
-async def remove_talashny_kb(c: Client, m: Message):
-    await m.reply(
-        "✔ تم إخفاء الكيبورد",
+@Client.on_message(filters.group & filters.regex(r"^حذف الكيبورد$"))
+async def _remove_keyboard(client: Client, message: Message):
+    if not message.from_user:
+        return
+    await message.reply_text(
+        "• تم حذف الكيبورد.",
         reply_markup=ReplyKeyboardRemove(selective=True),
+        reply_to_message_id=message.id,
     )
