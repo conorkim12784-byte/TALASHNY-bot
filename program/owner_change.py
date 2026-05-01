@@ -1,6 +1,6 @@
 """
 أمر «تغيير يوزر المالك»
-- ينفذه: المالك الرسمي (OWNER_ID في config) وأصحاب البوت (SUDO_USERS) فقط
+- ينفذه: المالك الرسمي (OWNER_ID) وأصحاب البوت (SUDO_USERS) فقط
 - المالك «الظاهر» اللي اتغير قبل كده مش يقدر يغيره (إلا لو هو سودو أصلاً)
 - لما يتنفذ الأمر، البوت يطلب من اللي طلبه يبعت يوزر/آيدي المالك الجديد
 - يستنى رسالة جديدة (مش يقرأ نص الأمر نفسه)
@@ -9,21 +9,25 @@
 
 import os
 import json
-import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
 from driver.filters import command2
 
+# استيراد آمن — كل قيمة لوحدها عشان لو واحدة ناقصة الباقي يفضل شغال
 try:
-    from config import OWNER_ID, SUDO_USERS  # type: ignore
+    from config import SUDO_USERS  # type: ignore
+except Exception:
+    SUDO_USERS = []
+
+try:
+    from config import OWNER_ID  # type: ignore
 except Exception:
     OWNER_ID = 0
-    SUDO_USERS = []
 
 STATE_FILE = "owner_state.json"
 
-_pending: dict[tuple[int, int], dict] = {}
+_pending: dict = {}
 
 _PREFIXES = ("/", "!", ".", "؟", "?", "#")
 _CANCEL_WORDS = {"الغاء", "إلغاء", "كنسل", "cancel", "خلاص"}
@@ -47,17 +51,28 @@ def _save_state(data: dict) -> None:
         pass
 
 
+def _sudo_list() -> list:
+    """يرجع SUDO_USERS كـ list of int بشكل آمن."""
+    try:
+        return [int(x) for x in (SUDO_USERS or [])]
+    except Exception:
+        try:
+            return list(SUDO_USERS or [])
+        except Exception:
+            return []
+
+
 def _is_real_owner(user_id: int) -> bool:
     """المالك الرسمي من config أو ضمن أصحاب البوت."""
     if not user_id:
         return False
-    if user_id == OWNER_ID:
-        return True
     try:
-        if user_id in SUDO_USERS:
+        if OWNER_ID and int(user_id) == int(OWNER_ID):
             return True
     except Exception:
         pass
+    if int(user_id) in _sudo_list():
+        return True
     return False
 
 
@@ -80,10 +95,16 @@ async def change_owner_cmd(client: Client, message: Message):
     if not message.from_user:
         return
 
-    if not _is_real_owner(message.from_user.id):
-        return await message.reply_text("• الأمر ده للمالك الرسمي / أصحاب البوت بس.")
+    uid = message.from_user.id
+    if not _is_real_owner(uid):
+        # رسالة تشخيصية مفيدة
+        return await message.reply_text(
+            "• الأمر ده للمالك الرسمي / أصحاب البوت بس.\n"
+            f"• آيدي حضرتك: <code>{uid}</code>\n"
+            f"• أصحاب البوت الحاليين: <code>{_sudo_list()}</code>"
+        )
 
-    key = (message.chat.id, message.from_user.id)
+    key = (message.chat.id, uid)
     _pending[key] = {"await_target": True, "request_msg_id": message.id}
 
     await message.reply_text(
@@ -111,7 +132,6 @@ async def _capture_new_owner(client: Client, message: Message):
     target_id = None
     target_username = None
 
-    # 1) لو رد على شخص
     if message.reply_to_message and message.reply_to_message.from_user:
         u = message.reply_to_message.from_user
         target_id = u.id
@@ -124,12 +144,10 @@ async def _capture_new_owner(client: Client, message: Message):
             _pending.pop(key, None)
             return await message.reply_text("• تم الإلغاء.")
 
-        # 2) آيدي رقمي
         cleaned = text.lstrip("@").strip()
         if cleaned.isdigit():
             target_id = int(cleaned)
         else:
-            # 3) يوزرنيم
             try:
                 user = await client.get_users(cleaned)
                 target_id = user.id
@@ -153,4 +171,7 @@ async def _capture_new_owner(client: Client, message: Message):
 
 def get_display_owner_id() -> int:
     data = _load_state()
-    return int(data.get("display_owner_id") or OWNER_ID or 0)
+    try:
+        return int(data.get("display_owner_id") or OWNER_ID or 0)
+    except Exception:
+        return 0
