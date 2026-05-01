@@ -1,50 +1,88 @@
-# botadmin_cmd.py
-# أوامر "المدير" — صلاحيات داخل البوت (مش صلاحيات الجروب)
-# تم فصل الأوامر تماماً عن "رفع مشرف":
-#   • "رفع مشرف"  → صلاحيات الجروب (ملف promote.py)
-#   • "رفع مدير"  → صلاحيات البوت (الملف ده)
-# وتم تغيير المسمى من "بوت ادمن" إلى "مدير" في كل الواجهة.
+# program/botadmin_cmd.py
+# أوامر "المدير" (Manager) — صلاحيات داخل البوت.
+#
+# قواعد صارمة:
+#   • رفع/تنزيل مدير = مسموح بس لـ:
+#       - المالك الرسمي (MASTER_ID)
+#       - أصحاب البوت (SUDO_USERS)
+#       - مدير عنده صلاحية "promote_managers" بشكل صريح
+#     (مالك الجروب بحد ذاته **لا يكفي**؛ لازم يكون من اللي فوق).
+#
+#   • أزرار الصلاحيات بتولّد تلقائيًا من ALL_PERMISSIONS (auto-discover)،
+#     فأي أمر جديد بيتضاف لفئة موجودة بيتغطى تلقائيًا.
+#
+#   • زرار "تفعيل الكل" و "تعطيل الكل" للسرعة.
+#
+#   • مدير عنده promote_managers مش مسموح يدّي صلاحيات RESTRICTED_PERMISSIONS
+#     (زي manage_bot) — دي بس من المالك/السوبر.
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from driver.filters import command, command2, other_filters
 from driver.botadmin import (
-    ALL_PERMISSIONS, MASTER_ID,
-    is_master, is_bot_admin,
+    ALL_PERMISSIONS, RESTRICTED_PERMISSIONS, MASTER_ID,
+    is_master, is_bot_admin, can_promote_managers,
     add_bot_admin, remove_bot_admin,
-    get_bot_admins, get_permissions
+    get_bot_admins, get_permissions,
 )
 
 
-async def is_allowed(c, chat_id, user_id):
+# ════════════════════════════════════════════════════
+# التحقق من الصلاحية لرفع/تنزيل مدير
+# ════════════════════════════════════════════════════
+async def can_manage_managers(c: Client, chat_id: int, user_id: int) -> bool:
+    """
+    مين مسموح له يرفع/ينزّل مديرين:
+      • المالك الرسمي
+      • أصحاب البوت (SUDO)
+      • مدير عنده صلاحية promote_managers
+    """
     if is_master(user_id):
         return True
-    try:
-        member = await c.get_chat_member(chat_id, user_id)
-        status = member.status.value
-        # المالك أو المشرف اللي عنده صلاحية إضافة مشرفين
-        if status in ("creator", "owner"):
-            return True
-        if status == "administrator":
-            if member.privileges and member.privileges.can_promote_members:
-                return True
-    except Exception:
-        pass
+    if can_promote_managers(chat_id, user_id):
+        return True
     return False
 
 
-def _perms_to_keyboard(user_id: int, perms: set) -> InlineKeyboardMarkup:
+def _allowed_perms_for(actor_id: int, chat_id: int) -> set:
+    """
+    الصلاحيات اللي الـ actor مسموح يمنحها.
+    المالك/السوبر = كل حاجة.
+    المدير صاحب promote_managers = كل حاجة ما عدا RESTRICTED_PERMISSIONS.
+    """
+    if is_master(actor_id):
+        return set(ALL_PERMISSIONS.keys())
+    return set(ALL_PERMISSIONS.keys()) - RESTRICTED_PERMISSIONS
+
+
+# ════════════════════════════════════════════════════
+# بناء كيبورد الصلاحيات (auto من ALL_PERMISSIONS)
+# ════════════════════════════════════════════════════
+def _perms_to_keyboard(actor_id: int, target_id: int, chat_id: int, perms: set) -> InlineKeyboardMarkup:
+    allowed = _allowed_perms_for(actor_id, chat_id)
     rows = []
-    for key, label in ALL_PERMISSIONS.items():
-        icon = "✔" if key in perms else "✘"
-        rows.append([InlineKeyboardButton(
-            f"{icon} {label}",
-            callback_data=f"ba|{user_id}|{key}|{int(key in perms)}"
-        )])
+    # زرّين فوق: تفعيل/تعطيل الكل
     rows.append([
-        InlineKeyboardButton("✔ ارفعه دلوقتي", callback_data=f"ba_confirm|{user_id}"),
-        InlineKeyboardButton("✘ الغاء", callback_data="ba_cancel"),
+        InlineKeyboardButton("✔ تفعيل الكل", callback_data=f"ba_all|{actor_id}|{target_id}|1"),
+        InlineKeyboardButton("✘ تعطيل الكل", callback_data=f"ba_all|{actor_id}|{target_id}|0"),
+    ])
+
+    # كل الصلاحيات — اللي مش مسموحة للـ actor تظهر بـ 🔒 ومُعطّلة فعليًا
+    for key, label in ALL_PERMISSIONS.items():
+        is_on = key in perms
+        is_locked = key not in allowed
+        if is_locked:
+            icon = "🔒"
+            cb = f"ba_locked|{key}"
+        else:
+            icon = "✔" if is_on else "✘"
+            cb = f"ba|{actor_id}|{target_id}|{key}|{int(is_on)}"
+        rows.append([InlineKeyboardButton(f"{icon} {label}", callback_data=cb)])
+
+    rows.append([
+        InlineKeyboardButton("✔ ارفعه دلوقتي", callback_data=f"ba_confirm|{actor_id}|{target_id}"),
+        InlineKeyboardButton("✘ الغاء",        callback_data=f"ba_cancel|{actor_id}"),
     ])
     return InlineKeyboardMarkup(rows)
 
@@ -57,81 +95,98 @@ def _extract_perms(markup) -> set:
         for btn in row:
             if btn.callback_data and btn.callback_data.startswith("ba|"):
                 p = btn.callback_data.split("|")
-                if len(p) >= 4 and bool(int(p[3])):
-                    perms.add(p[2])
+                # ba|actor|target|key|is_on
+                if len(p) >= 5 and bool(int(p[4])):
+                    perms.add(p[3])
     return perms
 
 
-# ═══════════════════════════════════════
-# رفع مدير  (صلاحيات البوت فقط)
-# ملاحظة: تم حذف "رفع" و "رفع بوت" و "بوت ادمن" من المطابقات
-# عشان ما يحصلش تضارب مع أمر "رفع مشرف" بتاع صلاحيات الجروب.
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
+# رفع مدير
+# ════════════════════════════════════════════════════
 @Client.on_message(
     (command(["botadmin"]) | command2(["رفع مدير", "رفع_مدير"])) & other_filters
 )
-async def promote_bot_admin(c: Client, m: Message):
-    await m.delete()
+async def promote_manager(c: Client, m: Message):
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
 
-    if not await is_allowed(c, chat_id, m.from_user.id):
-        return await m.reply("✘ مالك المجموعة بس")
+    if not m.from_user:
+        return
+    actor_id = m.from_user.id
+
+    if not await can_manage_managers(c, chat_id, actor_id):
+        return await m.reply(
+            "✘ **رفع مدير ممنوع**\n\n"
+            "هذا الأمر مخصص فقط لـ:\n"
+            "• المالك الرسمي\n"
+            "• أصحاب البوت\n"
+            "• المديرين الذين يملكون صلاحية «رفع مديرين»"
+        )
 
     target = None
-    if m.reply_to_message:
+    if m.reply_to_message and m.reply_to_message.from_user:
         target = m.reply_to_message.from_user
     elif len(m.command) >= 2:
         arg = m.command[1]
         try:
-            target = await c.get_users(int(arg) if arg.isdigit() else arg)
+            target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
         except Exception:
             return await m.reply("✘ مش لاقي المستخدم ده")
 
     if not target:
-        return await m.reply("رد على المستخدم أو اكتب معرفه")
+        return await m.reply("رد على المستخدم أو اكتب معرفه/آيديه")
     if target.is_bot:
         return await m.reply("✘ مينفعش نرفع بوتات")
     if is_master(target.id):
         return await m.reply("👑 الواد ده فوق الكل أصلاً")
 
-    current_perms = get_permissions(chat_id, target.id) or (set(ALL_PERMISSIONS.keys()) - {"promote"})
-    keyboard = _perms_to_keyboard(target.id, current_perms)
+    # الصلاحيات الحالية إن وجدت، وإلا فاضية (المالك يحدد)
+    current_perms = get_permissions(chat_id, target.id)
+    keyboard = _perms_to_keyboard(actor_id, target.id, chat_id, current_perms)
 
     await m.reply(
         f"👤 **رفع مدير**\n\n"
         f"**المستخدم:** [{target.first_name}](tg://user?id={target.id})\n"
-        f"**الايدي:** `{target.id}`\n\n"
-        f"اختار صلاحيات المدير داخل البوت:",
+        f"**الآيدي:** `{target.id}`\n\n"
+        f"اختار صلاحيات المدير داخل البوت ثم اضغط «ارفعه دلوقتي»:",
         reply_markup=keyboard
     )
 
 
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
 # تنزيل مدير
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
 @Client.on_message(
     (command(["rmbotadmin"]) | command2(["تنزيل مدير", "تنزل مدير", "شيل مدير"])) & other_filters
 )
-async def demote_bot_admin(c: Client, m: Message):
-    await m.delete()
+async def demote_manager(c: Client, m: Message):
+    try:
+        await m.delete()
+    except Exception:
+        pass
     chat_id = m.chat.id
 
-    if not await is_allowed(c, chat_id, m.from_user.id):
-        return await m.reply("✘ مالك المجموعة بس")
+    if not m.from_user:
+        return
+    if not await can_manage_managers(c, chat_id, m.from_user.id):
+        return await m.reply("✘ تنزيل مدير ممنوع — للمالك / أصحاب البوت / مدير عنده صلاحية رفع مديرين فقط")
 
     target = None
-    if m.reply_to_message:
+    if m.reply_to_message and m.reply_to_message.from_user:
         target = m.reply_to_message.from_user
     elif len(m.command) >= 2:
         arg = m.command[1]
         try:
-            target = await c.get_users(int(arg) if arg.isdigit() else arg)
+            target = await c.get_users(int(arg) if arg.lstrip("-").isdigit() else arg)
         except Exception:
             return await m.reply("✘ مش لاقي المستخدم ده")
 
     if not target:
         return await m.reply("رد على المستخدم أو اكتب معرفه")
-
     if not is_bot_admin(chat_id, target.id):
         return await m.reply("✘ الشخص ده مش مدير")
 
@@ -139,14 +194,17 @@ async def demote_bot_admin(c: Client, m: Message):
     await m.reply(f"✔ تم شيل [{target.first_name}](tg://user?id={target.id}) من المديرين")
 
 
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
 # قائمة المديرين
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
 @Client.on_message(
     (command(["botadmins"]) | command2(["قائمة المديرين", "قايمة المديرين", "المديرين"])) & other_filters
 )
-async def list_bot_admins(c: Client, m: Message):
-    await m.delete()
+async def list_managers(c: Client, m: Message):
+    try:
+        await m.delete()
+    except Exception:
+        pass
     admins = get_bot_admins(m.chat.id)
     if not admins:
         return await m.reply("✘ مفيش مديرين في الجروب ده")
@@ -158,24 +216,56 @@ async def list_bot_admins(c: Client, m: Message):
             name = user.first_name
         except Exception:
             name = str(user_id)
-        perms_text = ", ".join(ALL_PERMISSIONS.get(p, p) for p in perms)
+        perms_text = ", ".join(ALL_PERMISSIONS.get(p, p) for p in perms) or "بدون صلاحيات"
         text += f"👤 [{name}](tg://user?id={user_id})\n» {perms_text}\n\n"
 
     await m.reply(text, disable_web_page_preview=True)
 
 
-# ═══════════════════════════════════════
-# callback تبديل صلاحية
-# ═══════════════════════════════════════
+# ════════════════════════════════════════════════════
+# Callbacks
+# ════════════════════════════════════════════════════
+def _parse_actor(query: CallbackQuery):
+    """يستخرج actor_id من الـ callback_data (موجود في كل أزرار ba)."""
+    parts = query.data.split("|")
+    # patterns:
+    #  ba|actor|target|key|onoff
+    #  ba_all|actor|target|onoff
+    #  ba_confirm|actor|target
+    #  ba_cancel|actor
+    try:
+        return int(parts[1])
+    except Exception:
+        return None
+
+
+@Client.on_callback_query(filters.regex(r"^ba_locked\|"))
+async def locked_perm(c: Client, query: CallbackQuery):
+    await query.answer(
+        "🔒 هذه الصلاحية لا يستطيع منحها سوى المالك / أصحاب البوت",
+        show_alert=True
+    )
+
+
 @Client.on_callback_query(filters.regex(r"^ba\|"))
-async def toggle_bot_perm(c: Client, query: CallbackQuery):
-    if not await is_allowed(c, query.message.chat.id, query.from_user.id):
-        return await query.answer("✘ مالك المجموعة بس", show_alert=True)
+async def toggle_perm(c: Client, query: CallbackQuery):
+    actor_id = _parse_actor(query)
+    chat_id = query.message.chat.id
+
+    if query.from_user.id != actor_id and not is_master(query.from_user.id):
+        return await query.answer("✘ مش انت اللي بدأت العملية", show_alert=True)
+    if not await can_manage_managers(c, chat_id, query.from_user.id):
+        return await query.answer("✘ مش مسموح ليك", show_alert=True)
 
     parts = query.data.split("|")
-    user_id = int(parts[1])
-    key = parts[2]
-    current = bool(int(parts[3]))
+    target_id = int(parts[2])
+    key = parts[3]
+    current = bool(int(parts[4]))
+
+    # امنع منح صلاحية محظورة لو الـ actor مش master
+    allowed = _allowed_perms_for(query.from_user.id, chat_id)
+    if key not in allowed:
+        return await query.answer("🔒 الصلاحية دي للمالك بس", show_alert=True)
 
     perms = _extract_perms(query.message.reply_markup)
     if current:
@@ -183,43 +273,83 @@ async def toggle_bot_perm(c: Client, query: CallbackQuery):
     else:
         perms.add(key)
 
-    await query.message.edit_reply_markup(_perms_to_keyboard(user_id, perms))
+    await query.message.edit_reply_markup(
+        _perms_to_keyboard(actor_id, target_id, chat_id, perms)
+    )
     await query.answer()
 
 
-# ═══════════════════════════════════════
-# callback تأكيد الرفع
-# ═══════════════════════════════════════
-@Client.on_callback_query(filters.regex(r"^ba_confirm\|"))
-async def confirm_bot_admin(c: Client, query: CallbackQuery):
-    if not await is_allowed(c, query.message.chat.id, query.from_user.id):
-        return await query.answer("✘ مالك المجموعة بس", show_alert=True)
-
-    user_id = int(query.data.split("|")[1])
+@Client.on_callback_query(filters.regex(r"^ba_all\|"))
+async def toggle_all(c: Client, query: CallbackQuery):
+    actor_id = _parse_actor(query)
     chat_id = query.message.chat.id
 
-    perms = _extract_perms(query.message.reply_markup)
-    add_bot_admin(chat_id, user_id, perms)
-    target = await c.get_users(user_id)
+    if query.from_user.id != actor_id and not is_master(query.from_user.id):
+        return await query.answer("✘ مش انت اللي بدأت العملية", show_alert=True)
+    if not await can_manage_managers(c, chat_id, query.from_user.id):
+        return await query.answer("✘ مش مسموح ليك", show_alert=True)
 
-    perms_text = "\n".join(
-        f"  {'✔' if k in perms else '✘'} {v}"
-        for k, v in ALL_PERMISSIONS.items()
+    parts = query.data.split("|")
+    target_id = int(parts[2])
+    turn_on = bool(int(parts[3]))
+
+    allowed = _allowed_perms_for(query.from_user.id, chat_id)
+    if turn_on:
+        new_perms = set(allowed)  # كل المسموح بس
+    else:
+        new_perms = set()
+
+    await query.message.edit_reply_markup(
+        _perms_to_keyboard(actor_id, target_id, chat_id, new_perms)
     )
+    await query.answer("تم")
+
+
+@Client.on_callback_query(filters.regex(r"^ba_confirm\|"))
+async def confirm_manager(c: Client, query: CallbackQuery):
+    actor_id = _parse_actor(query)
+    chat_id = query.message.chat.id
+
+    if query.from_user.id != actor_id and not is_master(query.from_user.id):
+        return await query.answer("✘ مش انت اللي بدأت العملية", show_alert=True)
+    if not await can_manage_managers(c, chat_id, query.from_user.id):
+        return await query.answer("✘ مش مسموح ليك", show_alert=True)
+
+    parts = query.data.split("|")
+    target_id = int(parts[2])
+
+    perms = _extract_perms(query.message.reply_markup)
+
+    # تأمين: شيل أي صلاحية محظورة لو الـ actor مش master
+    allowed = _allowed_perms_for(query.from_user.id, chat_id)
+    perms = perms & allowed
+
+    add_bot_admin(chat_id, target_id, perms)
+    target = await c.get_users(target_id)
+
+    if perms:
+        perms_text = "\n".join(
+            f"  ✔ {ALL_PERMISSIONS.get(k, k)}" for k in perms
+        )
+    else:
+        perms_text = "  (بدون أي صلاحيات)"
 
     await query.message.edit_text(
         f"✔ **تم رفع المدير بنجاح**\n\n"
-        f"👤 **المستخدم:** [{target.first_name}](tg://user?id={user_id})\n"
+        f"👤 **المستخدم:** [{target.first_name}](tg://user?id={target_id})\n"
         f"🏠 **المجموعة:** `{chat_id}`\n\n"
-        f"**الصلاحيات:**\n{perms_text}"
+        f"**الصلاحيات الممنوحة:**\n{perms_text}"
     )
     await query.answer()
 
 
-# ═══════════════════════════════════════
-# callback الغاء
-# ═══════════════════════════════════════
-@Client.on_callback_query(filters.regex("^ba_cancel$"))
-async def cancel_bot_admin(c: Client, query: CallbackQuery):
-    await query.message.delete()
+@Client.on_callback_query(filters.regex(r"^ba_cancel\|"))
+async def cancel_manager(c: Client, query: CallbackQuery):
+    actor_id = _parse_actor(query)
+    if query.from_user.id != actor_id and not is_master(query.from_user.id):
+        return await query.answer("✘ مش انت اللي بدأت العملية", show_alert=True)
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     await query.answer()
