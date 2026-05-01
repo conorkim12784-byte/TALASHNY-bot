@@ -18,7 +18,7 @@ from pyrogram.types import (
 )
 
 from driver.filters import command2
-from driver.permissions import member_permissions
+from driver.permissions import get_rank
 
 # ذاكرة مؤقتة: { (chat_id, user_id): asyncio.Event/placeholder }
 # بنخزن "بانتظار اسم" + الرسالة الأصلية
@@ -50,17 +50,13 @@ async def talashny_keyboard_cmd(client: Client, message: Message):
     if not message.from_user:
         return
 
-    # تحقق صلاحية: مشرف أو سودو
+    # تحقق صلاحية: مشرف أو سودو/مالك
     try:
-        perms = await member_permissions(message.chat.id, message.from_user.id)
+        rank = await get_rank(client, message.chat.id, message.from_user.id)
     except Exception:
-        perms = []
+        rank = "member"
 
-    from config import SUDO_USERS  # type: ignore
-    is_sudo = message.from_user.id in SUDO_USERS
-
-    if not is_sudo and "can_restrict_members" not in perms and "can_promote_members" not in perms and "can_change_info" not in perms:
-        # عضو عادي
+    if rank == "member":
         return await message.reply_text("• الأمر ده للمشرفين فقط.")
 
     key = (message.chat.id, message.from_user.id)
