@@ -2,7 +2,7 @@ import asyncio
 
 from driver.veez import user
 from pyrogram.types import Message
-from pyrogram import Client
+from pyrogram import Client, filters
 from pyrogram.errors import (
     ChatAdminRequired,
     InviteHashExpired,
