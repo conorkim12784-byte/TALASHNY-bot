@@ -1,43 +1,33 @@
 """
-أوامر المالك:
-- «المالك» → يعرض بيانات المالك الظاهر للبوت (اسم/يوزر/آيدي + زرار محادثة).
-- «تغيير يوزر المالك» / «تغيير المالك» / «change_owner»
-    → يغيّر المالك الظاهر للبوت (للمالك الرسمي/أصحاب البوت فقط).
-- «تحديث المالك» / «ارجاع المالك» / «reset_owner»
-    → يرجّع المالك الظاهر للمالك الرسمي.
+أوامر المالك (لكل جروب على حدة):
 
-ملاحظات:
-- صلاحية تغيير/إرجاع المالك محصورة على OWNER_ID + SUDO_USERS، حتى
-  لو حد تاني اتعمله "مالك ظاهر" قبل كده.
-- يحفظ الحالة في owner_state.json
+- «المالك» / «مالك» / «owner»
+    → في أي جروب: يعرض صاحب الجروب الفعلي (creator) من Telegram
+      مع صورته واسمه ومنشن ماركداون. يقدر أي عضو يستخدمه.
+    → لو صاحب البوت (SUDO_USERS) عيّن "مالك ظاهر" مخصّص للجروب ده،
+      هيظهر هو بدل الـ creator، لحد ما يترجع.
+
+- «تغيير يوزر المالك» / «تغيير المالك» / «change_owner»
+    → لصاحب البوت بس. يغيّر المالك الظاهر للجروب الحالي فقط.
+
+- «تحديث المالك» / «ارجاع المالك» / «reset_owner»
+    → لصاحب البوت بس. يرجّع المالك الظاهر لصاحب الجروب الفعلي.
+
+التخزين لكل جروب على حدة في owner_state.json
 """
 
 import os
 import json
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.enums import ChatMemberStatus, ChatType
+from pyrogram.types import Message
 
 from driver.filters import command2
 
-# استيراد آمن
 try:
     from config import SUDO_USERS  # type: ignore
 except Exception:
     SUDO_USERS = []
-
-try:
-    from config import OWNER_ID  # type: ignore
-except Exception:
-    # fallback: أول واحد في SUDO_USERS هو المالك الرسمي
-    try:
-        OWNER_ID = int(SUDO_USERS[0]) if SUDO_USERS else 0
-    except Exception:
-        OWNER_ID = 0
-
-try:
-    from config import OWNER_NAME  # type: ignore
-except Exception:
-    OWNER_NAME = "المالك"
 
 STATE_FILE = "owner_state.json"
 
@@ -52,7 +42,8 @@ def _load_state() -> dict:
         return {}
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
     except Exception:
         return {}
 
@@ -75,17 +66,14 @@ def _sudo_list() -> list:
             return []
 
 
-def _is_real_owner(user_id: int) -> bool:
+def _is_bot_owner(user_id: int) -> bool:
+    """صلاحية تغيير/إرجاع المالك مقصورة على SUDO_USERS بس."""
     if not user_id:
         return False
     try:
-        if OWNER_ID and int(user_id) == int(OWNER_ID):
-            return True
+        return int(user_id) in _sudo_list()
     except Exception:
-        pass
-    if int(user_id) in _sudo_list():
-        return True
-    return False
+        return False
 
 
 def _is_command_like(text: str) -> bool:
@@ -102,22 +90,33 @@ def _is_command_like(text: str) -> bool:
     return False
 
 
-def get_display_owner_id() -> int:
-    data = _load_state()
+# ═══════════════════════════════════════
+# جلب صاحب الجروب الحقيقي من Telegram
+# ═══════════════════════════════════════
+async def _fetch_real_group_owner(client: Client, chat_id: int):
+    """يرجع pyrogram User للـ creator الفعلي للجروب، أو None."""
     try:
-        return int(data.get("display_owner_id") or OWNER_ID or 0)
+        async for m in client.get_chat_members(
+            chat_id, filter="administrators"
+        ):
+            try:
+                if m.status == ChatMemberStatus.OWNER:
+                    return m.user
+            except Exception:
+                # fallback لو الـ enum مختلف
+                if str(getattr(m, "status", "")).lower().endswith("owner") or \
+                   str(getattr(m, "status", "")).lower().endswith("creator"):
+                    return m.user
     except Exception:
-        return 0
+        pass
+    return None
 
 
-def get_display_owner_username() -> str:
-    data = _load_state()
-    return str(data.get("display_owner_username") or "") or ""
-
-
-def get_display_owner_name() -> str:
-    data = _load_state()
-    return str(data.get("display_owner_name") or OWNER_NAME or "المالك")
+def _full_name(u) -> str:
+    if not u:
+        return "المالك"
+    name = ((u.first_name or "") + ((" " + u.last_name) if u.last_name else "")).strip()
+    return name or "المالك"
 
 
 # ═══════════════════════════════════════
@@ -125,66 +124,98 @@ def get_display_owner_name() -> str:
 # ═══════════════════════════════════════
 @Client.on_message(command2(["المالك", "مالك", "owner"]))
 async def show_owner_cmd(client: Client, message: Message):
-    oid = get_display_owner_id()
-    oname = get_display_owner_name()
-    ouser = get_display_owner_username()
+    chat = message.chat
+    # في الخاص: ما فيش "صاحب جروب"
+    if chat.type == ChatType.PRIVATE:
+        return await message.reply_text("• الأمر ده يستخدم داخل المجموعات بس.")
 
-    # نحاول نجيب أحدث بيانات من تليجرام
-    if oid:
+    chat_key = str(chat.id)
+    state = _load_state().get(chat_key) or {}
+
+    target_id = None
+    target_user = None
+    target_name = None
+    target_username = None
+
+    # 1) لو في مالك مخصّص للجروب ده — استخدمه
+    custom_id = state.get("display_owner_id")
+    if custom_id:
         try:
-            u = await client.get_users(oid)
-            oname = (u.first_name or "") + ((" " + u.last_name) if u.last_name else "")
-            oname = oname.strip() or oname or "المالك"
-            ouser = u.username or ouser
-            # نحدّث الحالة بالاسم الجديد لو اتغير
-            data = _load_state()
-            if oname:
-                data["display_owner_name"] = oname
-            if ouser:
-                data["display_owner_username"] = ouser
-            _save_state(data)
+            target_id = int(custom_id)
+            try:
+                target_user = await client.get_users(target_id)
+                target_name = _full_name(target_user)
+                target_username = target_user.username
+            except Exception:
+                target_name = state.get("display_owner_name") or "المالك"
+                target_username = state.get("display_owner_username") or ""
         except Exception:
-            pass
+            target_id = None
 
-    user_link = f"tg://user?id={oid}" if oid else "tg://user?id=0"
-    username_line = f"@{ouser}" if ouser else "—"
+    # 2) غير كده — هات صاحب الجروب الفعلي
+    if not target_id:
+        real = await _fetch_real_group_owner(client, chat.id)
+        if real:
+            target_user = real
+            target_id = real.id
+            target_name = _full_name(real)
+            target_username = real.username
+        else:
+            return await message.reply_text(
+                "• معرفتش أوصل لصاحب المجموعة. اتأكد إن البوت مشرف."
+            )
 
-    text = (
-        "**╭───⌁ معلومات المالك ⌁───⟤**\n"
-        f"**│ ▸ الاسم:** [{oname}]({user_link})\n"
+    # منشن ماركداون
+    safe_name = (target_name or "المالك").replace("[", "(").replace("]", ")")
+    mention_md = f"[{safe_name}](tg://user?id={target_id})"
+    username_line = f"@{target_username}" if target_username else "—"
+
+    caption = (
+        "**╭───⌁ صاحب المجموعة ⌁───⟤**\n"
+        f"**│ ▸ الاسم:** {mention_md}\n"
         f"**│ ▸ اليوزر:** {username_line}\n"
-        f"**│ ▸ الآيدي:** `{oid}`\n"
+        f"**│ ▸ الآيدي:** `{target_id}`\n"
         "**╰────────────────⟤**"
     )
 
-    buttons = [[
-        InlineKeyboardButton("✦ محادثة المالك ✦", url=user_link),
-    ]]
-    if ouser:
-        buttons[0].append(InlineKeyboardButton("✧ يوزر ✧", url=f"https://t.me/{ouser}"))
+    # نحاول نبعت صورة البروفايل
+    photo_file_id = None
+    try:
+        async for ph in client.get_chat_photos(target_id, limit=1):
+            photo_file_id = ph.file_id
+            break
+    except Exception:
+        photo_file_id = None
 
     try:
-        await message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(buttons),
-            disable_web_page_preview=True,
-        )
+        if photo_file_id:
+            await message.reply_photo(
+                photo=photo_file_id,
+                caption=caption,
+            )
+        else:
+            await message.reply_text(caption, disable_web_page_preview=True)
     except Exception:
-        await message.reply_text(text, disable_web_page_preview=True)
+        try:
+            await message.reply_text(caption, disable_web_page_preview=True)
+        except Exception:
+            pass
 
 
 # ═══════════════════════════════════════
-# أمر: تغيير يوزر المالك
+# أمر: تغيير يوزر المالك (لصاحب البوت بس — لكل جروب على حدة)
 # ═══════════════════════════════════════
 @Client.on_message(command2(["تغيير يوزر المالك", "تغيير المالك", "change_owner"]))
 async def change_owner_cmd(client: Client, message: Message):
     if not message.from_user:
         return
+    if message.chat.type == ChatType.PRIVATE:
+        return await message.reply_text("• الأمر ده يستخدم داخل المجموعات بس.")
 
     uid = message.from_user.id
-    if not _is_real_owner(uid):
+    if not _is_bot_owner(uid):
         return await message.reply_text(
-            "• الأمر ده للمالك الرسمي / أصحاب البوت بس.\n"
+            "• الأمر ده لصاحب البوت بس.\n"
             f"• آيدي حضرتك: <code>{uid}</code>"
         )
 
@@ -192,7 +223,7 @@ async def change_owner_cmd(client: Client, message: Message):
     _pending[key] = {"await_target": True, "request_msg_id": message.id}
 
     await message.reply_text(
-        "✏️ ابعت دلوقتي يوزر أو آيدي المالك الجديد.\n"
+        "✏️ ابعت دلوقتي يوزر أو آيدي المالك الجديد للجروب ده.\n"
         "ممكن كمان ترد بالرسالة على المستخدم نفسه.\n"
         "اكتب «الغاء» للإلغاء.",
         reply_to_message_id=message.id,
@@ -200,29 +231,30 @@ async def change_owner_cmd(client: Client, message: Message):
 
 
 # ═══════════════════════════════════════
-# أمر: تحديث / ارجاع المالك للمالك الرسمي
+# أمر: ارجاع المالك لصاحب الجروب الحقيقي (لصاحب البوت بس)
 # ═══════════════════════════════════════
 @Client.on_message(command2(["تحديث المالك", "ارجاع المالك", "إرجاع المالك", "reset_owner"]))
 async def reset_owner_cmd(client: Client, message: Message):
     if not message.from_user:
         return
+    if message.chat.type == ChatType.PRIVATE:
+        return await message.reply_text("• الأمر ده يستخدم داخل المجموعات بس.")
 
     uid = message.from_user.id
-    if not _is_real_owner(uid):
+    if not _is_bot_owner(uid):
         return await message.reply_text(
-            "• الأمر ده للمالك الرسمي / أصحاب البوت بس.\n"
+            "• الأمر ده لصاحب البوت بس.\n"
             f"• آيدي حضرتك: <code>{uid}</code>"
         )
 
     data = _load_state()
-    data.pop("display_owner_id", None)
-    data.pop("display_owner_username", None)
-    data.pop("display_owner_name", None)
-    _save_state(data)
+    chat_key = str(message.chat.id)
+    if chat_key in data:
+        data.pop(chat_key, None)
+        _save_state(data)
 
     await message.reply_text(
-        "✅ تم إرجاع المالك للمالك الرسمي.\n"
-        f"• آيدي المالك الرسمي: <code>{int(OWNER_ID) if OWNER_ID else 0}</code>"
+        "✅ تم إرجاع المالك لصاحب المجموعة الفعلي."
     )
 
 
@@ -250,7 +282,7 @@ async def _capture_new_owner(client: Client, message: Message):
         u = message.reply_to_message.from_user
         target_id = u.id
         target_username = u.username
-        target_name = ((u.first_name or "") + ((" " + u.last_name) if u.last_name else "")).strip()
+        target_name = _full_name(u)
     else:
         if _is_command_like(text):
             _pending.pop(key, None)
@@ -266,14 +298,14 @@ async def _capture_new_owner(client: Client, message: Message):
                 try:
                     u = await client.get_users(target_id)
                     target_username = u.username
-                    target_name = ((u.first_name or "") + ((" " + u.last_name) if u.last_name else "")).strip()
+                    target_name = _full_name(u)
                 except Exception:
                     pass
             else:
                 u = await client.get_users(cleaned)
                 target_id = u.id
                 target_username = u.username
-                target_name = ((u.first_name or "") + ((" " + u.last_name) if u.last_name else "")).strip()
+                target_name = _full_name(u)
         except Exception:
             _pending.pop(key, None)
             return await message.reply_text("• معرفتش أوصل للمستخدم ده. حاول تاني.")
@@ -281,21 +313,24 @@ async def _capture_new_owner(client: Client, message: Message):
     _pending.pop(key, None)
 
     data = _load_state()
-    data["display_owner_id"] = target_id
+    chat_key = str(message.chat.id)
+    chat_state = data.get(chat_key) or {}
+    chat_state["display_owner_id"] = target_id
     if target_username:
-        data["display_owner_username"] = target_username
+        chat_state["display_owner_username"] = target_username
     else:
-        data.pop("display_owner_username", None)
+        chat_state.pop("display_owner_username", None)
     if target_name:
-        data["display_owner_name"] = target_name
+        chat_state["display_owner_name"] = target_name
     else:
-        data.pop("display_owner_name", None)
+        chat_state.pop("display_owner_name", None)
+    data[chat_key] = chat_state
     _save_state(data)
 
     name_show = target_name or (f"@{target_username}" if target_username else str(target_id))
     user_link = f"tg://user?id={target_id}"
     await message.reply_text(
-        "✅ تم تعيين المالك الظاهر بنجاح.\n"
+        "✅ تم تعيين المالك الظاهر للجروب ده بنجاح.\n"
         f"• الاسم: [{name_show}]({user_link})\n"
         f"• اليوزر: {('@' + target_username) if target_username else '—'}\n"
         f"• الآيدي: `{target_id}`",

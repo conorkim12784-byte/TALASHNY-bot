@@ -154,11 +154,35 @@ async def _ensure_userbot_joined(c: Client, chat_id: int):
 # 4.b) فتح الدردشة الصوتية لو مش موجودة
 # ─────────────────────────────────────────
 
-async def _ensure_group_call_started(c: Client, chat_id: int):
+async def _group_call_is_active(c: Client, chat_id: int) -> bool:
+    """يتحقق هل في دردشة صوتية شغالة في الجروب دلوقتي."""
+    try:
+        from pyrogram.raw import types as raw_types
+        peer = await c.resolve_peer(chat_id)
+        if isinstance(peer, raw_types.InputPeerChannel):
+            full = await c.invoke(
+                raw_functions.channels.GetFullChannel(channel=peer)
+            )
+        else:
+            full = await c.invoke(
+                raw_functions.messages.GetFullChat(chat_id=peer.chat_id)
+            )
+        gc = getattr(full.full_chat, "call", None)
+        return gc is not None
+    except Exception:
+        return False
+
+
+async def _ensure_group_call_started(c: Client, chat_id: int) -> bool:
     """
-    لو مفيش دردشة صوتية شغالة، البوت يفتح واحدة جديدة عشان
-    الحساب المساعد يقدر يدخل بدون مشاكل.
+    يتأكد إن الدردشة الصوتية شغالة. لو مش شغالة يفتحها بالبوت.
+    يرجع True لو الكول شغال (أو اتفتح بنجاح)، False لو فشل الفتح.
     """
+    # 1) لو شغالة فعلاً → خلاص
+    if await _group_call_is_active(c, chat_id):
+        return True
+
+    # 2) نحاول نفتحها
     try:
         peer = await c.resolve_peer(chat_id)
         rid = c.rnd_id() if hasattr(c, "rnd_id") else int.from_bytes(os.urandom(4), "big", signed=True)
@@ -166,9 +190,17 @@ async def _ensure_group_call_started(c: Client, chat_id: int):
             raw_functions.phone.CreateGroupCall(peer=peer, random_id=rid)
         )
         await asyncio.sleep(2.0)
-    except Exception:
-        # GROUPCALL_ALREADY_STARTED أو ANONYMOUS_CALLS_DISABLED — نتجاهل
-        return
+    except Exception as e:
+        msg = str(e).upper()
+        # لو فعلاً شغالة بالفعل اعتبرها نجاح
+        if "GROUPCALL_ALREADY_STARTED" in msg or "ALREADY" in msg:
+            return True
+        # غير كده — فشل (صلاحيات/anonymous calls/إلخ)
+        print(f"[ensure_group_call_started] failed: {e}")
+        return False
+
+    # 3) نتحقق فعلياً إنها بقت شغالة
+    return await _group_call_is_active(c, chat_id)
 
 
 async def _force_userbot_rejoin(c: Client, chat_id: int):
@@ -346,19 +378,27 @@ async def _handle_play(c: Client, m: Message):
     except RuntimeError as e:
         return await m.reply_text(str(e))
 
-    # نفتح الدردشة الصوتية لو مكنش فيها واحدة شغالة (عشان المساعد يدخل بسلاسة)
+    # نتأكد إن الدردشة الصوتية شغالة قبل أي محاولة تشغيل.
+    # لو مش شغالة، البوت يحاول يفتحها. لو معرفش (صلاحيات/إعدادات) →
+    # نرد بـ"افتح الكول" ونوقف.
+    call_ok = await _ensure_group_call_started(c, chat_id)
+    if not call_ok:
+        return await m.reply_text("افتح الكول")
+
     # ونتأكد إن المساعد فعلاً داخل الكول — مش بس عضو في الجروب — لأن
     # بعد ما الأغنية بتخلص py-tgcalls بيخرج المساعد من الكول لكنه بيفضل عضو
     # في الجروب، وده بيخلي التشغيل التالي ميشتغلش لحد ما نعمل rejoin قسري.
     from driver.queues import QUEUE as _Q
     if chat_id not in _Q:
         # تشغيل جديد بالكامل — اعمل rejoin قسري للحساب المساعد لضمان دخوله للكول
-        # حتى لو كان عضو في الجروب من جلسة سابقة (بعد leave_call).
         try:
             await _force_userbot_rejoin(c, chat_id)
         except Exception as _e:
             print(f"[force rejoin on new play] {_e}")
-        await _ensure_group_call_started(c, chat_id)
+        # بعد الـ rejoin نتأكد تاني إن الكول لسه شغال
+        call_ok = await _ensure_group_call_started(c, chat_id)
+        if not call_ok:
+            return await m.reply_text("افتح الكول")
 
     replied = m.reply_to_message
 
