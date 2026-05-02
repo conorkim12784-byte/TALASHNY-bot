@@ -239,11 +239,11 @@ async def show_owner_cmd(client: Client, message: Message):
     username_line = f"@{target_username}" if target_username else "—"
 
     caption = (
-        "**╭───⌁ صاحب المجموعة ⌁───⟤**\n"
-        f"**الاسم:** {mention_md}\n"
-        f"**اليوزر:** {username_line}\n"
-        f"**الآيدي:** `{target_id}`\n"
-        "**╰────⌁ صاحب المجموعة ⌁────⟤**"
+        "**───⌁ صاحب المجموعة ⌁───**\n"
+        f"**𝗧** {mention_md}\n"
+        f"**𝗧** {username_line}\n"
+        f"**𝗧** `{target_id}`\n"
+        "**───⌁𝗧𝗹𝗔𝘀𝗛𝗮𝗡𝘆⌁───**"
     )
 
     # نحاول نبعت صورة البروفايل
