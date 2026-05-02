@@ -20,6 +20,10 @@ import os
 import json
 from pyrogram import Client, filters
 from pyrogram.enums import ChatMemberStatus, ChatType
+try:
+    from pyrogram.enums import ChatMembersFilter  # Pyrogram v2
+except Exception:
+    ChatMembersFilter = None  # type: ignore
 from pyrogram.types import Message
 
 from driver.filters import command2
@@ -95,20 +99,55 @@ def _is_command_like(text: str) -> bool:
 # ═══════════════════════════════════════
 async def _fetch_real_group_owner(client: Client, chat_id: int):
     """يرجع pyrogram User للـ creator الفعلي للجروب، أو None."""
+    # الطريقة 1: get_chat → فيه owner في بعض الإصدارات
     try:
-        async for m in client.get_chat_members(
-            chat_id, filter="administrators"
-        ):
+        chat = await client.get_chat(chat_id)
+        for attr in ("owner", "creator"):
+            u = getattr(chat, attr, None)
+            if u:
+                return u
+    except Exception:
+        pass
+
+    # الطريقة 2: get_chat_members بـ enum (Pyrogram v2)
+    if ChatMembersFilter is not None:
+        try:
+            async for m in client.get_chat_members(
+                chat_id, filter=ChatMembersFilter.ADMINISTRATORS
+            ):
+                try:
+                    if m.status == ChatMemberStatus.OWNER:
+                        return m.user
+                except Exception:
+                    if str(getattr(m, "status", "")).lower().endswith(("owner", "creator")):
+                        return m.user
+        except Exception:
+            pass
+
+    # الطريقة 3: get_chat_members من غير filter (fallback عام)
+    try:
+        async for m in client.get_chat_members(chat_id):
             try:
                 if m.status == ChatMemberStatus.OWNER:
                     return m.user
             except Exception:
-                # fallback لو الـ enum مختلف
-                if str(getattr(m, "status", "")).lower().endswith("owner") or \
-                   str(getattr(m, "status", "")).lower().endswith("creator"):
+                if str(getattr(m, "status", "")).lower().endswith(("owner", "creator")):
                     return m.user
     except Exception:
         pass
+
+    # الطريقة 4: string filter (Pyrogram v1 القديم)
+    try:
+        async for m in client.get_chat_members(chat_id, filter="administrators"):
+            try:
+                if m.status == ChatMemberStatus.OWNER:
+                    return m.user
+            except Exception:
+                if str(getattr(m, "status", "")).lower().endswith(("owner", "creator")):
+                    return m.user
+    except Exception:
+        pass
+
     return None
 
 
