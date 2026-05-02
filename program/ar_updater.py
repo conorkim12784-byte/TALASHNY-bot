@@ -63,7 +63,7 @@ def check_update() -> tuple[bool, str]:
     return True, msg
 
 
-@Client.on_message(command2(["تحديث"]))
+@Client.on_message(command2(["تحديث_البوت", "update_bot"]))
 @sudo_users_only
 async def update_repo(_, message: Message):
     await message.delete()

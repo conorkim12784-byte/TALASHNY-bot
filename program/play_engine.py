@@ -99,47 +99,57 @@ async def _check_bot_perms(c: Client, chat_id: int) -> str | None:
 # 4) انضمام الـ userbot للجروب
 # ─────────────────────────────────────────
 
+def _status_value(status) -> str:
+    value = getattr(status, "value", status)
+    return str(value).lower()
+
+
 async def _fresh_invite_and_join(c: Client, chat_id: int):
-    """ينشئ رابط دعوة جديد لحظياً ويضم الـ userbot. يتعامل مع روابط منتهية."""
+    """ينشئ رابط دعوة ويضم الحساب المساعد بدون إخراجه لو موجود بالفعل."""
     try:
-        # ننشئ رابط جديد بدل export_chat_invite_link اللي ممكن يرجع رابط متخزن منتهي
         new_invite = await c.create_chat_invite_link(chat_id)
         link = new_invite.invite_link
     except ChatAdminRequired:
-        raise RuntimeError(
-            "البوت محتاج صلاحية **دعوة المستخدمين** عشان يضم الحساب المساعد."
-        )
-    except Exception as e:
-        raise RuntimeError(f"تعذر إنشاء رابط دعوة جديد\n\nالسبب: `{e}`")
+        raise RuntimeError("البوت محتاج صلاحية **دعوة المستخدمين** عشان يضم الحساب المساعد.")
+    except Exception:
+        try:
+            link = await c.export_chat_invite_link(chat_id)
+            if link.startswith("https://t.me/+"):
+                link = link.replace("https://t.me/+", "https://t.me/joinchat/")
+        except Exception as e:
+            raise RuntimeError(f"تعذر إنشاء رابط دعوة جديد\n\nالسبب: `{e}`")
 
     try:
         await user.join_chat(link)
     except (InviteHashExpired, InviteHashInvalid):
-        # نحاول نعمل رابط جديد تاني
         try:
             new_invite = await c.create_chat_invite_link(chat_id)
             await user.join_chat(new_invite.invite_link)
         except UserAlreadyParticipant:
             return
         except Exception as e:
-            raise RuntimeError(
-                "رابط الدعوة منتهي/غير صالح. اطلب من المالك إعادة المحاولة.\n\n"
-                f"السبب: `{e}`"
-            )
+            raise RuntimeError(f"رابط الدعوة منتهي/غير صالح. حاول تاني.\n\nالسبب: `{e}`")
     except UserAlreadyParticipant:
         return
     except InviteRequestSent:
-        raise RuntimeError(
-            "تم إرسال طلب انضمام للمساعد — اقبل الطلب أو فعّل القبول التلقائي."
-        )
+        raise RuntimeError("تم إرسال طلب انضمام للمساعد — اقبل الطلب من إعدادات المجموعة.")
 
 
 async def _ensure_userbot_joined(c: Client, chat_id: int):
     try:
         ubot_id = (await user.get_me()).id
         member = await c.get_chat_member(chat_id, ubot_id)
-        if member.status.value == "banned":
+        status = _status_value(getattr(member, "status", None))
+        if status == "banned":
             await c.unban_chat_member(chat_id, ubot_id)
+            await _fresh_invite_and_join(c, chat_id)
+        elif status in ("member", "administrator", "creator", "owner", "restricted"):
+            try:
+                await user.get_chat(chat_id)
+            except Exception:
+                pass
+            return
+        else:
             await _fresh_invite_and_join(c, chat_id)
     except (UserNotParticipant, PeerIdInvalid):
         try:
@@ -203,22 +213,13 @@ async def _ensure_group_call_started(c: Client, chat_id: int) -> bool:
     return await _group_call_is_active(c, chat_id)
 
 
-async def _force_userbot_rejoin(c: Client, chat_id: int):
-    """
-    يخرج الحساب المساعد من الجروب ويعيد ضمه — يُستخدم كحل أخير
-    عندما يكون 'عضو' لكن جلسته في الكول معطّلة بعد leave_call سابق.
-    """
+async def _reset_userbot_call_session(chat_id: int):
+    """يصفر جلسة المكالمة فقط بدون خروج الحساب المساعد من المجموعة."""
     try:
-        ubot_id = (await user.get_me()).id
-        try:
-            await user.leave_chat(chat_id)
-        except Exception:
-            pass
-        await asyncio.sleep(1.0)
-        await _fresh_invite_and_join(c, chat_id)
-        await asyncio.sleep(1.0)
-    except Exception as e:
-        print(f"[force_userbot_rejoin error] {e}")
+        await call_py.leave_call(chat_id)
+    except Exception:
+        pass
+    await asyncio.sleep(1.0)
 
 
 
@@ -310,10 +311,9 @@ async def _do_play(
         try:
             await _try_play()
         except Exception as play_err:
-            # غالباً المساعد طلع من الكول السابق (leave_call) ولسه عضو في الجروب
-            # فـ pytgcalls مش لاقي session نشطة. نعيد ضمه بقوة ونحاول تاني.
-            print(f"[play retry] {play_err} — forcing userbot rejoin")
-            await _force_userbot_rejoin(c, chat_id)
+            print(f"[play retry] {play_err} — resetting assistant call session")
+            await _reset_userbot_call_session(chat_id)
+            await _ensure_userbot_joined(c, chat_id)
             await _ensure_group_call_started(c, chat_id)
             await _try_play()
 
@@ -384,21 +384,6 @@ async def _handle_play(c: Client, m: Message):
     call_ok = await _ensure_group_call_started(c, chat_id)
     if not call_ok:
         return await m.reply_text("افتح الكول")
-
-    # ونتأكد إن المساعد فعلاً داخل الكول — مش بس عضو في الجروب — لأن
-    # بعد ما الأغنية بتخلص py-tgcalls بيخرج المساعد من الكول لكنه بيفضل عضو
-    # في الجروب، وده بيخلي التشغيل التالي ميشتغلش لحد ما نعمل rejoin قسري.
-    from driver.queues import QUEUE as _Q
-    if chat_id not in _Q:
-        # تشغيل جديد بالكامل — اعمل rejoin قسري للحساب المساعد لضمان دخوله للكول
-        try:
-            await _force_userbot_rejoin(c, chat_id)
-        except Exception as _e:
-            print(f"[force rejoin on new play] {_e}")
-        # بعد الـ rejoin نتأكد تاني إن الكول لسه شغال
-        call_ok = await _ensure_group_call_started(c, chat_id)
-        if not call_ok:
-            return await m.reply_text("افتح الكول")
 
     replied = m.reply_to_message
 

@@ -26,12 +26,19 @@ def _yt_thumb_from_link(link: str) -> str:
     return IMG_5
 
 
-@Client.on_message(command2(["اعاده", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
+@Client.on_message(command2(["اعاده", "تحديث", "تحديث_الادمن", "حدث_الادمن"]) & other_filters)
 @owner_only
 async def update_admin_ar(client, message):
     await message.delete()
-    await refresh_administrators(message.chat)
-    await message.reply_text("✔ تم تحديث قائمة المسؤولين بنجاح!")
+    admins = await refresh_administrators(message.chat)
+    owner_ok = False
+    try:
+        from program.owner_change import refresh_group_owner_state
+        owner_ok = bool(await refresh_group_owner_state(client, message.chat.id))
+    except Exception as e:
+        print(f"[refresh owner state error] {e}")
+    owner_text = "وتم تحديث المالك" if owner_ok else "وتعذر تحديث المالك"
+    await message.reply_text(f"✔ تم تحديث قائمة المسؤولين ({len(admins)}) {owner_text}.")
 
 
 @Client.on_message(command2(["تخطي"]) & other_filters)
