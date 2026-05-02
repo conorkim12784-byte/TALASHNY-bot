@@ -137,7 +137,7 @@ async def show_owner_cmd(client: Client, message: Message):
     target_name = None
     target_username = None
 
-    # 1) لو في مالك مخصّص للجروب ده — استخدمه
+    # 1) لو في مالك مخصّص للجروب ده — استخدمه (مع تحديث اليوزر/الاسم تلقائياً من تيليجرام)
     custom_id = state.get("display_owner_id")
     if custom_id:
         try:
@@ -145,7 +145,7 @@ async def show_owner_cmd(client: Client, message: Message):
             try:
                 target_user = await client.get_users(target_id)
                 target_name = _full_name(target_user)
-                target_username = target_user.username
+                target_username = target_user.username or ""
             except Exception:
                 target_name = state.get("display_owner_name") or "المالك"
                 target_username = state.get("display_owner_username") or ""
@@ -165,6 +165,35 @@ async def show_owner_cmd(client: Client, message: Message):
                 "• معرفتش أوصل لصاحب المجموعة. اتأكد إن البوت مشرف."
             )
 
+    # تحديث تلقائي: لو معندناش بيانات محفوظة، احفظ صاحب الجروب الفعلي
+    # ولو اليوزر/الاسم اتغير من تيليجرام، حدّثهم تلقائياً
+    try:
+        if target_user is not None:
+            data_all = _load_state()
+            chat_state = data_all.get(chat_key) or {}
+            fresh_username = target_user.username or ""
+            fresh_name = _full_name(target_user)
+            changed = False
+            if chat_state.get("display_owner_id") != target_id:
+                chat_state["display_owner_id"] = target_id
+                changed = True
+            if chat_state.get("display_owner_username", "") != fresh_username:
+                if fresh_username:
+                    chat_state["display_owner_username"] = fresh_username
+                else:
+                    chat_state.pop("display_owner_username", None)
+                changed = True
+            if chat_state.get("display_owner_name", "") != fresh_name:
+                chat_state["display_owner_name"] = fresh_name
+                changed = True
+            if changed:
+                data_all[chat_key] = chat_state
+                _save_state(data_all)
+                target_username = fresh_username
+                target_name = fresh_name
+    except Exception:
+        pass
+
     # منشن ماركداون
     safe_name = (target_name or "المالك").replace("[", "(").replace("]", ")")
     mention_md = f"[{safe_name}](tg://user?id={target_id})"
@@ -172,10 +201,10 @@ async def show_owner_cmd(client: Client, message: Message):
 
     caption = (
         "**╭───⌁ صاحب المجموعة ⌁───⟤**\n"
-        f"**│ ▸ الاسم:** {mention_md}\n"
-        f"**│ ▸ اليوزر:** {username_line}\n"
-        f"**│ ▸ الآيدي:** `{target_id}`\n"
-        "**╰────────────────⟤**"
+        f"**الاسم:** {mention_md}\n"
+        f"**اليوزر:** {username_line}\n"
+        f"**الآيدي:** `{target_id}`\n"
+        "**╰────⌁ صاحب المجموعة ⌁────⟤**"
     )
 
     # نحاول نبعت صورة البروفايل
