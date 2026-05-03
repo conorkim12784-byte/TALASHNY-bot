@@ -151,7 +151,7 @@ async def marry_cmd(client: Client, message: Message):
     # هل في تارجت محدد؟
     target = await _resolve_target(client, message)
 
-    # لو مفيش تارجت → اختار شخص عشوائي وزوّجه فورًا
+    # لو مفيش تارجت → اختار شخص عشوائي وابعتله طلب موافقة (مش زواج إجباري)
     if not target:
         if _get_spouse(chat_id, proposer.id):
             await message.reply("✦ انت متجوز بالفعل، لازم تطلق الأول 💔")
@@ -167,18 +167,8 @@ async def marry_cmd(client: Client, message: Message):
             await message.reply("✦ مفيش حد متاح للزواج دلوقتي 😅")
             return
 
-        _set_marriage(
-            chat_id,
-            {"id": proposer.id, "name": proposer.first_name or "عضو"},
-            {"id": random_user.id, "name": random_user.first_name or "عضو"},
-        )
-        await message.reply(
-            f"💞 القرعة وقعت! 🎉\n\n"
-            f"العريس: {_mention(proposer)}\n"
-            f"العروسة: {_mention(random_user)}\n\n"
-            f"عقبال ما نشوف الاولاد ✨"
-        )
-        return
+        target = random_user
+        # نكمل بنفس مسار العرض المعتاد بدل ما نزوّجه فورًا
 
     # تارجت محدد — العرض المعتاد
     if target.is_bot:
