@@ -1,7 +1,8 @@
 tgcrypto
 py-tgcalls==2.2.11
-pyrofork
-# ✅ خلي yt-dlp محدّث دايماً — هو اللي بيتعامل مع تغييرات يوتيوب
+# pyrotgfork: نسخة pyrofork محدّثة على Layer 225
+# بتدعم تلوين الأزرار (ButtonStyle.PRIMARY/SUCCESS/DANGER)
+pyrotgfork>=2.2.23
 # في كل deploy: pip install -U yt-dlp
 yt-dlp>=2025.09.26
 bgutil-ytdlp-pot-provider>=1.3.1
