@@ -43,9 +43,8 @@ TOGGLEABLE_COMMANDS = {
     "طلاق":    ["طلاق"],
     "xo":      ["xo", "اكس"],
     "كت":      ["كت"],
-    "صراحة":   ["صراحة", "صراحه"],
     "تاك":     ["تاك"],
-    "الهمس":   ["الهمس", "whisper"],
+    "همسة":    ["همسة", "الهمسة", "الهمس", "همس", "whisper"],
     "اشتراك":  ["اشتراك اجباري", "fsub"],
     "قائمة":   ["قائمه الاوامر", "الاوامر", "اوامر", "commands", "help"],
     "كيبورد":  ["كيبورد", "keyboard"],
@@ -91,14 +90,8 @@ def _set_lock(chat_id: int, key: str, locked: bool) -> None:
 
 
 async def _is_owner_or_master(c: Client, chat_id: int, user_id: int) -> bool:
-    if is_master(user_id):
-        return True
-    try:
-        m = await c.get_chat_member(chat_id, user_id)
-        st = getattr(m.status, "value", str(m.status)).lower()
-        return st in ("creator", "owner", "administrator")
-    except Exception:
-        return False
+    """الأمر مقصور على: المالك الرسمي / أصحاب البوت فقط."""
+    return is_master(user_id)
 
 
 def _resolve_key(name: str) -> str | None:

@@ -7,7 +7,7 @@
    أو ترد: @BotUsername بالرد على المستخدم — هتكتب بعدها الرسالة.
    مثال: @MyBot @ahmed أنا بحبك
 2) البوت بيرجّع نتيجة Inline. اختار النتيجة وابعتها للجروب/الشات.
-3) لما المستخدم المستهدف يدوس على «اقرأ الهمس» تظهرله الرسالة في تنبيه
+3) لما المستخدم المستهدف يدوس على «اقرأ الهمسة» تظهرله الرسالة في تنبيه
    خاص بيه فقط، أي حد تاني يدوس بيظهرله "الرسالة دي مش ليك".
 
 التحكم (للمالك/المشرفين/أصحاب البوت):
@@ -101,7 +101,7 @@ def _is_sudo(uid: int) -> bool:
 
 def _panel_kb(chat_id: int) -> InlineKeyboardMarkup:
     enabled = _is_enabled(chat_id)
-    txt = "🔴 تعطيل الهمس" if enabled else "🟢 تفعيل الهمس"
+    txt = "🔴 تعطيل الهمسة" if enabled else "🟢 تفعيل الهمسة"
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(txt, callback_data=f"wh:toggle:{chat_id}")],
         [InlineKeyboardButton("✖️ إغلاق", callback_data="wh:close")],
@@ -111,7 +111,7 @@ def _panel_kb(chat_id: int) -> InlineKeyboardMarkup:
 def _panel_text(chat_id: int) -> str:
     enabled = _is_enabled(chat_id)
     return (
-        "**╭───⌁ نظام الهمس ⌁───⟤**\n"
+        "**╭───⌁ نظام الهمسة ⌁───⟤**\n"
         f"**│ ▸ الحالة:** {'🟢 مفعّل' if enabled else '🔴 معطّل'}\n"
         "**│ ▸ الاستخدام:** اكتب في أي شات\n"
         "**│   `@BOT_USERNAME @user رسالتك`**\n"
@@ -119,7 +119,7 @@ def _panel_text(chat_id: int) -> str:
     )
 
 
-@Client.on_message(command2(["الهمس", "همس", "whisper"]) & filters.group)
+@Client.on_message(command2(["همسة", "الهمسة", "الهمس", "همس", "whisper"]) & filters.group)
 async def whisper_panel(client: Client, message: Message):
     if not message.from_user:
         return
@@ -129,7 +129,7 @@ async def whisper_panel(client: Client, message: Message):
     await message.reply_text(_panel_text(message.chat.id), reply_markup=_panel_kb(message.chat.id))
 
 
-@Client.on_message(command2(["تفعيل الهمس", "enable_whisper"]) & filters.group)
+@Client.on_message(command2(["تفعيل الهمسة", "تفعيل الهمس", "enable_whisper"]) & filters.group)
 async def whisper_enable(client: Client, message: Message):
     if not message.from_user:
         return
@@ -137,10 +137,10 @@ async def whisper_enable(client: Client, message: Message):
     if rank not in ("admin", "owner", "sudo"):
         return await message.reply_text("• الأمر ده للمشرفين/المالك/أصحاب البوت بس.")
     _set_enabled(message.chat.id, True)
-    await message.reply_text("✅ تم تفعيل نظام الهمس في الجروب.")
+    await message.reply_text("✅ تم تفعيل نظام الهمسة في الجروب.")
 
 
-@Client.on_message(command2(["تعطيل الهمس", "disable_whisper"]) & filters.group)
+@Client.on_message(command2(["تعطيل الهمسة", "تعطيل الهمس", "disable_whisper"]) & filters.group)
 async def whisper_disable(client: Client, message: Message):
     if not message.from_user:
         return
@@ -148,7 +148,7 @@ async def whisper_disable(client: Client, message: Message):
     if rank not in ("admin", "owner", "sudo"):
         return await message.reply_text("• الأمر ده للمشرفين/المالك/أصحاب البوت بس.")
     _set_enabled(message.chat.id, False)
-    await message.reply_text("🔴 تم تعطيل نظام الهمس في الجروب.")
+    await message.reply_text("🔴 تم تعطيل نظام الهمسة في الجروب.")
 
 
 @Client.on_callback_query(filters.regex(r"^wh:"))
@@ -186,10 +186,10 @@ async def whisper_inline(client: Client, query: InlineQuery):
         return await query.answer(
             results=[
                 InlineQueryResultArticle(
-                    title="نظام الهمس 🔇",
+                    title="نظام الهمسة 🔇",
                     description="اكتب: @user رسالتك السرية",
                     input_message_content=InputTextMessageContent(
-                        "**نظام الهمس**\n"
+                        "**نظام الهمسة**\n"
                         "الاستخدام: `@BotUsername @user رسالتك السرية`"
                     ),
                 )
@@ -254,7 +254,7 @@ async def whisper_inline(client: Client, query: InlineQuery):
         "اضغط على الزر تحت لقراءتها (للمستهدف فقط)."
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👁 اقرأ الهمس", callback_data=f"wread:{wid}")]
+        [InlineKeyboardButton("👁 اقرأ الهمسة", callback_data=f"wread:{wid}")]
     ])
 
     await query.answer(
@@ -285,7 +285,7 @@ async def whisper_read_cb(client: Client, cq: CallbackQuery):
     # تفعيل/تعطيل في الجروب
     chat = cq.message.chat if cq.message else None
     if chat and chat.type and str(chat.type).lower().endswith("group") and not _is_enabled(chat.id):
-        return await cq.answer("• نظام الهمس متعطّل في الجروب ده.", show_alert=True)
+        return await cq.answer("• نظام الهمسة متعطّل في الجروب ده.", show_alert=True)
 
     is_target = False
     if w.get("target_id") and uid == w["target_id"]:
