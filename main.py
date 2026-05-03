@@ -4,6 +4,30 @@ import asyncio
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
+# ─────────────────────────────────────────────────────────
+# Patch: أي InlineKeyboardButton مش محدد له style ولا أحمر/أخضر
+# يبقى أزرق افتراضياً (Bot API 9.4+).
+# ─────────────────────────────────────────────────────────
+from pyrogram.types import InlineKeyboardButton as _IKB
+try:
+    from pyrogram.enums import ButtonStyle as _BS  # type: ignore
+    _DEFAULT_STYLE = _BS.PRIMARY
+except Exception:
+    _DEFAULT_STYLE = None
+
+_orig_ikb_init = _IKB.__init__
+def _patched_ikb_init(self, *args, **kwargs):
+    style = kwargs.pop("style", None)
+    _orig_ikb_init(self, *args, **kwargs)
+    try:
+        if style is None and _DEFAULT_STYLE is not None:
+            style = _DEFAULT_STYLE
+        if style is not None:
+            object.__setattr__(self, "style", style)
+    except Exception:
+        pass
+_IKB.__init__ = _patched_ikb_init
+
 from pyrogram.raw.all import layer  # noqa
 from pyrogram import Client
 from pytgcalls import idle
