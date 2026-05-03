@@ -64,6 +64,9 @@ def BTN(
     style: 'primary' | 'success' | 'danger' | 'default'
     url: لو الزر URL بدل callback
     """
+    # افتراضي: أي زر مش محدد لون يبقى أزرق (primary)
+    if not style:
+        style = "primary"
     s = _resolve(style)
     kwargs = {"text": text}
     if url:

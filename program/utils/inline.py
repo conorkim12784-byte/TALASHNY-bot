@@ -11,7 +11,10 @@ from config import UPDATES_CHANNEL, BOT_USERNAME
 
 def _btn(text, style=None, **kwargs):
   """ينشئ InlineKeyboardButton ويحاول تطبيق ميزة style (تلوين الأزرار - Bot API 9.4+).
+  لو الزر مش محدد لون → افتراضي primary (أزرق).
   لو نسخة Pyrogram لا تدعم style بعد، يتم تجاهله تلقائياً بدون أن يكسر البوت."""
+  if not style:
+    style = "primary"
   btn = InlineKeyboardButton(text=text, **kwargs)
   if style:
     try:
