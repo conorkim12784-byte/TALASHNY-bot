@@ -26,7 +26,10 @@ def main_keyboard(user_id: int):
             InlineKeyboardButton("الأعضاء", callback_data="cmds_members"),
             InlineKeyboardButton("المشرفين", callback_data="cmds_admins"),
         ],
-        [InlineKeyboardButton("المالك", callback_data="cmds_owner")],
+        [
+            InlineKeyboardButton("المالك", callback_data="cmds_owner"),
+            InlineKeyboardButton("الألعاب", callback_data="cmds_games"),
+        ],
     ]
     if user_id in SUDO_USERS:
         rows.append([InlineKeyboardButton("المطور", callback_data="cmds_dev")])
@@ -386,4 +389,33 @@ async def cmds_close(c: Client, query: CallbackQuery):
         await query.message.delete()
     except Exception:
         pass
+    await query.answer()
+
+
+# ═══════════════════════════════════════
+# قسم الألعاب
+# ═══════════════════════════════════════
+GAMES_AR = """**🎮 أوامر الألعاب**
+
+**▸ 💍 نظام الزواج:**
+`زوجني` (بالرد أو @user) — تطلب الزواج، الطرف التاني يوافق أو يرفض بزر
+`زوجي` — يعرض شريك حياتك في الجروب
+`طلاق` — تطلق شريكك الحالي
+
+**▸ ❌⭕ لعبة XO (إكس أو):**
+`xo` (بالرد أو @user) — تبدأ لعبة XO ضد عضو
+`اكس` — نفس الأمر
+
+**ملاحظات:**
+• كل لعبة بتشتغل مع أي عضو في الجروب
+• الزواج محفوظ لكل جروب على حدة"""
+
+
+@Client.on_callback_query(filters.regex("^cmds_games$"))
+async def cmds_games_cb(c: Client, query: CallbackQuery):
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("رجوع", callback_data=f"cmds_back_{query.from_user.id}")],
+        [InlineKeyboardButton("إغلاق", callback_data="cmds_close")],
+    ])
+    await _safe_edit(query, GAMES_AR, kb)
     await query.answer()
