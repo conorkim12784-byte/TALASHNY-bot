@@ -1,20 +1,15 @@
 """
-ألعاب تفاعلية للأعضاء (نسخة محدّثة):
-- XO (إكس أو) مع نقاط (فوز=3 / تعادل=1)
-- زواج بموافقة (مفيش اختيار عشوائي تلقائي)
-- لعبة كت (Cat) — أسئلة عامة
-- أمر "تاك" (مش لعبة) — تفعيل/تعطيل + صلاحية
-- لعبة "تفكيك" — كلمة مبعثرة (نقاط)
-- لعبة "تجميع" — حروف متفرقة لتكوين كلمة (نقاط)
-- لعبة "قرعة" — يدخل أسماء والبوت يختار واحد
-- نظام نقاط تراكمي عبر كل الجروبات + أمر "توب"
-- تفعيل/تعطيل الألعاب لكل جروب: «تفعيل الالعاب» / «تعطيل الالعاب»
+ألعاب تفاعلية للأعضاء:
+- لعبة XO (إكس أو) — لاعبين بأزرار Inline (بدعم زرار "انضمام")
+- نظام الزواج: زوجني / زوجي / طلاق (مع دعم اختيار شخص عشوائي)
+- لعبة كت (Cat) — 1000 سؤال عام عشوائي باللهجة المصرية
+- لعبة صراحة — أسئلة صراحة عشوائية كثيرة
+- أمر "تاك" — منشن لأعضاء الجروب بالعدد أو كله (مع تفعيل/تعطيل وصلاحية)
 
 التخزين: ملف JSON محلي (games_data.json)
 """
 
 import os
-import re
 import json
 import random
 import asyncio
@@ -28,12 +23,10 @@ from pyrogram.types import (
     InlineKeyboardMarkup,
 )
 
-from driver.filters import command2, other_filters
+from driver.filters import command2, other_filters, phrases
+from program.utils.colored_buttons import BTN
 from driver.botadmin import is_master, has_permission
 from config import SUDO_USERS
-
-from program.games_words import SCRAMBLE_WORDS, BUILD_WORDS
-from program.games_questions import CAT_QUESTIONS
 
 DATA_FILE = "games_data.json"
 
@@ -42,17 +35,15 @@ DATA_FILE = "games_data.json"
 # ═══════════════════════════════════════════════
 def _load() -> dict:
     if not os.path.exists(DATA_FILE):
-        return {}
+        return {"marriages": {}, "tag_enabled": {}}
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             d = json.load(f)
+            d.setdefault("marriages", {})
+            d.setdefault("tag_enabled", {})
+            return d
     except Exception:
-        d = {}
-    d.setdefault("marriages", {})
-    d.setdefault("tag_enabled", {})
-    d.setdefault("games_enabled", {})   # {chat_id: bool}
-    d.setdefault("scores", {})          # {user_id: {"name": str, "points": int}}
-    return d
+        return {"marriages": {}, "tag_enabled": {}}
 
 
 def _save(data: dict) -> None:
@@ -68,7 +59,8 @@ def _md_escape(name: str) -> str:
 
 
 def _mention(user) -> str:
-    return f"[{_md_escape(user.first_name)}](tg://user?id={user.id})"
+    name = _md_escape(user.first_name)
+    return f"[{name}](tg://user?id={user.id})"
 
 
 def _mention_id(uid: int, name: str) -> str:
@@ -76,84 +68,10 @@ def _mention_id(uid: int, name: str) -> str:
 
 
 # ═══════════════════════════════════════════════
-# نظام النقاط (تراكمي عبر كل الجروبات)
-# ═══════════════════════════════════════════════
-def _add_points(user_id: int, first_name: str, points: int) -> int:
-    data = _load()
-    rec = data["scores"].get(str(user_id), {"name": first_name or "عضو", "points": 0})
-    rec["name"] = first_name or rec.get("name") or "عضو"
-    rec["points"] = int(rec.get("points", 0)) + int(points)
-    data["scores"][str(user_id)] = rec
-    _save(data)
-    return rec["points"]
-
-
-def _get_points(user_id: int) -> int:
-    data = _load()
-    return int(data["scores"].get(str(user_id), {}).get("points", 0))
-
-
-# ═══════════════════════════════════════════════
-# تفعيل/تعطيل الألعاب على مستوى الجروب
-# ═══════════════════════════════════════════════
-GAME_PERM = "tag"  # نفس صلاحية التاك تتحكم في تفعيل/تعطيل الألعاب
-
-
-def _games_enabled(chat_id: int) -> bool:
-    data = _load()
-    val = data["games_enabled"].get(str(chat_id))
-    return True if val is None else bool(val)
-
-
-def _games_set(chat_id: int, value: bool) -> None:
-    data = _load()
-    data["games_enabled"][str(chat_id)] = bool(value)
-    _save(data)
-
-
-async def _can_manage(client: Client, chat_id: int, user_id: int) -> bool:
-    if user_id in SUDO_USERS or is_master(user_id):
-        return True
-    if has_permission(chat_id, user_id, GAME_PERM):
-        return True
-    try:
-        member = await client.get_chat_member(chat_id, user_id)
-        status = getattr(member.status, "value", str(member.status)).lower()
-        if status in ("creator", "owner", "administrator"):
-            return True
-    except Exception:
-        pass
-    return False
-
-
-@Client.on_message(command2(["تفعيل الالعاب", "تفعيل الألعاب"]) & other_filters)
-async def games_enable(client: Client, message: Message):
-    if not message.from_user:
-        return
-    if not await _can_manage(client, message.chat.id, message.from_user.id):
-        return await message.reply("❌ مش عندك صلاحية")
-    _games_set(message.chat.id, True)
-    await message.reply("✔ **تم تفعيل الألعاب** 🎮")
-
-
-@Client.on_message(command2(["تعطيل الالعاب", "تعطيل الألعاب", "ايقاف الالعاب"]) & other_filters)
-async def games_disable(client: Client, message: Message):
-    if not message.from_user:
-        return
-    if not await _can_manage(client, message.chat.id, message.from_user.id):
-        return await message.reply("❌ مش عندك صلاحية")
-    _games_set(message.chat.id, False)
-    await message.reply("✘ **تم تعطيل الألعاب**")
-
-
-def _games_ok(message: Message) -> bool:
-    return _games_enabled(message.chat.id)
-
-
-# ═══════════════════════════════════════════════
-# اختيار عضو عشوائي
+# اختيار عضو عشوائي من الجروب
 # ═══════════════════════════════════════════════
 async def _random_member(client: Client, chat_id: int, exclude_ids: set):
+    """يجيب عضو عشوائي من الجروب — ينقّي البوتات والمستبعدين."""
     try:
         candidates = []
         async for m in client.get_chat_members(chat_id):
@@ -173,11 +91,13 @@ async def _random_member(client: Client, chat_id: int, exclude_ids: set):
 
 
 # ═══════════════════════════════════════════════
-# 💍 نظام الزواج — بموافقة فقط
+# 💍 نظام الزواج
 # ═══════════════════════════════════════════════
 def _get_spouse(chat_id: int, user_id: int) -> Optional[dict]:
     data = _load()
-    return data["marriages"].get(str(chat_id), {}).get(str(user_id))
+    chat = data["marriages"].get(str(chat_id), {})
+    rec = chat.get(str(user_id))
+    return rec
 
 
 def _set_marriage(chat_id: int, u1: dict, u2: dict) -> None:
@@ -199,16 +119,20 @@ def _remove_marriage(chat_id: int, user_id: int) -> Optional[dict]:
 
 
 async def _resolve_target(client: Client, message: Message):
+    """جيب اليوزر الهدف من الرد أو المنشن أو اليوزرنيم"""
     if message.reply_to_message and message.reply_to_message.from_user:
         return message.reply_to_message.from_user
+
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
         return None
+
     arg = parts[1].strip()
     if message.entities:
         for ent in message.entities:
             if ent.type.value == "text_mention" and ent.user:
                 return ent.user
+
     arg = arg.lstrip("@")
     try:
         return await client.get_users(arg)
@@ -216,32 +140,63 @@ async def _resolve_target(client: Client, message: Message):
         return None
 
 
+# ── زوجني ──
 @Client.on_message(command2(["زوجني", "اتجوز"]) & other_filters)
 async def marry_cmd(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    if not message.from_user:
         return
     proposer = message.from_user
     chat_id = message.chat.id
+
+    # هل في تارجت محدد؟
     target = await _resolve_target(client, message)
 
+    # لو مفيش تارجت → اختار شخص عشوائي وزوّجه فورًا
     if not target:
-        return await message.reply(
-            "✦ لازم تحدد الشخص اللي عايز تتجوزه — رد على رسالته أو اعمله منشن.\n"
-            "مثال: `زوجني @username`"
-        )
+        if _get_spouse(chat_id, proposer.id):
+            await message.reply("✦ انت متجوز بالفعل، لازم تطلق الأول 💔")
+            return
 
+        # استبعد المتجوزين بالفعل
+        data = _load()
+        married_ids = set(int(k) for k in data["marriages"].get(str(chat_id), {}).keys())
+        exclude = {proposer.id} | married_ids
+
+        random_user = await _random_member(client, chat_id, exclude)
+        if not random_user:
+            await message.reply("✦ مفيش حد متاح للزواج دلوقتي 😅")
+            return
+
+        _set_marriage(
+            chat_id,
+            {"id": proposer.id, "name": proposer.first_name or "عضو"},
+            {"id": random_user.id, "name": random_user.first_name or "عضو"},
+        )
+        await message.reply(
+            f"💞 القرعة وقعت! 🎉\n\n"
+            f"العريس: {_mention(proposer)}\n"
+            f"العروسة: {_mention(random_user)}\n\n"
+            f"عقبال ما نشوف الاولاد ✨"
+        )
+        return
+
+    # تارجت محدد — العرض المعتاد
     if target.is_bot:
-        return await message.reply("✦ مينفعش تتجوز بوت 🤖")
+        await message.reply("✦ مينفعش تتجوز بوت 🤖")
+        return
     if target.id == proposer.id:
-        return await message.reply("✦ مينفعش تتجوز نفسك 😅")
+        await message.reply("✦ مينفعش تتجوز نفسك 😅")
+        return
     if _get_spouse(chat_id, proposer.id):
-        return await message.reply("✦ انت متجوز بالفعل، لازم تطلق الأول 💔")
+        await message.reply("✦ انت متجوز بالفعل، لازم تطلق الأول 💔")
+        return
     if _get_spouse(chat_id, target.id):
-        return await message.reply(f"✦ {_mention(target)} متجوز بالفعل 💔")
+        await message.reply(f"✦ {_mention(target)} متجوز بالفعل 💔")
+        return
 
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("موافق ✅", callback_data=f"mrg:y:{proposer.id}:{target.id}"),
-        InlineKeyboardButton("رفض ❌", callback_data=f"mrg:n:{proposer.id}:{target.id}"),
+        BTN("موافق", f"mrg:y:{proposer.id}:{target.id}", "success"),
+        BTN("رفض",   f"mrg:n:{proposer.id}:{target.id}", "danger"),
     ]])
     await message.reply(
         f"💍 {_mention(proposer)} عرض الزواج على {_mention(target)}\n\n"
@@ -253,25 +208,39 @@ async def marry_cmd(client: Client, message: Message):
 @Client.on_callback_query(filters.regex(r"^mrg:(y|n):(\d+):(\d+)$"))
 async def marry_cb(client: Client, query: CallbackQuery):
     answer, proposer_id, target_id = query.data.split(":")[1:]
-    proposer_id = int(proposer_id); target_id = int(target_id)
+    proposer_id = int(proposer_id)
+    target_id = int(target_id)
+
     if query.from_user.id != target_id:
-        return await query.answer("✦ القرار ليك انت بس", show_alert=True)
+        await query.answer("✦ القرار ليك انت بس مش لحد تاني", show_alert=True)
+        return
+
     chat_id = query.message.chat.id
+
     if answer == "n":
-        await query.message.edit_text(f"💔 {_mention(query.from_user)} رفض/رفضت عرض الزواج")
-        return await query.answer("تم الرفض")
+        await query.message.edit_text(
+            f"💔 {_mention(query.from_user)} رفض/رفضت عرض الزواج"
+        )
+        await query.answer("تم الرفض")
+        return
+
     if _get_spouse(chat_id, proposer_id) or _get_spouse(chat_id, target_id):
         await query.message.edit_text("✦ العرض اتلغى — أحد الطرفين بقى متجوز")
-        return await query.answer()
+        await query.answer()
+        return
+
     try:
         proposer = await client.get_users(proposer_id)
     except Exception:
-        return await query.answer("تعذر جلب بيانات العريس", show_alert=True)
+        await query.answer("تعذر جلب بيانات العريس", show_alert=True)
+        return
+
     _set_marriage(
         chat_id,
         {"id": proposer.id, "name": proposer.first_name or "عضو"},
         {"id": query.from_user.id, "name": query.from_user.first_name or "عضو"},
     )
+
     await query.message.edit_text(
         f"💞 مبروك الزواج 🎉🎊\n\n"
         f"العريس: {_mention(proposer)}\n"
@@ -281,26 +250,30 @@ async def marry_cb(client: Client, query: CallbackQuery):
     await query.answer("تم الزواج 💍")
 
 
+# ── زوجي ──
 @Client.on_message(command2(["زوجي", "زوجتي"]) & other_filters)
 async def my_spouse(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    if not message.from_user:
         return
     rec = _get_spouse(message.chat.id, message.from_user.id)
     if not rec:
-        return await message.reply("✦ انت لسه أعزب/عزباء 😅 جرب: `زوجني @user`")
+        await message.reply("✦ انت لسه أعزب/عزباء 😅 جرب: `زوجني @user`")
+        return
     await message.reply(
         f"💍 {_mention(message.from_user)} متجوز/متجوزة من "
         f"{_mention_id(rec['id'], rec['name'])}"
     )
 
 
+# ── طلاق ──
 @Client.on_message(command2(["طلاق", "طلق"]) & other_filters)
 async def divorce_cmd(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    if not message.from_user:
         return
     rec = _remove_marriage(message.chat.id, message.from_user.id)
     if not rec:
-        return await message.reply("✦ انت أصلًا مش متجوز 😅")
+        await message.reply("✦ انت أصلًا مش متجوز 😅")
+        return
     await message.reply(
         f"💔 {_mention(message.from_user)} طلق/طلقت "
         f"{_mention_id(rec['id'], rec['name'])}\nالله يعوض على الكل 🥲"
@@ -308,13 +281,15 @@ async def divorce_cmd(client: Client, message: Message):
 
 
 # ═══════════════════════════════════════════════
-# ❌⭕ لعبة XO + نقاط (فوز=3، تعادل=1)
+# ❌⭕ لعبة XO (مع زر انضمام لمن مفيش تارجت)
 # ═══════════════════════════════════════════════
 games_xo: dict = {}
-WIN_LINES = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
 
-XO_WIN_POINTS = 3
-XO_DRAW_POINTS = 1
+WIN_LINES = [
+    (0, 1, 2), (3, 4, 5), (6, 7, 8),
+    (0, 3, 6), (1, 4, 7), (2, 5, 8),
+    (0, 4, 8), (2, 4, 6),
+]
 
 
 def _xo_keyboard(msg_id: int, board: list) -> InlineKeyboardMarkup:
@@ -326,14 +301,14 @@ def _xo_keyboard(msg_id: int, board: list) -> InlineKeyboardMarkup:
             cell = board[i] or "·"
             row.append(InlineKeyboardButton(cell, callback_data=f"xo:m:{msg_id}:{i}"))
         rows.append(row)
-    rows.append([InlineKeyboardButton("إلغاء اللعبة ❌", callback_data=f"xo:c:{msg_id}:0")])
+    rows.append([BTN("إلغاء اللعبة", f"xo:c:{msg_id}:0", "danger")])
     return InlineKeyboardMarkup(rows)
 
 
 def _xo_join_keyboard(msg_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("انضمام ➕", callback_data=f"xo:j:{msg_id}:0")],
-        [InlineKeyboardButton("إلغاء ❌", callback_data=f"xo:c:{msg_id}:0")],
+        [BTN("انضمام", f"xo:j:{msg_id}:0", "success")],
+        [BTN("إلغاء",  f"xo:c:{msg_id}:0", "danger")],
     ])
 
 
@@ -348,9 +323,11 @@ def _xo_check(board: list) -> Optional[str]:
 
 @Client.on_message(command2(["xo", "اكس اوه", "إكس", "إكسأو", "اكسأو", "اكس او", "اكس"]) & other_filters)
 async def xo_start(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    if not message.from_user:
         return
     target = await _resolve_target(client, message)
+
+    # مفيش تارجت → ابدأ بزرار انضمام، أول واحد يضغط هو الخصم
     if not target:
         sent = await message.reply(
             f"❌⭕ **لعبة XO**\n\n"
@@ -364,8 +341,11 @@ async def xo_start(client: Client, message: Message):
         }
         await sent.edit_reply_markup(reply_markup=_xo_join_keyboard(sent.id))
         return
+
     if target.is_bot or target.id == message.from_user.id:
-        return await message.reply("✦ مينفعش تلعب مع نفسك أو مع بوت")
+        await message.reply("✦ مينفعش تلعب مع نفسك أو مع بوت")
+        return
+
     sent = await message.reply(
         f"❌⭕ لعبة XO\n\n"
         f"❌ {_mention(message.from_user)}\n"
@@ -385,23 +365,32 @@ async def xo_start(client: Client, message: Message):
 @Client.on_callback_query(filters.regex(r"^xo:(m|c|j):(\d+):(\d+)$"))
 async def xo_cb(client: Client, query: CallbackQuery):
     action, msg_id, idx = query.data.split(":")[1:]
-    msg_id = int(msg_id); idx = int(idx)
+    msg_id = int(msg_id)
+    idx = int(idx)
     game = games_xo.get(msg_id)
     if not game:
-        return await query.answer("✦ اللعبة انتهت أو مش موجودة", show_alert=True)
+        await query.answer("✦ اللعبة انتهت أو مش موجودة", show_alert=True)
+        return
+
     uid = query.from_user.id
 
+    # ── انضمام ──
     if action == "j":
         if not game.get("waiting"):
-            return await query.answer("✦ اللعبة بدأت بالفعل", show_alert=True)
+            await query.answer("✦ اللعبة بدأت بالفعل", show_alert=True)
+            return
         if uid == game["p1"]["id"]:
-            return await query.answer("✦ مينفعش تنضم لنفسك 😅", show_alert=True)
+            await query.answer("✦ مينفعش تنضم لنفسك 😅", show_alert=True)
+            return
         if query.from_user.is_bot:
-            return await query.answer("✦ مفيش بوتات هنا", show_alert=True)
+            await query.answer("✦ مفيش بوتات هنا", show_alert=True)
+            return
+
         game["p2"] = {"id": uid, "name": query.from_user.first_name or "O"}
         game["board"] = [None] * 9
         game["turn"] = game["p1"]["id"]
         game["waiting"] = False
+
         await query.message.edit_text(
             f"❌⭕ لعبة XO\n\n"
             f"❌ {_mention_id(game['p1']['id'], game['p1']['name'])}\n"
@@ -409,54 +398,67 @@ async def xo_cb(client: Client, query: CallbackQuery):
             f"الدور على: ❌ {_mention_id(game['p1']['id'], game['p1']['name'])}",
             reply_markup=_xo_keyboard(msg_id, game["board"]),
         )
-        return await query.answer("تم الانضمام 🎮")
+        await query.answer("تم الانضمام 🎮")
+        return
 
+    # ── إلغاء ──
     if action == "c":
+        # اللاعبين أو منشئ اللعبة (لو لسه waiting) فقط
         owners = {game["p1"]["id"]}
         if game.get("p2"):
             owners.add(game["p2"]["id"])
         if uid not in owners:
-            return await query.answer("✦ مش بتاعتك", show_alert=True)
+            await query.answer("✦ مش بتاعتك", show_alert=True)
+            return
         games_xo.pop(msg_id, None)
-        await query.message.edit_text(f"❌ تم إلغاء اللعبة بواسطة {_mention(query.from_user)}")
-        return await query.answer("تم الإلغاء")
+        await query.message.edit_text(
+            f"❌ تم إلغاء اللعبة بواسطة {_mention(query.from_user)}"
+        )
+        await query.answer("تم الإلغاء")
+        return
 
+    # ── حركة ──
     if game.get("waiting"):
-        return await query.answer("✦ اللعبة لسه ماتبدأتش", show_alert=True)
+        await query.answer("✦ اللعبة لسه ماتبدأتش", show_alert=True)
+        return
+
     if uid not in (game["p1"]["id"], game["p2"]["id"]):
-        return await query.answer("✦ اللعبة دي مش ليك", show_alert=True)
+        await query.answer("✦ اللعبة دي مش ليك", show_alert=True)
+        return
+
     if uid != game["turn"]:
-        return await query.answer("✦ مش دورك", show_alert=True)
+        await query.answer("✦ مش دورك", show_alert=True)
+        return
+
     if game["board"][idx] is not None:
-        return await query.answer("✦ المربع ده محجوز", show_alert=True)
+        await query.answer("✦ المربع ده محجوز", show_alert=True)
+        return
 
     symbol = "❌" if uid == game["p1"]["id"] else "⭕"
     game["board"][idx] = symbol
+
     result = _xo_check(game["board"])
     if result:
         games_xo.pop(msg_id, None)
         if result == "draw":
-            _add_points(game["p1"]["id"], game["p1"]["name"], XO_DRAW_POINTS)
-            _add_points(game["p2"]["id"], game["p2"]["name"], XO_DRAW_POINTS)
             await query.message.edit_text(
-                f"🤝 تعادل! (+{XO_DRAW_POINTS} لكل لاعب)\n\n"
-                f"❌ {_mention_id(game['p1']['id'], game['p1']['name'])}\n"
+                f"🤝 تعادل!\n\n❌ {_mention_id(game['p1']['id'], game['p1']['name'])}\n"
                 f"⭕ {_mention_id(game['p2']['id'], game['p2']['name'])}",
             )
         else:
             winner = game["p1"] if result == "❌" else game["p2"]
             loser = game["p2"] if result == "❌" else game["p1"]
-            total = _add_points(winner["id"], winner["name"], XO_WIN_POINTS)
             await query.message.edit_text(
-                f"🏆 فاز {result} {_mention_id(winner['id'], winner['name'])} (+{XO_WIN_POINTS})\n"
-                f"💔 خسر {_mention_id(loser['id'], loser['name'])}\n"
-                f"⭐ نقاطه الكلية: {total}"
+                f"🏆 فاز {result} {_mention_id(winner['id'], winner['name'])}\n"
+                f"💔 خسر {_mention_id(loser['id'], loser['name'])}"
             )
-        return await query.answer("انتهت اللعبة")
+        await query.answer("انتهت اللعبة")
+        return
 
     game["turn"] = game["p2"]["id"] if uid == game["p1"]["id"] else game["p1"]["id"]
     next_name = game["p2"]["name"] if game["turn"] == game["p2"]["id"] else game["p1"]["name"]
     next_sym = "⭕" if game["turn"] == game["p2"]["id"] else "❌"
+
     await query.message.edit_text(
         f"❌⭕ لعبة XO\n\n"
         f"❌ {_mention_id(game['p1']['id'], game['p1']['name'])}\n"
@@ -473,187 +475,1157 @@ async def xo_noop(client: Client, query: CallbackQuery):
 
 
 # ═══════════════════════════════════════════════
-# 🐱 لعبة كت — أسئلة عامة
+# 🐱 لعبة كت (Cat) — أسئلة عامة عشوائية باللهجة المصرية
 # ═══════════════════════════════════════════════
-@Client.on_message(command2(["كت", "cat", "لعبة كت", "تويت"]) & other_filters)
+CAT_QUESTIONS = [
+    "إيه أكتر فاكهة بتحبها؟",
+    "إيه رأيك في الحزن؟",
+    "بتفضل الصبر ولا التحرك السريع؟",
+    "إيه رأيك في البطاطس مهروسة مقارنة بـالبطاطس مقلية؟",
+    "بتحب القراءة قبل النوم ولا الموسيقى؟",
+    "بتحب الحوار في الفلسفة ولا الكوميديا؟",
+    "بتحب العيلة ليه؟",
+    "لو هتختار بين البولينج والبلياردو، هتختار إيه؟",
+    "إيه رأيك في الشطة مقارنة بـالخل؟",
+    "إيه أحلى ذكرى ليك مع رمضان؟",
+    "إيه رأيك في الموسيقى؟",
+    "لو هتروح ديزني لاند، مع مين؟",
+    "لو هتقابل توأم روحك بكره، هتقوله إيه؟",
+    "إيه أكتر حاجة بتخاف منها لما تكبر؟",
+    "إيه رأيك في الصوم؟",
+    "لو تختار لون يعبر عنك، هتختار إيه؟",
+    "بتحب الحوار العميق ولا الخفيف؟",
+    "بتفضل الكلام في القهوة ولا في البيت؟",
+    "لو تتعلم لغة جديدة، هتختار إيه؟",
+    "بتحب الكافيهات ليه؟",
+    "لو معاك جوكر في الحياة، هتستخدمه فين؟",
+    "إيه أحلى ذكرى ليك مع السفر؟",
+    "لو هتختار بين اللحمة الكندوز والضأن، هتختار إيه؟",
+    "بتحب صوت المياه ولا صوت الطيور؟",
+    "إيه أحلى موقف فاكره مع الفلوس؟",
+    "إيه رأيك في الأم كحك مقارنة بـالبسبوسة؟",
+    "رمضان بيفكرك بإيه؟",
+    "بتحب صديق صريح ولا دبلوماسي؟",
+    "إيه أكتر شيء بتفرح لما حد يقولهولك؟",
+    "بتفضل الترمس ولا الفول السوداني؟",
+    "بتحب الأنمي ولا الكرتون العادي؟",
+    "لو هتختار بين الجاكيت والكوفية، هتختار إيه؟",
+    "إيه أكتر مكان بتحب تذاكر فيه؟",
+    "إيه أكتر شخص بيلهمك؟",
+    "بتفضل القعدة على الكنبة ولا على الأرض؟",
+    "إيه رأيك في العيلة؟",
+    "بتحب الفلاش باك في الأفلام ولا لأ؟",
+    "إيه رأيك في المطاعم؟",
+    "إيه أحلى موقف فاكره مع البلكونة؟",
+    "إيه أكتر شيء بيشغل بالك دلوقتي؟",
+    "بتحب الصدق ولا المجاملة؟",
+    "لو معاك مفتاح أي عربية، هتختار إيه؟",
+    "إيه رأيك في الكورة الفنية مقارنة بـالكورة الجماعية؟",
+    "لو هتغير حاجة في المصنع، هتغير إيه؟",
+    "إيه أكتر حاجة بتزعلك في الشعر؟",
+    "إيه أكتر شيء عاوز تجربه قبل الـ٣٠؟",
+    "إيه أكتر شيء بتحب تشوفه على الناس لما يفرحوا؟",
+    "إيه رأيك في الخوف؟",
+    "لو هتغير حاجة في العطور، هتغير إيه؟",
+    "بتحب الكلام في التليفون ولا الشات؟",
+    "لو لقيت مصباح علاء الدين، هتطلب 3 أمنيات إيه؟",
+    "إيه أكتر حاجة بتزعلك في الطفولة؟",
+    "بتحب السمك ولا الفراخ؟",
+    "النيل بيفكرك بإيه؟",
+    "بتحب الدعاء ليه؟",
+    "إيه رأيك في الحواوشي مقارنة بـالفول المدمس؟",
+    "لو هتعمل بحث عن أي موضوع، هيكون إيه؟",
+    "بتحب المطر ولا الشمس؟",
+    "بتفضل تستيقظ مع الفجر ولا مع الضوء الكامل؟",
+    "لو معاك معلم في حياتك، تشكره على إيه؟",
+    "إيه أكتر حاجة بتعصبك؟",
+    "بتحب البحر ولا الجبل؟",
+    "بتفضل التين ولا العنب؟",
+    "لو هتعمل تاتو، هترسم إيه؟",
+    "إيه أحلى حاجة سمعتها من أمك؟",
+    "بتفضل الأسبوع شغل ولا إجازة؟",
+    "إيه أحلى ذكرى ليك مع الفلوس؟",
+    "لو هتختار بين الزعتر والكمون، هتختار إيه؟",
+    "لو هتنصح حد عن الحزن، تقوله إيه؟",
+    "إيه أكتر حاجة بتحبها في الموسيقى؟",
+    "لو هتنصح حد عن العيلة، تقوله إيه؟",
+    "لو هتختار اسم مستعار، هيكون إيه؟",
+    "لو هتغير اسمك، هتختار إيه؟",
+    "لو هتختار بين الأزرق الفاتح والأزرق الغامق، هتختار إيه؟",
+    "إيه آخر فيلم عجبك جامد؟",
+    "لو معاك خمس دقايق وحس إن الدنيا هتنتهي، هتعمل إيه؟",
+    "لو هتغير حاجة في الطفولة، هتغير إيه؟",
+    "بتحب الصوم ليه؟",
+    "لو هتنصح حد عن الطفولة، تقوله إيه؟",
+    "لو هتختار بين اليوجا والكروس فيت، هتختار إيه؟",
+    "إيه رأيك في الموبايل آيفون مقارنة بـسامسونج؟",
+    "لو هتنصح حد عن الكافيهات، تقوله إيه؟",
+    "إيه أكتر شيء بتزعل عليه ويمر بسرعة؟",
+    "لو هتختار بين السباحة والجري، هتختار إيه؟",
+    "إيه أكتر حاجة بتزعلك في الموسيقى؟",
+    "إيه رأيك في البني مقارنة بـالرمادي؟",
+    "لو هتعمل قائمة بالأشياء اللي بتحبها، أول 5؟",
+    "لو معاك مفتاح بيت أحلامك، هيكون فين؟",
+    "لو هتختار بين الجوافة والرمان، هتختار إيه؟",
+    "لو هتغير حاجة في الشعر، هتغير إيه؟",
+    "لو هتختار بين الشاورما والكفتة، هتختار إيه؟",
+    "لو معاك 5 دقايق مع جدك، هتقوله إيه؟",
+    "إيه رأيك في الأزرق الفاتح مقارنة بـالأزرق الغامق؟",
+    "لو تكون شخصية كرتون، هتكون مين؟",
+    "لو هتعمل خطة عمر، تبدأ منين؟",
+    "إيه رأيك في الكاميرا الكبيرة مقارنة بـالموبايل؟",
+    "لو معاك حاجة تخرج كل يوم تفرح بيها، هتختار إيه؟",
+    "بتحب التيك توك ولا الإنستجرام؟",
+    "إيه أكتر تجربة معاك مع الكافيهات؟",
+    "إيه آخر كتاب قريته؟",
+    "الفلوس بيفكرك بإيه؟",
+    "إيه أكتر حاجة بتزعلك في رمضان؟",
+    "بتحب وقت الفطار في رمضان ولا السحور؟",
+    "بتحب الفلسفة ولا الواقع؟",
+    "لو تختار اسم لابنك، هتختار إيه؟",
+    "لو هتغير حاجة في الحزن، هتغير إيه؟",
+    "إيه أحلى ذكرى ليك مع الصلاة؟",
+    "إيه أكتر تجربة معاك مع الأفلام؟",
+    "إيه أحلى موقف فاكره مع الكافيهات؟",
+    "إيه أكتر تجربة معاك مع الحجاب؟",
+    "الوحدة بيفكرك بإيه؟",
+    "بتفضل الفطير ولا العيش؟",
+    "إيه أكتر مكان نفسك تشتغل فيه؟",
+    "لو هتنصح حد عن الحجاب، تقوله إيه؟",
+    "بتفضل الأكل بإيدك ولا بالشوكة؟",
+    "إيه أحلى ذكرى ليك مع الأفلام؟",
+    "إيه أكتر شيء بتفتقده من اللي ماتوا؟",
+    "إيه أكتر حاجة بتحب تعملها في الصيف؟",
+    "بتفضل الكلام البطيء ولا السريع؟",
+    "بتفضل الخجل ولا الجرأة؟",
+    "بتفضل الكاميرا الكبيرة ولا الموبايل؟",
+    "إيه رأيك في الشاورما مقارنة بـالكفتة؟",
+    "بتفضل الموبايل آيفون ولا سامسونج؟",
+    "إيه أكتر حاجة بتغير مزاجك في الصبح؟",
+    "لو هتختار بين الباذنجان والكوسة، هتختار إيه؟",
+    "إيه رأيك في الكوكاكولا مقارنة بـالبيبسي؟",
+    "لو تختار رياضة، هتختار إيه؟",
+    "لو هتغير حاجة في العادات، هتغير إيه؟",
+    "لو هتعمل أعظم حركة في حياتك، هتعمل إيه؟",
+    "إيه أكتر شيء بيخليك تحس بالغيرة؟",
+    "إيه أكتر سؤال محرج اتسألته؟",
+    "لو هتعمل سفرة عمر، تروح فين؟",
+    "بتحب التحديات ولا الراحة؟",
+    "إيه أكتر حاجة بتحبها في الكافيهات؟",
+    "إيه أكتر شيء بتفتقده من زمان قوي؟",
+    "لو تختار بلد للسياحة، هتختار إيه؟",
+    "بتفضل تتعرف على ناس جديدة ولا تكتفي؟",
+    "لو معاك وقت تتعلم رياضة جديدة، تختار إيه؟",
+    "إيه أكتر تجربة معاك مع الشعر؟",
+    "إيه رأيك في المصنع؟",
+    "لو هتختار بين الكوكاكولا والبيبسي، هتختار إيه؟",
+    "بتفضل اللحمة ولا الفراخ؟",
+    "لو معاك صديق وسامحك، هتعمل إيه؟",
+    "إيه رأيك في الأكل؟",
+    "لو هتختار بين التيشرت والقميص، هتختار إيه؟",
+    "إيه رأيك في الأفلام؟",
+    "بتحب التظاهر بالقوة ولا تظهر ضعفك؟",
+    "لو تشتغل في بلد تانية، هتختار إيه؟",
+    "لو هتغير حاجة في الصوم، هتغير إيه؟",
+    "لو هتفتح مدونة، عن إيه؟",
+    "الأفلام بيفكرك بإيه؟",
+    "بتحب البص في النجوم ولا في القمر؟",
+    "بتحب الحزن ليه؟",
+    "لو هتفتح مشروع، هيكون إيه؟",
+    "إيه رأيك في الجروبات؟",
+    "إيه رأيك في الجبل؟",
+    "إيه رأيك في الأبيض في الجواز مقارنة بـالأبيض في العربية؟",
+    "إيه أحلى ذكرى ليك مع القطط؟",
+    "إيه أكتر حاجة بتزعلك في الدعاء؟",
+    "بتفضل تتعلم بالقراءة ولا بالمشاهدة؟",
+    "لو هتدخل تاريخ، هتدخله إزاي؟",
+    "لو هتنصح حد عن القطط، تقوله إيه؟",
+    "إيه رأيك في النيل؟",
+    "إيه أكتر حاجة بتحبها في البيت؟",
+    "إيه أكتر حاجة بتحبها في القطط؟",
+    "إيه أحلى موقف فاكره مع الأفلام؟",
+    "بتفضل الفلوس كاش ولا فيزا؟",
+    "لو هتغير حاجة في الفلوس، هتغير إيه؟",
+    "بتفضل الشاورما ولا الكفتة؟",
+    "بتفضل تذاكر ع الموسيقى ولا في صمت؟",
+    "لو تختار حيوان أليف، هتختار إيه؟",
+    "إيه رأيك في الصلاة؟",
+    "بتفضل العائلة الكبيرة ولا الصغيرة؟",
+    "لو معاك كاميرا، هتصور إيه؟",
+    "بتفضل الكوتشي الأبيض ولا الأسود؟",
+    "بتفضل الأكل الحلو ولا الحادق؟",
+    "بتحب القلب الكبير ولا العقل المدبر؟",
+    "إيه أحلى موقف فاكره مع الجروبات؟",
+    "لو ربنا قالك تطلب أي حاجة، هتطلب إيه؟",
+    "بتفضل الجلسات الكبيرة ولا الصغيرة؟",
+    "لو هتنصح حد عن الموسيقى، تقوله إيه؟",
+    "إيه أكتر مرة حسيت إنك بطل؟",
+    "لو تختار سوبر باور، هتختار إيه؟",
+    "بتفضل الجلباب ولا البيجامة في البيت؟",
+    "لو تختار يوم تعيشه طول حياتك، هتختار إيه؟",
+    "بتفضل القلم الأزرق ولا الأسود؟",
+    "إيه أكتر شيء بتفرح بيه طفل؟",
+    "بتفضل المشي ولا العربية؟",
+    "بتفضل الأزرق الفاتح ولا الأزرق الغامق؟",
+    "إيه أحلى موقف فاكره مع رمضان؟",
+    "إيه أكتر حاجة بتفكر فيها وانت بتمشي لوحدك؟",
+    "إيه أكتر تجربة معاك مع الخوف؟",
+    "بتفضل السمك المقلي ولا السمك المشوي؟",
+    "إيه أكتر مسلسل تابعته من الأول للآخر؟",
+    "بتفضل الموبايل ولا الكمبيوتر؟",
+    "لو هتختار بين الحواوشي والفول المدمس، هتختار إيه؟",
+    "إيه أكتر مرة حسيت إن الدنيا حلوة؟",
+    "إيه أكتر حاجة شفتها وفضلت تفكر فيها؟",
+    "لو هتنصح حد عن الصلاة، تقوله إيه؟",
+    "بتحب الأمسيات الموسيقية ولا السينما؟",
+    "بتحب التسوق لوحدك ولا مع حد؟",
+    "بتحب البحر هادي ولا فيه موج؟",
+    "بتحب المدرسة ليه؟",
+    "إيه أكتر مرة ضحكت فيها لحد ما عيطت؟",
+    "بتفضل القعدة في البيت ولا الخروج؟",
+    "بتحب الطائرة الورق ولا العادية؟",
+    "إيه أكتر شيء بتحب تشاركه مع الناس؟",
+    "إيه أكتر مكان نفسك تزوره في مصر؟",
+    "بتحب رمضان ولا العيد؟",
+    "بتفضل تتكلم لما تتضايق ولا تسكت؟",
+    "إيه أحلى موقف فاكره مع الضحك؟",
+    "بتحب الخوف ليه؟",
+    "لو هتعمل عريضة لتحقيق حلم، هيكون إيه؟",
+    "إيه رأيك في رمضان؟",
+    "إيه أكتر حاجة عاوز تشكر نفسك عليها؟",
+    "لو هتختار بين الكبدة والمخ، هتختار إيه؟",
+    "بتحب الميديا ولا تتجنبها؟",
+    "بتحب الكتابة في دفتر ولا في تطبيق؟",
+    "إيه رأيك في العطور؟",
+    "إيه أكتر تجربة معاك مع السفر؟",
+    "إيه أكتر حاجة بتفهمها بتعب؟",
+    "لو هتنصح حد عن الأفلام، تقوله إيه؟",
+    "إيه أكتر شيء بتشكر ربنا عليه دلوقتي؟",
+    "لو هتسلم على لاعبك المفضل، هتقوله إيه؟",
+    "بتفضل الكورة الفنية ولا الكورة الجماعية؟",
+    "إيه أكتر حاجة بتشد انتباهك في الناس؟",
+    "إيه رأيك في الحجاب؟",
+    "إيه أكتر تجربة معاك مع العادات؟",
+    "لو هتختار بين التين والعنب، هتختار إيه؟",
+    "لو هتعمل وصية بسيطة، هتقول فيها إيه؟",
+    "إيه أحلى ذكرى ليك مع الحجاب؟",
+    "لو هتقابل عالم، تسأله إيه؟",
+    "بتفضل الشغل من البيت ولا المكتب؟",
+    "إيه رأيك في القرص مقارنة بـالبتاو؟",
+    "بتفضل الحياة ساكنة ولا متغيرة؟",
+    "إيه أكتر شيء بيدخلك في حالة تأمل؟",
+    "الحجاب بيفكرك بإيه؟",
+    "إيه أكتر تجربة معاك مع العطور؟",
+    "بتفضل تاكل في البيت ولا في مطعم؟",
+    "إيه أحلى موقف فاكره مع البيت؟",
+    "إيه أكتر حاجة بتحبها في المصنع؟",
+    "إيه رأيك في الدعاء؟",
+    "لو معاك مياه فاترة في يوم حر، هتشربها؟",
+    "لو هتغير حاجة في الجبل، هتغير إيه؟",
+    "إيه أحلى موقف فاكره مع الموضة؟",
+    "إيه رأيك في الوحدة؟",
+    "إيه أحلى ذكرى ليك مع الحزن؟",
+    "لو هتختار بين النوكيا القديم والذكي، هتختار إيه؟",
+    "إيه أكتر حاجة بتزعلك في السفر؟",
+    "الصوم بيفكرك بإيه؟",
+    "لو معاك معلم في الحب، تتعلم منه إيه؟",
+    "إيه أكتر شيء بيخليك تحس بالأمان؟",
+    "لو هتختار بين اللبن والزبادي، هتختار إيه؟",
+    "إيه أكتر حاجة بتبهرك في الطبيعة؟",
+    "إيه أكتر برنامج بتتفرج عليه؟",
+    "إيه رأيك في المدرسة؟",
+    "بتفضل النوكيا القديم ولا الذكي؟",
+    "إيه رأيك في الكافيهات؟",
+    "إيه أكتر حاجة بتدعي بيها؟",
+    "لو هتغير حاجة في السفر، هتغير إيه؟",
+    "إيه رأيك في الفلوس؟",
+    "بتحب الشعر ليه؟",
+    "إيه رأيك في اللاب توشيبا مقارنة بـديل؟",
+    "لو هتوصل رسالة لشخص واحد، تقوله إيه؟",
+    "بتفضل قهوة الصبح ولا الضهر؟",
+    "إيه أكتر شيء بتحس إنه يستحق الانتظار؟",
+    "إيه أحلى موقف فاكره مع السفر؟",
+    "بتحب الفسحة قبل المغرب ولا بعدها؟",
+    "إيه أكتر شيء حسيت إنه ظلم؟",
+    "إيه أحلى ذكرى ليك مع البيت؟",
+    "لو هتروح كافيه لوحدك، تروح فين؟",
+    "لو هتغير حاجة في النيل، هتغير إيه؟",
+    "إيه أحلى ذكرى ليك مع المطاعم؟",
+    "لو هتختار بين الشطة والخل، هتختار إيه؟",
+    "بتفضل الواتساب ولا التليجرام؟",
+    "لو هتغير حاجة في القطط، هتغير إيه؟",
+    "بتفضل القعدة في الجامعة ولا المدرسة؟",
+    "إيه أكتر حاجة بتحبها في رمضان؟",
+    "بتحب الأخبار ولا تتجنبها؟",
+    "إيه أحلى وقت بتقضيه مع نفسك؟",
+    "لو هتختار بين الأبيض والبيج، هتختار إيه؟",
+    "الدعاء بيفكرك بإيه؟",
+    "لو هتسافر بدون عيلتك، تروح فين؟",
+    "إيه أكتر حاجة بتفرحك من اخواتك؟",
+    "إيه أحلى موقف فاكره مع الإنترنت؟",
+    "إيه أكتر حاجة بتلهمك؟",
+    "بتفضل تتكلم ولا تسمع؟",
+    "لو هتسلم نفسك جايزة، هتديها لإيه؟",
+    "لو هتغير حاجة في الموضة، هتغير إيه؟",
+    "إيه أكتر شيء بتحب تتكلم فيه كتير؟",
+    "بتحب البلكونة في الشتا ولا في الصيف؟",
+    "بتحب الأكل ليه؟",
+    "لو هتعمل بيت من الصفر، تختار شكله إزاي؟",
+    "لو معاك دعاء واحد يستجاب فورا، هتدعي بإيه؟",
+    "بتحب المطاعم ليه؟",
+    "إيه أكتر شيء بتبكي عليه بصمت؟",
+    "لو هتختار بين الأتاري والبلايستيشن، هتختار إيه؟",
+    "بتفضل الصبر على الناس ولا قطعهم؟",
+    "لو هتختار بين الفراخ المشوي والفراخ المسلوق، هتختار إيه؟",
+    "لو هتغير حاجة في الإنترنت، هتغير إيه؟",
+    "لو هتشتري كتاب لطفل، هتختار إيه؟",
+    "إيه أكتر حاجة بتحبها في الصوم؟",
+    "لو معاك جراب فيه أسرارك، فاكر تخبيه فين؟",
+    "بتحب الوحدة ليه؟",
+    "لو هتشيل اسم محل بإيدك، هتسميه إيه؟",
+    "إيه أكتر مدينة عربية بتحلم تشوفها؟",
+    "بتفضل النظارة الشمسية ولا الطبية؟",
+    "إيه أكتر شيء بتفكر فيه ومش بتقوله؟",
+    "لو معاك جهاز زمن، هتروح فين؟",
+    "بتحب الصور القديمة ولا الجديدة أكتر؟",
+    "إيه رأيك في الواجب مقارنة بـالمذاكرة الذاتية؟",
+    "لو هتنصح حد عن الخوف، تقوله إيه؟",
+    "لو هتنصح حد عن المدرسة، تقوله إيه؟",
+    "إيه أحلى ذكرى ليك مع الأكل؟",
+    "إيه رأيك في ساعة اليد مقارنة بـالموبايل؟",
+    "بتحب الخط الديواني ولا الكوفي؟",
+    "بتفضل العالم لو كان أبسط ولا أعقد؟",
+    "إيه أكتر تجربة معاك مع النيل؟",
+    "إيه أكتر سر فاكره من المدرسة؟",
+    "إيه رأيك في الباذنجان مقارنة بـالكوسة؟",
+    "إيه أكتر حاجة ما بتعرفش تستغنى عنها؟",
+    "إيه أحلى ذكرى ليك مع الجروبات؟",
+    "إيه أكتر حاجة بتعصب إخوتك بيها؟",
+    "لو هتنصح حد عن المصنع، تقوله إيه؟",
+    "إيه أكتر حاجة بتعلمتها من أبوك؟",
+    "إيه أكتر حاجة بتغير مزاجك بسرعة؟",
+    "بتحب القراءة ولا الأفلام؟",
+    "إيه رأيك في الكنافة مقارنة بـالبقلاوة؟",
+    "إيه رأيك في الأبيض مقارنة بـالبيج؟",
+    "لو تختار وظيفة أحلامك، هتختار إيه؟",
+    "لو معاك دقيقتين في الراديو، هتقول إيه؟",
+    "لو هتغير حاجة في البيت، هتغير إيه؟",
+    "بتحب الموسيقى الكلاسيكية ولا البوب؟",
+    "إيه رأيك في النظارة الشمسية مقارنة بـالطبية؟",
+    "لو هتشتغل وانت بتسمع موسيقى، تسمع إيه؟",
+    "بتفضل الشطرنج ولا الكوتشينة؟",
+    "إيه أكتر شيء بتهتم بيه في الموضة؟",
+    "لو ترجع للمدرسة يوم واحد، هتعمل إيه؟",
+    "إيه أحلى ذكرى ليك مع الإنترنت؟",
+    "بتحب الواحة ولا الجزيرة؟",
+    "إيه أكتر مكان بترتاح فيه؟",
+    "لو هتنصح حد عن البلكونة، تقوله إيه؟",
+    "بتفضل الجو الحر ولا البرد؟",
+    "إيه أكتر حاجة بتحبها في الأفلام؟",
+    "إيه أكتر تجربة معاك مع الوحدة؟",
+    "بتحب رمضان ليه؟",
+    "بتفضل الواجب ولا المذاكرة الذاتية؟",
+    "إيه أكتر حاجة بتفتقدها من الطفولة؟",
+    "إيه أكتر حاجة نفسك تتعلمها؟",
+    "لو هتغير حاجة في الأفلام، هتغير إيه؟",
+    "لو معاك تليفون قديم نوكيا، هتعمل إيه بيه؟",
+    "بتحب الإنترنت ليه؟",
+    "إيه رأيك في الشطرنج مقارنة بـالكوتشينة؟",
+    "إيه أحلى موقف فاكره مع الوحدة؟",
+    "بتحب المصنع ليه؟",
+    "إيه أكتر مرة شفت إنسان جميل من جواه؟",
+    "لو هتنصح حد عن العادات، تقوله إيه؟",
+    "إيه أكتر حاجة بتحبها في الخوف؟",
+    "إيه أكتر تجربة معاك مع الصلاة؟",
+    "لو هتعمل صديق جديد بكره، تتمنى يكون إيه؟",
+    "لو معاك تليفون جديد بكل المميزات، هتعمل إيه؟",
+    "بتفضل تروح المسجد ولا تصلي في البيت؟",
+    "لو تشوف نفسك بعد 10 سنين، هتلاقي إيه؟",
+    "إيه أكتر حاجة بتعرف تعملها بإتقان؟",
+    "إيه أحلى ذكرى ليك مع الشعر؟",
+    "إيه رأيك في الترمس مقارنة بـالفول السوداني؟",
+    "إيه أكتر حاجة بتزعلك في المدرسة؟",
+    "بتفضل اللاب توشيبا ولا ديل؟",
+    "لو هتعمل يوم خاص، هتختار إيه فيه؟",
+    "إيه أكتر حاجة بتزعلك في العيلة؟",
+    "إيه رأيك في الجوافة مقارنة بـالرمان؟",
+    "الشارع بيفكرك بإيه؟",
+    "إيه أحلى هدية اتقدمت ليك؟",
+    "بتحب الأكل اللي وصفته كبيرة ولا البسيط؟",
+    "لو هتختار بين القرص والبتاو، هتختار إيه؟",
+    "إيه أكتر شيء بتعتبره فرصة ثانية؟",
+    "لو هتسلم مفاتيح بيتك لحد، تسلمها لمين؟",
+    "إيه أكتر حاجة بتحبها في السفر؟",
+    "بتفضل الذكريات تتذكرها بالصور ولا بالحكي؟",
+    "لو هتغير حاجة في الشارع، هتغير إيه؟",
+    "لو هتعزم حد على الغدا، هتعمله إيه؟",
+    "لو معاك سيف خشبي زمان، تتذكر إيه؟",
+    "بتحب الكورة ولا الجيم؟",
+    "إيه أكتر حاجة بتفرحك في الجمعة؟",
+    "إيه رأيك في السفن أب مقارنة بـالفانتا؟",
+    "إيه أكتر طبخة فاشلة عملتها؟",
+    "إيه أحلى فسحة عملتها في حياتك؟",
+    "إيه أكتر شيء بترجع تتعلمه لو ترجع للمدرسة؟",
+    "إيه أكتر شيء بتعمله لما تكون وحيد؟",
+    "إيه أحلى ذكرى ليك مع الموسيقى؟",
+    "بتفضل البني ولا الرمادي؟",
+    "بتفضل التليفون كبير ولا صغير؟",
+    "إيه أكتر حلم وحش جالك؟",
+    "الإنترنت بيفكرك بإيه؟",
+    "لو معاك خبر مفاجأة جامد، تقوله لمين أول واحد؟",
+    "لو هتقابل نفسك بعد 20 سنة، هتسأله إيه؟",
+    "بتحب الحياة المنظمة ولا الفوضى الإبداعية؟",
+    "إيه أكتر شيء بتغفر فيه نفسك؟",
+    "إيه أكتر حاجة بتعمل لها أعذار؟",
+    "لو هتسلم نفسك ١٠٠ كلمة، هتختار إيه؟",
+    "بتفضل الكتاب الورقي ولا الصوتي؟",
+    "إيه أكتر حاجة بتزعلك في المطاعم؟",
+    "إيه أكتر شيء بتفضل تعمله في الإجازة؟",
+    "لو هتختار بين الجبنة الرومي والجبنة الموتزاريلا، هتختار إيه؟",
+    "إيه رأيك في الشعر؟",
+    "لو هتختار بين القعدة في الجامعة والمدرسة، هتختار إيه؟",
+    "إيه أحلى يوم في حياتك؟",
+    "إيه أكتر مكان لازم تزوره مرة واحدة في عمرك؟",
+    "إيه رأيك في الطفولة؟",
+    "إيه رأيك في الموضة؟",
+    "لو هتختار بين الأرز والمكرونة، هتختار إيه؟",
+    "بتفضل الإكس بوكس ولا النينتندو؟",
+    "لو هتشتري لأمك هدية، هتشتري إيه؟",
+    "إيه أحلى ذكرى ليك مع الطفولة؟",
+    "إيه أحلى ذكرى ليك مع الخوف؟",
+    "إيه أكتر حاجة بتحبها في الشعر؟",
+    "إيه رأيك في الشاي بنعناع مقارنة بـالشاي عادي؟",
+    "إيه أكتر حاجة بتزهقك؟",
+    "إيه رأيك في الفطير مقارنة بـالعيش؟",
+    "لو معاك صحبة عمر، اسمها إيه؟",
+    "إيه أكتر حاجة بتحبها في الإنترنت؟",
+    "إيه أكتر شيء بتزهقك في المواصلات؟",
+    "إيه أكتر حاجة بتشتريها لما تخرج؟",
+    "بتفضل التفاصيل ولا الخطوط العريضة؟",
+    "لو معاك زرار يوقف الزمن، هتستخدمه إمتى؟",
+    "إيه رأيك في الزعتر مقارنة بـالكمون؟",
+    "إيه رأيك في العادات؟",
+    "لو معاك يوم في الجنة، تعمل إيه؟",
+    "بتفضل الجبنة القريش ولا الفيتا؟",
+    "بتفضل البطاطس مهروسة ولا البطاطس مقلية؟",
+    "لو معاك يوم إجازة، هتقضيه إزاي؟",
+    "لو معاك يوم بدون نت، هتعمل إيه؟",
+    "بتحب القهوة سادة ولا بسكر؟",
+    "لو هتختار بين الكنافة والبقلاوة، هتختار إيه؟",
+    "الحزن بيفكرك بإيه؟",
+    "إيه رأيك في سماعة في وداني مقارنة بـبلوتوث؟",
+    "إيه آخر سيلفي اتصورتها؟",
+    "لو هتختار بين الجمبري والكاليماري، هتختار إيه؟",
+    "لو هتنصح حد عن الإنترنت، تقوله إيه؟",
+    "لو معاك أب جديد لسة هتختاره، تختار حد بصفة إيه؟",
+    "بتفضل الحب الأول ولا الأخير؟",
+    "إيه رأيك في البلكونة؟",
+    "إيه أكتر مرة قلت \"ياه ده فات بسرعة\"؟",
+    "بتفضل البيت قديم وفيه ذكريات ولا جديد؟",
+    "بتحب الصبح بمزاج جامد ولا الهادئ؟",
+    "إيه أكتر تجربة معاك مع المطاعم؟",
+    "إيه أكتر شيء بتسأل نفسك عنه ليلا؟",
+    "بتحب الحلم بالنوم ولا الحلم باليقظة؟",
+    "بتفضل السفن أب ولا الفانتا؟",
+    "إيه رأيك في الملوخية مقارنة بـالبامية؟",
+    "الجروبات بيفكرك بإيه؟",
+    "بتحب الحجاب ليه؟",
+    "إيه أكتر حاجة بتحبها في الدعاء؟",
+    "لو هتعمل غنوة، هتقول فيها إيه؟",
+    "إيه رأيك في التليفون كبير مقارنة بـصغير؟",
+    "لو هتختار طبيب لنفسك، تختار صفته إيه؟",
+    "لو هتقابل طفل صغير وتنصحه، تقوله إيه؟",
+    "لو ترجع طفل تاني، هتعمل إيه أول حاجة؟",
+    "إيه أكتر شيء عملته وأنت غضبان وندمت؟",
+    "إيه أكتر حاجة في طفولتك تتمنى ترجعها؟",
+    "بتفضل الباذنجان ولا الكوسة؟",
+    "لو هتختار بين الكورة الفنية والكورة الجماعية، هتختار إيه؟",
+    "بتفضل السباحة ولا الجري؟",
+    "لو معاك فرصة تشوف فلم لسة ما طلعش، تختار إيه؟",
+    "إيه رأيك في اليوجا مقارنة بـالكروس فيت؟",
+    "لو معاك ساعة فاضية، بتعملها إزاي؟",
+    "بتفضل الأبيض في الجواز ولا الأبيض في العربية؟",
+    "بتفضل البطيخ ولا الشمام؟",
+    "بتحب التصوير ليلا ولا نهارا؟",
+    "القطط بيفكرك بإيه؟",
+    "العادات بيفكرك بإيه؟",
+    "إيه أكتر شيء بتنساه دايما؟",
+    "لو هتنصح حد عن الموضة، تقوله إيه؟",
+    "إيه رأيك في الأتاري مقارنة بـالبلايستيشن؟",
+    "بتحب الناس البسيطة ولا المتفلسفة؟",
+    "إيه أكتر حاجة بتبقا فخور بيها؟",
+    "بتحب الاحتفال بعيد ميلادك ولا تتجاهله؟",
+    "لو هتنصح حد عن الجروبات، تقوله إيه؟",
+    "بتفضل النيلة ولا الفلفل؟",
+    "إيه أحلى موقف فاكره مع العيلة؟",
+    "لو هتغير حاجة في الوحدة، هتغير إيه؟",
+    "لو هتشتري عربية، هتختار نوع إيه؟",
+    "لو هتعمل قائمة أمنيات، أول حاجة فيها؟",
+    "بتحب الكلام ع الفون ولا الميتنج وش لوش؟",
+    "لو هتختار بين الفطير والعيش، هتختار إيه؟",
+    "لو هتعمل دكان، هيبيع إيه؟",
+    "لو تنزل تشتغل دلوقتي، تنزل فين؟",
+    "إيه أكتر شارع بتحبه في بلدك؟",
+    "بتفضل الكوتشي ولا الجزمة؟",
+    "إيه أكتر سؤال بتستحي تسأله؟",
+    "المصنع بيفكرك بإيه؟",
+    "إيه أحلى موقف فاكره مع المصنع؟",
+    "بتفضل النضافة ولا الرص؟",
+    "إيه أحلى موقف فاكره مع الدعاء؟",
+    "إيه أكتر مرة حسيت إنك صغير قوي؟",
+    "إيه أكتر حاجة بتحبها في الضحك؟",
+    "إيه أكتر حلقة في مسلسل ضحكتك؟",
+    "إيه أكتر شيء بتلهم نفسك بيه؟",
+    "إيه أكتر حاجة بتعلمتها من حد ضايقك؟",
+    "إيه أكتر شخصية تاريخية بتعجبك؟",
+    "إيه أكتر حاجة بترجع إليها لما تتضايق؟",
+    "بتفضل الأم كحك ولا البسبوسة؟",
+    "إيه أحلى تعليق اتقالك في حياتك؟",
+    "لو معاك ضوء واحد في الظلام، هتستخدمه إزاي؟",
+    "إيه أكتر طبق بتعرف تعمله كويس؟",
+    "لو هتختار بين الجزر والخيار، هتختار إيه؟",
+    "إيه أكتر حاجة بتزعلك في الموضة؟",
+    "لو هتغير حاجة في الدعاء، هتغير إيه؟",
+    "إيه أكتر حاجة بتفرح بيها أمك؟",
+    "إيه أكتر مدرس بتفتكره؟",
+    "إيه أكتر حاجة بتحبها في الأكل؟",
+    "لو معاك خاتم بيتمنى لك، هتلبسه دايما؟",
+    "بتفضل المسامحة ولا النسيان؟",
+    "لو هتغير حاجة في الموسيقى، هتغير إيه؟",
+    "لو معاك مفاجأة جامدة، تعملها لمين؟",
+    "إيه رأيك في الوردي مقارنة بـالبنفسجي؟",
+    "لو في كاميرا بتصورك على مدار اليوم، هتغير إيه؟",
+    "إيه أكتر شيء بتحس إنه نعمة عليك؟",
+    "لو تختار لحظة تتجمد فيها للأبد، هتختار إيه؟",
+    "إيه رأيك في التيشرت مقارنة بـالقميص؟",
+    "بتحب العطور ليه؟",
+    "بتحب صوت السيارات ولا الهدوء؟",
+    "لو هتسهر مع صحابك، تختار إيه؟",
+    "إيه أكتر شيء بتبكي عليه في الأفلام؟",
+    "لو هتعمل لقطة سينمائية لحياتك، تكون فيها إيه؟",
+    "لو هتغير حاجة في الخوف، هتغير إيه؟",
+    "بتفضل القهوة ولا الشاي؟",
+    "بتفضل الجمبري ولا الكاليماري؟",
+    "لو هتعمل حركة بالساحرة، هتعمل إيه؟",
+    "لو هتختار بين الوردي والبنفسجي، هتختار إيه؟",
+    "لو هتختار بين النظارة الشمسية والطبية، هتختار إيه؟",
+    "لو هتسمع كلمة لطيفة من حد، تتمنى يكون مين؟",
+    "بتحب البكا ولا الصمت لما تتضايق؟",
+    "بتفضل الفلوس الجديدة ولا اللي ليك بيها ذكرى؟",
+    "بتفضل الجوازات الكبيرة ولا الحفلات الصغيرة؟",
+    "لو هتغير حاجة في البلكونة، هتغير إيه؟",
+    "إيه أكتر تجربة معاك مع القطط؟",
+    "إيه أكتر حاجة بتزعلك في الوحدة؟",
+    "لو تطبخ أكلة بس، هتطبخ إيه؟",
+    "لو هتختار بين الموبايل آيفون وسامسونج، هتختار إيه؟",
+    "لو تكتب رسالة لنفسك في المستقبل، هتقول إيه؟",
+    "إيه أحلى موقف فاكره مع النيل؟",
+    "إيه أكتر حاجة بتزعلك في الإنترنت؟",
+    "إيه أكتر حاجة بتعتمد عليها في يومك؟",
+    "لو هتنصح حد عن الدعاء، تقوله إيه؟",
+    "لو هتنصح حد عن الصوم، تقوله إيه؟",
+    "بتحب القرى الصغيرة ولا المدن الكبيرة؟",
+    "لو هتختار بين سماعة في وداني وبلوتوث، هتختار إيه؟",
+    "إيه أكتر شيء بتقدره في امك؟",
+    "بتفضل الأسود ولا الأبيض؟",
+    "إيه أكتر حاجة بتعمل لك مشكلة في النوم؟",
+    "إيه أحلى ذكرى ليك مع الضحك؟",
+    "بتحب الجبل ليه؟",
+    "إيه رأيك في السفر؟",
+    "العطور بيفكرك بإيه؟",
+    "لو هتختار بين الواجب والمذاكرة الذاتية، هتختار إيه؟",
+    "إيه أكتر مكان حسيت فيه إنك مرحب بيك؟",
+    "إيه أكتر شيء بتلاحظه في الناس أول ما تشوفهم؟",
+    "إيه رأيك في الإكس بوكس مقارنة بـالنينتندو؟",
+    "لو هتختار بين ساعة اليد والموبايل، هتختار إيه؟",
+    "إيه أكتر حاجة عاوز تنساها؟",
+    "إيه أكتر شيء بتدعي بيه لأهلك؟",
+    "البيت بيفكرك بإيه؟",
+    "إيه رأيك في السباحة مقارنة بـالجري؟",
+    "بتحب البقاء في البيت ولا الخروج كل يوم؟",
+    "إيه أكتر حاجة بتفرح أمك؟",
+    "بتفضل الفول بزيت ولا بسمنة؟",
+    "الكافيهات بيفكرك بإيه؟",
+    "بتفضل الخطط البعيدة ولا القريبة؟",
+    "إيه أحلى موقف فاكره مع الأكل؟",
+    "إيه أحلى ذكرى ليك مع العيلة؟",
+    "بتحب الأفلام ليه؟",
+    "إيه أكتر سؤال بتسأله نفسك؟",
+    "بتحب العادات ليه؟",
+    "بتفضل الصور بالأبيض والأسود ولا ملونة؟",
+    "بتفضل النجاح بصمت ولا بضجيج؟",
+    "بتفضل البتاع المسلي ولا المفيد؟",
+    "لو هتنصح حد عن النيل، تقوله إيه؟",
+    "إيه أكتر تجربة معاك مع الجبل؟",
+    "لو هتعمل لوجو لنفسك، هيبقا إيه؟",
+    "إيه أكتر تجربة معاك مع البلكونة؟",
+    "الموضة بيفكرك بإيه؟",
+    "إيه رأيك في الجاكيت مقارنة بـالكوفية؟",
+    "إيه أكتر حاجة بتزعلك في الفلوس؟",
+    "لو هتلتقط صورة جامدة، تكون لإيه؟",
+    "لو هتعمل مع نفسك حوار، هتقول إيه؟",
+    "لو هتختار بين الباندانا والكاب، هتختار إيه؟",
+    "بتفضل الشطة ولا الخل؟",
+    "لو معاك مليون جنيه دلوقتي، هتعمل بيهم إيه؟",
+    "إيه أكتر تجربة معاك مع الجروبات؟",
+    "إيه رأيك في السمك المقلي مقارنة بـالسمك المشوي؟",
+    "إيه أكتر شيء بتخاف من التغيير فيه؟",
+    "إيه أكتر حاجة بتحبها في الجروبات؟",
+    "لو هتغير حاجة في الضحك، هتغير إيه؟",
+    "إيه رأيك في الشارع؟",
+    "بتفضل اللب الأبيض ولا اللب السوبر؟",
+    "بتفضل الأتاري ولا البلايستيشن؟",
+    "إيه أكتر شيء بتضحك على نفسك بسببه؟",
+    "الضحك بيفكرك بإيه؟",
+    "إيه أكتر شيء بتحب تتكلم فيه مع نفسك؟",
+    "لو معاك سجل أحلام، فيه إيه؟",
+    "لو هتنصح حد عن الأكل، تقوله إيه؟",
+    "لو هتختار بين التليفون كبير وصغير، هتختار إيه؟",
+    "لو هتنصح حد عن الوحدة، تقوله إيه؟",
+    "إيه رأيك في التنس مقارنة بـالإسكواش؟",
+    "المطاعم بيفكرك بإيه؟",
+    "بتحب الصلاة ليه؟",
+    "العيلة بيفكرك بإيه؟",
+    "إيه أكتر حاجة بتخاف منها؟",
+    "لو هتلعب مع طفل، تلعب معاه إيه؟",
+    "إيه رأيك في الضحك؟",
+    "بتحب الكلام في الحب ولا تخفيه؟",
+    "لو هتختار بين الملوخية والبامية، هتختار إيه؟",
+    "إيه أكتر حاجة بتحفز نفسك بيها؟",
+    "بتفضل الزعتر ولا الكمون؟",
+    "بتحب الصبح بدري ولا تنام لحد متأخر؟",
+    "إيه أكتر تجربة معاك مع الموسيقى؟",
+    "لو هتسلم تعبير لشخص واحد، تسلم لمين؟",
+    "إيه أكتر حاجة بتحبها في البلكونة؟",
+    "إيه أكتر مفاجأة عجبتك؟",
+    "إيه أكتر لعبة بتحب تلعبها؟",
+    "لو هتاخد جدك معاك في رحلة، تروحوا فين؟",
+    "إيه أكتر حاجة بتحس إنها مهمة في الصداقة؟",
+    "لو هتعمل بوست شكر، لمين؟",
+    "بتفضل المشي تحت المطر ولا في الشمس؟",
+    "لو هتسلم لقمة عيش لحد، تسلم لمين؟",
+    "لو هتعمل بوست عن نفسك، هتقول فيه إيه؟",
+    "إيه أكتر بنطلون مرتاح فيه؟",
+    "بتحب الأمل ولا الواقعية؟",
+    "بتفضل الفطار ولا العشا؟",
+    "بتحب الجمعية الكبيرة ولا القلة؟",
+    "إيه أكتر صديق طفولة بتفتكره؟",
+    "إيه أحلى موقف فاكره مع الشارع؟",
+    "إيه أكتر حاجة بتحبها في العيلة؟",
+    "الأكل بيفكرك بإيه؟",
+    "بتحب القعدة ع البلكونة ولا في الصالة؟",
+    "بتفضل تتعلم الطبخ ولا تكتفي بالأكل؟",
+    "لو معاك ٢٤ ساعة بس في حياتك، هتقضيهم مع مين؟",
+    "بتفضل الديليفري ولا تطبخ؟",
+    "إيه أكتر شيء بتحب تتعلمه أونلاين؟",
+    "بتحب الفسحة على الكورنيش ولا في المول؟",
+    "بتفضل الفسحة بالليل ولا بالنهار؟",
+    "إيه أحلى موقف فاكره مع الصوم؟",
+    "إيه أكتر حاجة بتزعلك في الجروبات؟",
+    "لو هتختار بين القرع العسلي والبطاطا، هتختار إيه؟",
+    "إيه أكتر حاجة بتزعلك في الصوم؟",
+    "إيه رأيك في النوكيا القديم مقارنة بـالذكي؟",
+    "إيه أكتر حاجة بتحبها في الفلوس؟",
+    "إيه أكتر حاجة عاوز تشتريها دلوقتي؟",
+    "إيه أكتر تجربة معاك مع الأكل؟",
+    "إيه أكتر تجربة معاك مع الدعاء؟",
+    "لو معاك ٥ مكتبات في العالم، تختار إيه؟",
+    "إيه أكتر حاجة بتحبها في النيل؟",
+    "بتحب الضحك العالي ولا الهادي؟",
+    "لو معاك أم عظيمة، هتقولها إيه؟",
+    "بتحب التصوير ولا تتصور؟",
+    "لو معاك مكنة زمن لمرة واحدة، تروح ولا ترجع؟",
+    "إيه أكتر دعوة بتدعي بيها لأهلك؟",
+    "بتحب رأي الكبار ولا الصغار؟",
+    "بتفضل الكنتالوب ولا البطيخ؟",
+    "لو هتختار بين النيلة والفلفل، هتختار إيه؟",
+    "إيه أكتر حاجة بتحبها في الوحدة؟",
+    "إيه أحلى رحلة عملتها مع العيلة؟",
+    "إيه رأيك في الأرز مقارنة بـالمكرونة؟",
+    "إيه أكتر يوم في الأسبوع بتحبه؟",
+    "إيه أحلى موقف فاكره مع الموسيقى؟",
+    "لو هتغير حاجة في المطاعم، هتغير إيه؟",
+    "السفر بيفكرك بإيه؟",
+    "بتفضل اللحمة الكندوز ولا الضأن؟",
+    "إيه أكتر شيء بيجعلك تبتسم بدون سبب؟",
+    "إيه رأيك في المكرونة بالبشاميل مقارنة بـالكوسة؟",
+    "إيه أكتر حاجة فقدت بريقها بمرور الوقت؟",
+    "بتحب النيل ليه؟",
+    "بتفضل المياه الفوارة ولا العادية؟",
+    "بتفضل الكبدة ولا المخ؟",
+    "لو هتختار حيوان يمثلك، هيكون إيه؟",
+    "إيه أكتر شيء بتحس إنه يدخل قلبك؟",
+    "إيه أكتر حاجة بتزعلك في الحزن؟",
+    "بتفضل الجبنة البيضا ولا الرومي؟",
+    "بتحب صوتك في التسجيل ولا لأ؟",
+    "إيه أحلى ذكرى ليك مع الكافيهات؟",
+    "إيه أحلى موقف فاكره مع المدرسة؟",
+    "بتحب اللعب أونلاين ولا أوفلاين؟",
+    "إيه أحلى عيد ميلاد جالك؟",
+    "لو هتغير حاجة في الحجاب، هتغير إيه؟",
+    "إيه أكتر حاجة بتزعلك في البيت؟",
+    "بتفضل العصير الفريش ولا العصير المعلب؟",
+    "الخوف بيفكرك بإيه؟",
+    "بتفضل ساعة اليد ولا الموبايل؟",
+    "بتفضل تركب الميكروباص ولا التاكسي؟",
+    "لو معاك بطاقة سفر مفتوحة لشخص، تديها لمين؟",
+    "إيه أكتر فيلم اتفرجت عليه أكتر من مرة؟",
+    "بتفضل البولينج ولا البلياردو؟",
+    "لو هتعمل فاميلي تري، هتبدأ منين؟",
+    "إيه أكتر شيء بتحلم بيه ومش قدرت توصله؟",
+    "لو هتلغي عادة سيئة، هتلغي إيه؟",
+    "إيه أكتر حاجة بتزعلك في الحجاب؟",
+    "بتحب رأيك يتسمع ولا تسمع رأي الناس؟",
+    "لو هتكتب مذكرات، هتسميها إيه؟",
+    "لو هتعمل حياة جديدة، هتبدأ منين؟",
+    "بتحب الزفة ولا قعدة هادية؟",
+    "بتحس إنك محظوظ ولا لأ؟",
+    "بتفضل التيشرت ولا القميص؟",
+    "لو هتعمل قائمة أكلات، فيها إيه؟",
+    "إيه أكتر حاجة بتحبها في الحجاب؟",
+    "إيه أحلى ذكرى ليك مع المدرسة؟",
+    "بتنام كام ساعة في اليوم؟",
+    "إيه أحلى موقف فاكره مع الحجاب؟",
+    "إيه أحلى موقف فاكره مع العادات؟",
+    "لو هتختار بين الأبيض في الجواز والأبيض في العربية، هتختار إيه؟",
+    "لو هتسلم ميدالية، هتسلم لمين؟",
+    "بتفضل الأرز ولا المكرونة؟",
+    "إيه أكتر حاجة بتحبها في المطاعم؟",
+    "الطفولة بيفكرك بإيه؟",
+    "لو معاك صور مبعزقة، هترتبها إزاي؟",
+    "لو معاك سند في حياتك، مين هو؟",
+    "بتفضل الكتابة بالقلم الجاف ولا الرصاص؟",
+    "بتحب الطفولة ليه؟",
+    "لو معاك حق ندم على حاجة واحدة، هتختار إيه؟",
+    "لو هتنصح حد عن الضحك، تقوله إيه؟",
+    "إيه أكتر تجربة معاك مع العيلة؟",
+    "لو هتختار بين العصير الفريش والعصير المعلب، هتختار إيه؟",
+    "بتحب الضحك ليه؟",
+    "بتفضل الباندانا ولا الكاب؟",
+    "إيه أكتر فيلم عربي بتحبه؟",
+    "لو معاك دقيقة تكلم نفسك الصغير، هتقوله إيه؟",
+    "إيه رأيك في اللحمة الكندوز مقارنة بـالضأن؟",
+    "إيه رأيك في القرع العسلي مقارنة بـالبطاطا؟",
+    "بتحب الصمت بعد المغرب ولا الضوضاء؟",
+    "إيه أكتر هواية بتحبها؟",
+    "بتفضل البيتزا ولا البرجر؟",
+    "إيه أحلى ذكرى ليك مع العادات؟",
+    "لو هتعمل عيد ميلاد لنفسك مفاجأة، تختار إيه؟",
+    "بتحب التسوق فست فود ولا أوكازيون؟",
+    "إيه رأيك في الجمبري مقارنة بـالكاليماري؟",
+    "بتحب البلكونة ليه؟",
+    "بتفضل تدي هدية ولا تاخد؟",
+    "لو هتعمل بطاقة نجاح، تديها لمين؟",
+    "إيه أكتر حاجة بتزعلك في الكافيهات؟",
+    "بتفضل التريقة ولا الجد في الحوار؟",
+    "إيه أكتر حاجة بتزعلك في العطور؟",
+    "إيه أحلى ذكرى ليك مع الجبل؟",
+    "بتحب الموضة ليه؟",
+    "إيه أكتر حاجة فقدتها وندمان عليها؟",
+    "لو معاك لاعب كرة بيلعب معاك، تختار مين؟",
+    "إيه أكتر شيء بتحس إنه يستحق التعب؟",
+    "بتفضل الكنافة ولا البقلاوة؟",
+    "لو هتختار بين الكاميرا الكبيرة والموبايل، هتختار إيه؟",
+    "إيه رأيك في النيلة مقارنة بـالفلفل؟",
+    "بتفضل القهوة الفرنساوي ولا القهوة التركي؟",
+    "لو معاك سحاب يحملك، تروح فين؟",
+    "بتحب تتفرج على المباريات ولا تلعبها؟",
+    "بتفضل القرع العسلي ولا البطاطا؟",
+    "إيه أكتر حلم بتحلم بيه؟",
+    "لو هتختار بين اللب الأبيض واللب السوبر، هتختار إيه؟",
+    "بتفضل التنس ولا الإسكواش؟",
+    "لو هتسمع كلمة \"بحبك\" دلوقتي، من مين؟",
+    "بتفضل الشاي بنعناع ولا الشاي عادي؟",
+    "بتفضل الهدوء ولا الموسيقى وانت بتذاكر؟",
+    "إيه أكتر شيء بتخاف تخسره؟",
+    "لو هتسلم على شخص لقيته في الشارع، هتسلم على مين؟",
+    "إيه أكتر تجربة معاك مع المدرسة؟",
+    "إيه أكتر تجربة معاك مع الموضة؟",
+    "إيه رأيك في اللب الأبيض مقارنة بـاللب السوبر؟",
+    "إيه أحلى موقف فاكره مع الشعر؟",
+    "بتفضل الكاكاو ولا الشاي بلبن؟",
+    "لو معاك دقيقة في التليفزيون، هتقول إيه؟",
+    "بتفضل الملوخية ولا البامية؟",
+    "إيه أكتر حاجة بتحبها في العطور؟",
+    "إيه أحلى موقف فاكره مع الحزن؟",
+    "إيه أكتر تجربة معاك مع البيت؟",
+    "بتفضل القرص ولا البتاو؟",
+    "إيه أكتر شيء فاكره من أول جروب اشتركت فيه؟",
+    "بتفضل الجوافة ولا الرمان؟",
+    "بتحب الموسيقى ليه؟",
+    "إيه أكتر حاجة بتفكر فيها قبل النوم؟",
+    "لو هتجمع صحابك القدام، تختار مين؟",
+    "إيه أكتر حاجة بتحبها في الطفولة؟",
+    "الشعر بيفكرك بإيه؟",
+    "إيه رأيك في الجبنة الرومي مقارنة بـالجبنة الموتزاريلا؟",
+    "إيه أحلى ذكرى ليك مع الدعاء؟",
+    "لو هتختار بين التنس والإسكواش، هتختار إيه؟",
+    "لو هتغير حاجة في رمضان، هتغير إيه؟",
+    "لو هتلعب لعبة فيديو، تختار إيه؟",
+    "لو معاك صورة قديمة، أنت فين فيها؟",
+    "لو هتغير حاجة في الأكل، هتغير إيه؟",
+    "إيه أكتر تطبيق بتفتحه في اليوم؟",
+    "لو هتعمل قائمة بأناس بتقدرهم، أول واحد فيها؟",
+    "إيه أكتر حاجة بتحبها في الجبل؟",
+    "لو هتختار بين السمك المقلي والسمك المشوي، هتختار إيه؟",
+    "لو هتختار بين الأم كحك والبسبوسة، هتختار إيه؟",
+    "إيه أحلى موقف فاكره مع الصلاة؟",
+    "إيه أحلى ذكرى ليك مع الوحدة؟",
+    "بتحب الفلوس ليه؟",
+    "بتفضل اليوميات الكتابة ولا الصوت؟",
+    "لو معاك تليفون قديم وفيه أرقام، هترن لمين؟",
+    "إيه أحلى موقف فاكره مع القطط؟",
+    "لو هتعمل خطاب لرئيس مدرستك، هتقوله إيه؟",
+    "إيه أحلى أكلة بتحب امك تعملهالك؟",
+    "بتفضل البطء والإتقان ولا السرعة والإنجاز؟",
+    "لو هتفتح مكتبة، هتركز على إيه؟",
+    "إيه أحلى ذكرى ليك مع المصنع؟",
+    "إيه أكتر حاجة بتحس إنها هدية ربنا ليك؟",
+    "إيه أكتر حاجة بتفكر فيها وانت في المواصلات؟",
+    "لو هتشتري لنفسك هدية بسيطة، هتشتري إيه؟",
+    "إيه أحلى ذكرى ليك مع الموضة؟",
+    "إيه أكتر تجربة معاك مع رمضان؟",
+    "إيه أكتر مكان حنين عندك؟",
+    "إيه أكتر مفاجأة قدمتها لحد؟",
+    "إيه أكتر تجربة معاك مع الطفولة؟",
+    "إيه أكتر مغني بتحب تسمعله؟",
+    "بتفضل الصيف ولا الشتا؟",
+    "بتفضل الجبنة الرومي ولا الجبنة الموتزاريلا؟",
+    "بتفضل اللبن ولا الزبادي؟",
+    "بتفضل الشيكولاتة ولا الحلويات الشرقي؟",
+    "إيه أكتر حاجة بتزعلك في العادات؟",
+    "لو هتختار بين المكرونة بالبشاميل والكوسة، هتختار إيه؟",
+    "لو هتسلم بوكيه ورد، تسلم لمين؟",
+    "بتحب الزحمة ولا الهدوء؟",
+    "لو هتعمل مكتبتك المثالية، فيها إيه؟",
+    "إيه أكتر شيء بتنساه وانت بتطبخ؟",
+    "إيه أكتر حاجة بتحبها في الموضة؟",
+    "بتحب الترتيب ولا العفوية؟",
+    "إيه أكتر حاجة بتحبها في الشارع؟",
+    "بتحب الأسانسير ولا السلم؟",
+    "لو معاك صبر زيادة، تعمله مع مين؟",
+    "لو هتغير حاجة في العيلة، هتغير إيه؟",
+    "لو هتنصح حد عن الفلوس، تقوله إيه؟",
+    "بتفضل تشاهد التريلر ولا تعرف القصة؟",
+    "إيه أكتر شيء فاجأك في 2024؟",
+    "لو معاك تذكرة طيارة مفتوحة، هتروح فين؟",
+    "الموسيقى بيفكرك بإيه؟",
+    "إيه أكتر شيء بتسأل عنه ربنا؟",
+    "إيه أكتر حاجة بتحبها في الصلاة؟",
+    "بتفضل الكسل ولا النشاط؟",
+    "لو معاك فرصة تغير حاجة في حياتك، هتغير إيه؟",
+    "إيه أكتر شخص بتحبه في حياتك؟",
+    "بتفضل الكوكاكولا ولا البيبسي؟",
+    "إيه رأيك في اللبن مقارنة بـالزبادي؟",
+    "المدرسة بيفكرك بإيه؟",
+    "إيه أكتر حاجة بتفرح بيها أهلك؟",
+    "إيه أكتر حاجة بتزعلك في الصلاة؟",
+    "بتفضل الأكل في السفرة ولا قعدة على الأرض؟",
+    "لو هتسلم نفسك حضن، هتقول لنفسك إيه؟",
+    "بتحب القطط ليه؟",
+    "إيه أكتر مرة حسيت إنك حر؟",
+    "لو هتعمل بحث عن سعادتك، هتبدأ منين؟",
+    "لو هتختار بين القهوة الفرنساوي والقهوة التركي، هتختار إيه؟",
+    "لو هتعمل حفلة، هتعزم مين؟",
+    "لو هتلاقي 100 جنيه في الشارع، هتعمل بيهم إيه؟",
+    "إيه أكتر صورة بتحفظها في موبايلك؟",
+    "إيه أكتر فترة حسيت إنها أحسن أيامك؟",
+    "لو هتنصح حد عن رمضان، تقوله إيه؟",
+    "إيه أكتر حاجة بتزعلك في الضحك؟",
+    "إيه أحلى ذكرى ليك مع الصوم؟",
+    "إيه أكتر شيء بتخاف تنساه؟",
+    "بتفضل الكتاب الذي يجعلك تفكر ولا الذي يجعلك تضحك؟",
+    "لو هتختار بين البطاطس مهروسة والبطاطس مقلية، هتختار إيه؟",
+    "لو هتختار بين الشاي بنعناع والشاي عادي، هتختار إيه؟",
+    "لو هتنصح حد عن الجبل، تقوله إيه؟",
+    "إيه آخر حاجة جديدة جربتها؟",
+    "إيه رأيك في القطط؟",
+    "لو معاك سنة فاضية بدون شغل، هتعمل إيه؟",
+    "لو هتنصح حد عن الشعر، تقوله إيه؟",
+    "إيه أكتر حاجة بتحبها في المدرسة؟",
+    "لو معاك يوم لازم تقضيه صامت، هتعمل إيه؟",
+    "لو معاك تذكرة سيرك، تاخد مين معاك؟",
+    "بتفضل سماعة في وداني ولا بلوتوث؟",
+    "إيه أكتر حاجة بتزعلك في المصنع؟",
+    "إيه أكتر حاجة بتخليك تتمنى تتغير؟",
+    "بتفضل الكوميدي ولا الرعب؟",
+    "إيه أكتر حاجة بتعجبك في الجروب ده؟",
+    "لو هتعمل حلقة بودكاست، عن إيه؟",
+    "بتحب الكشري ولا الفول؟",
+    "بتفضل اليوجا ولا الكروس فيت؟",
+    "بتحب السفر ليه؟",
+    "إيه أكتر حاجة بتخليك تضحك؟",
+    "إيه أكتر أغنية بتسمعها دلوقتي؟",
+    "لو هتعمل تطبيق، هيخدم إيه؟",
+    "إيه رأيك في الإنترنت؟",
+    "بتحب الجو الصحراوي ولا الزراعي؟",
+    "إيه رأيك في الكنتالوب مقارنة بـالبطيخ؟",
+    "لو هتختار بين اللاب توشيبا وديل، هتختار إيه؟",
+    "بتحب القطط ولا الكلاب؟",
+    "بتفضل الصلاة جماعة ولا فرادى؟",
+    "إيه أحلى ذكرى ليك مع الشارع؟",
+    "إيه أكتر شيء بتدور عليه في النت؟",
+    "بتحب الحمام الساخن ولا البارد؟",
+    "إيه أكتر حاجة عاوز تخسرها في نفسك؟",
+    "لو هتشتري بيت في حتة، تختار فين؟",
+    "بتفضل الأبيض ولا البيج؟",
+    "بتفضل الحياة بالعقل ولا بالقلب؟",
+    "إيه أكتر حاجة بتزعلك في النيل؟",
+    "لو هتختار بين السفن أب والفانتا، هتختار إيه؟",
+    "لو هتغير حاجة في المدرسة، هتغير إيه؟",
+    "لو هتعمل وصفة سحر، هتحط فيها إيه؟",
+    "بتحب الأخبار الجديدة ولا التقليدية؟",
+    "لو هتنصح حد عن السفر، تقوله إيه؟",
+    "بتحب الرسم ولا الكتابة؟",
+    "إيه أكتر حاجة بتزعلك في الأفلام؟",
+    "لو هتغير حاجة في الصلاة، هتغير إيه؟",
+    "إيه أحلى ذكرى ليك مع العطور؟",
+    "إيه أحلى ذكرى ليك مع النيل؟",
+    "لو هتعمل برنامج تلفزيوني، هيتكلم عن إيه؟",
+    "بتحب القعدة وسط النور ولا في الضوء الخافت؟",
+    "إيه رأيك في البولينج مقارنة بـالبلياردو؟",
+    "إيه أحلى ذكرى ليك مع البلكونة؟",
+    "إيه رأيك في القعدة في الجامعة مقارنة بـالمدرسة؟",
+    "بتحب البيت يكون فيه نباتات ولا فاضي؟",
+    "بتحب القراءة ورق ولا إلكتروني؟",
+    "بتفضل المكرونة بالبشاميل ولا الكوسة؟",
+    "لو هتاخد صورة بنفس وضعية كل سنة، تاخدها فين؟",
+    "إيه رأيك في القهوة الفرنساوي مقارنة بـالقهوة التركي؟",
+    "بتحب الرحلات الطويلة ولا القصيرة؟",
+    "بتفضل تكسب لوحدك ولا تخسر مع جماعة؟",
+    "بتحب الجروبات ليه؟",
+    "لو هتختار بين البني والرمادي، هتختار إيه؟",
+    "إيه أحلى موقف فاكره مع العطور؟",
+    "لو هتسافر بكرة، هتاخد معاك إيه؟",
+    "إيه أكتر حاجة بتحبها في العادات؟",
+    "إيه أكتر حاجة بتحس إنها سرك الجميل؟",
+    "الصلاة بيفكرك بإيه؟",
+    "إيه أكتر مكان حسيت فيه بالسعادة؟",
+    "بتفضل الموسيقى الهادية ولا الصاخبة؟",
+    "بتفضل الحواوشي ولا الفول المدمس؟",
+    "إيه رأيك في البيت؟",
+    "لو هتعرف لغة بدون مذاكرة، هتختار إيه؟",
+    "لو تقابل مشهور، هتقابل مين؟",
+    "إيه أكتر حاجة بترحلك من الزحام؟",
+    "إيه أكتر حاجة بتقولها لأخواتك؟",
+    "إيه أكتر حاجة بتزعلك في الأكل؟",
+    "إيه أكتر تجربة معاك مع الفلوس؟",
+    "البلكونة بيفكرك بإيه؟",
+    "إيه أكتر مرة شعرت فيها بالامتنان؟",
+    "إيه أكتر تجربة معاك مع الحزن؟",
+    "إيه أكتر صفة بتحبها في صحابك؟",
+    "إيه أكتر شيء بتنام عليه ع التليفون؟",
+    "بتحب الفنون ولا العلوم؟",
+    "بتفضل الجاكيت ولا الكوفية؟",
+    "إيه أكتر حاجة بتفرحك في يومك؟",
+    "لو هتنصح حد عن البيت، تقوله إيه؟",
+    "إيه رأيك في الجزر مقارنة بـالخيار؟",
+    "لو هتغير حاجة في الكافيهات، هتغير إيه؟",
+    "إيه رأيك في الباندانا مقارنة بـالكاب؟",
+    "لو معاك سحر وتنفذ أي أمر، هتعمل إيه؟",
+    "لو هتنصح حد عن المطاعم، تقوله إيه؟",
+    "بتفضل اللحظة الحالية ولا المستقبل؟",
+    "لو هتجرب حاجة جديدة بكره، هتجرب إيه؟",
+    "إيه أكتر حاجة بتفكر فيها في الصبح؟",
+    "لو هتختار بين الترمس والفول السوداني، هتختار إيه؟",
+    "إيه أحلى موقف فاكره مع المطاعم؟",
+    "إيه رأيك في الكبدة مقارنة بـالمخ؟",
+    "إيه أكتر تجربة معاك مع الضحك؟",
+    "إيه أكتر شيء بتخاف منه في الكبر؟",
+    "بتفضل الفراخ المشوي ولا الفراخ المسلوق؟",
+    "إيه أكتر تجربة معاك مع الإنترنت؟",
+    "لو كنت فلوس، هتكون عملة إيه؟",
+    "بتحب البيت ليه؟",
+    "إيه رأيك في العصير الفريش مقارنة بـالعصير المعلب؟",
+    "إيه أكتر تطبيق محذوفه ورجعت نزلته؟",
+    "لو هتنصح حد عن العطور، تقوله إيه؟",
+    "لو هتختار بين الشطرنج والكوتشينة، هتختار إيه؟",
+    "إيه أكتر مكان مفقدته الجنون؟",
+    "إيه أكتر حاجة بتزعلك في الجبل؟",
+    "إيه أكتر حاجة بتزعلك في البلكونة؟",
+    "الجبل بيفكرك بإيه؟",
+    "لو سافرت بكره، هتروح فين؟",
+    "إيه أكتر حلم اشتغلت عليه فعلا؟",
+    "إيه أكتر حاجة بتشتاقلها لما تكون مسافر؟",
+    "بتحب أن تختار ولا أن يُختار لك؟",
+    "لو هتشتري هدية لأبوك، هتشتري إيه؟",
+    "إيه أكتر إعلان مضايقك في التلفزيون؟",
+    "لو هتلاقي صورة لجدتك، هتعمل إيه؟",
+    "لو هتختار بين الإكس بوكس والنينتندو، هتختار إيه؟",
+    "لو هتغير حاجة في الجروبات، هتغير إيه؟",
+    "لو معاك مهارة سحرية، هتكون إيه؟",
+    "إيه أحلى موقف فاكره مع الطفولة؟",
+    "إيه رأيك في التين مقارنة بـالعنب؟",
+    "إيه أكتر حاجة بتزعلك في القطط؟",
+    "إيه أحلى موقف فاكره مع الخوف؟",
+    "إيه أكتر حاجة بتحس إنها كنز؟",
+    "إيه أحلى موقف فاكره مع الجبل؟",
+    "إيه أكتر حاجة بتزعلك في الشارع؟",
+    "إيه أحلى ذكرى من المدرسة؟",
+    "إيه أكتر حاجة بتحبها في الحزن؟",
+    "إيه أكتر تجربة معاك مع المصنع؟",
+    "لو هتختار بين الكنتالوب والبطيخ، هتختار إيه؟",
+    "إيه أكتر حاجة بتأذيك من غير ما تقول؟",
+    "بتفضل الجزر ولا الخيار؟",
+    "إيه أكتر شيء بتحب تشاهده ع التليفزيون؟",
+    "بتحب الشارع ليه؟",
+    "لو معاك صوت رائع، هتغني إيه؟",
+    "بتفضل الكتب القديمة ولا الجديدة؟",
+    "لو هتعمل قناة يوتيوب، هتعمل عن إيه؟",
+    "بتفضل الوردي ولا البنفسجي؟",
+    "لو هتدخل مغامرة جامدة، تختار إيه؟",
+    "إيه أكتر حاجة بتزعلك في الخوف؟",
+    "إيه أكتر تجربة معاك مع الصوم؟",
+    "بتحب الكاوتش الجلد ولا الكنفا؟",
+    "إيه رأيك في الفراخ المشوي مقارنة بـالفراخ المسلوق؟",
+]
+
+
+# "لعبة كت" فيها مسافة فما كانش بيشتغل مع filters.command — بنفصلها بـ phrases()
+@Client.on_message(
+    (command2(["كت", "cat", "تويت"]) | phrases(["لعبة كت", "لعبه كت"]))
+    & other_filters
+)
 async def cat_game(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    if not message.from_user:
         return
     q = random.choice(CAT_QUESTIONS)
     await message.reply(
-        f"🎲 **لعبة كت**\n\n"
+        f"🎲 **لعبة كت-تويت**\n\n"
         f"{_mention(message.from_user)} خد سؤالك:\n\n"
         f"**{q}**"
     )
 
 
 # ═══════════════════════════════════════════════
-# 🔤 لعبة تفكيك — كلمة مبعثرة
-# 🧩 لعبة تجميع — حروف متفرقة لتكوين كلمة
-# نقاط: تفكيك = 5 / تجميع = 5
+# 🤫 لعبة صراحة
 # ═══════════════════════════════════════════════
-WORD_GAME_TIMEOUT = 60  # ثانية
-WORD_WIN_POINTS = 5
+SARAHA_QUESTIONS = [
+    "بصراحة، إيه رأيك في {target}؟",
+    "بصراحة، إيه أكتر صفة بتحبها في {target}؟",
+    "بصراحة، إيه أكتر صفة بتكرهها في {target}؟",
+    "بصراحة، {target} بيفكرك بمين؟",
+    "بصراحة، تعتبر {target} صديق ولا معرفة؟",
+    "بصراحة، لو {target} طلب منك حاجة، هتعملها؟",
+    "بصراحة، إيه أول انطباع جالك عن {target}؟",
+    "بصراحة، {target} شخصيته بتشبه إيه؟",
+    "بصراحة، لو {target} غاب عن الجروب هتوحشك؟",
+    "بصراحة، إيه أحلى موقف فاكره مع {target}؟",
+    "بصراحة، تثق في {target} لدرجة إيه من 10؟",
+    "بصراحة، {target} تنفع تكون صاحبك في رحلة؟",
+    "بصراحة، {target} بيضحكك ولا بيزهقك؟",
+    "بصراحة، لو {target} طلب منك سر، هتقوله؟",
+    "بصراحة، {target} حنين ولا جامد؟",
+    "بصراحة، تتمنى {target} يفضل في حياتك؟",
+    "بصراحة، {target} بيشبه حد من عيلتك؟",
+    "بصراحة، لو {target} زعلك، هتسامحه بسرعة؟",
+    "بصراحة، {target} عنده موهبة في إيه؟",
+    "بصراحة، إيه الحاجة اللي تتمناها لـ{target}؟",
+    "بصراحة، {target} كتوم ولا بيحكي كل حاجة؟",
+    "بصراحة، {target} ذكي ولا عبيط شوية؟",
+    "بصراحة، لو {target} عرض عليك صداقة العمر، هتوافق؟",
+    "بصراحة، {target} بيعرف يحافظ على الأسرار؟",
+    "بصراحة، {target} تنفع شريك مشروع؟",
+    "بصراحة، {target} مزاجه إزاي معاك؟",
+    "بصراحة، لو {target} سألك سؤال محرج، هترد بإيه؟",
+    "بصراحة، {target} بيهتم بيك ولا بيسلم وبس؟",
+    "بصراحة، إيه أكتر حاجة عاوز تقولها لـ{target}؟",
+    "بصراحة، {target} تعتبره صديق طفولة لو اتقابلتوا بدري؟",
+    "بصراحة، {target} بيفهمك من نص كلمة؟",
+    "بصراحة، لو {target} في ضيق، هتقف معاه؟",
+    "بصراحة، {target} طيب لدرجة إنه بيتأذى أحيانا؟",
+    "بصراحة، {target} بيحب الجروب فعلا ولا بس متفرج؟",
+    "بصراحة، {target} ليه طاقة إيجابية ولا سلبية؟",
+    "بصراحة، {target} بيقولك الحقيقة دايما؟",
+    "بصراحة، {target} هيكون أب/أم كويسة؟",
+    "بصراحة، {target} بيفكر بعقله ولا بقلبه؟",
+    "بصراحة، {target} بيحب يساعد ولا بيأخر؟",
+    "بصراحة، إيه أكتر حاجة تخاف تقولها لـ{target}؟",
+    "بصراحة، {target} بيحس بمشاعرك؟",
+    "بصراحة، {target} حياته بتشبه فيلم إيه؟",
+    "بصراحة، {target} لو سافر بكره هتفتقده؟",
+    "بصراحة، {target} اسمه بيليق عليه؟",
+    "بصراحة، {target} عنده أسلوب جميل في الكلام؟",
+    "بصراحة، {target} لما بيغضب شكله إيه؟",
+    "بصراحة، {target} بيحب نفسه بزيادة ولا متواضع؟",
+    "بصراحة، {target} نفسه ليك ولا بعيد عنك؟",
+    "بصراحة، {target} لو طلب منك تعلمه حاجة، تعلمه إيه؟",
+    "بصراحة، {target} هيوصل لحلمه في رأيك؟",
+]
 
-# {chat_id: {"word": str, "shuffled": str, "starter_id": int, "msg_id": int, "kind": "tafkeek"|"tagmee3"}}
-active_word_games: dict = {}
+SARAHA_TRUTHS = [
+    "بصراحة معاك… أنت طيب أكتر مما بتفتكر، بس بتخبيها 🤍",
+    "بصراحة معاك… أنت أقوى مما بتتخيل، بس محتاج وقت تشوف ده.",
+    "بصراحة معاك… ابتسامتك بتفرق مع ناس ما بتعرفش.",
+    "بصراحة معاك… أنت بتاخد قرارات عاطفية أكتر من اللازم.",
+    "بصراحة معاك… عندك جنب من قلبك بيحب ينعزل.",
+    "بصراحة معاك… أنت بتسامح بسرعة بس بتفتكر طويل.",
+    "بصراحة معاك… محتاج تحب نفسك أكتر شوية.",
+    "بصراحة معاك… أنت أذكى مما بتظهره.",
+    "بصراحة معاك… بتدور على حد يفهمك من غير ما تتكلم.",
+    "بصراحة معاك… أنت محظوظ بناس حواليك بيحبوك بصمت.",
+    "بصراحة معاك… أنت محتاج راحة، خد نفس.",
+    "بصراحة معاك… شخصيتك أعمق من اللي الناس شايفينه.",
+    "بصراحة معاك… عندك حلم لسه ما تخليتش عنه، كمل فيه.",
+    "بصراحة معاك… أنت بتدّي ناس ما بتستاهلش.",
+    "بصراحة معاك… الناس بتاخد منك طاقة، خلي بالك من نفسك.",
+    "بصراحة معاك… أنت بتكسب قلوب من غير ما تحاول.",
+    "بصراحة معاك… أنت كتوم لكن داخلك بحر.",
+    "بصراحة معاك… محتاج تتكلم مع نفسك بنبرة ألطف.",
+    "بصراحة معاك… عندك موهبة ما بتعرفهاش.",
+    "بصراحة معاك… أنت أحلى لما بتكون على طبيعتك.",
+]
 
 
-def _shuffle_word(w: str) -> str:
-    chars = list(w)
-    for _ in range(20):
-        random.shuffle(chars)
-        if "".join(chars) != w:
-            break
-    return "".join(chars)
-
-
-def _spaced_letters(w: str) -> str:
-    chars = list(w)
-    random.shuffle(chars)
-    return " - ".join(chars)
-
-
-async def _start_word_game(message: Message, kind: str):
+@Client.on_message(command2(["صراحه", "صراحة", "truth"]) & other_filters)
+async def saraha_question(client: Client, message: Message):
+    if not message.from_user:
+        return
+    # تجاهل "صراحة معاك" — ليه handler منفصل
+    txt = (message.text or "").strip()
+    if txt.startswith(("صراحة معاك", "صراحه معاك")):
+        return
     chat_id = message.chat.id
-    if chat_id in active_word_games:
-        return await message.reply("✦ في لعبة كلمات شغالة دلوقتي، استنى تخلص.")
-    pool = SCRAMBLE_WORDS if kind == "tafkeek" else BUILD_WORDS
-    word = random.choice(pool)
-    if kind == "tafkeek":
-        display = _shuffle_word(word)
-        title = "🔤 **لعبة تفكيك**"
-        hint = f"رتّب الحروف وكوّن الكلمة الأصلية:\n\n`{display}`"
-    else:
-        display = _spaced_letters(word)
-        title = "🧩 **لعبة تجميع**"
-        hint = f"جمّع الحروف دي وكوّن كلمة:\n\n`{display}`"
-    sent = await message.reply(
-        f"{title}\n\n{hint}\n\n"
-        f"⏱ عندك {WORD_GAME_TIMEOUT} ثانية — اكتب الإجابة في الجروب.\n"
-        f"🏆 الجائزة: +{WORD_WIN_POINTS} نقاط"
-    )
-    active_word_games[chat_id] = {
-        "word": word, "shuffled": display, "starter_id": message.from_user.id,
-        "msg_id": sent.id, "kind": kind,
-    }
-    await asyncio.sleep(WORD_GAME_TIMEOUT)
-    state = active_word_games.get(chat_id)
-    if state and state["msg_id"] == sent.id:
-        active_word_games.pop(chat_id, None)
-        try:
-            await message.reply(f"⌛ خلص الوقت! الكلمة كانت: **{word}**")
-        except Exception:
-            pass
-
-
-@Client.on_message(command2(["تفكيك", "تفكيك كلمة"]) & other_filters)
-async def tafkeek_cmd(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
+    exclude = {message.from_user.id}
+    target = await _random_member(client, chat_id, exclude)
+    if not target:
+        await message.reply("✦ مفيش حد تاني في الجروب أسأل عنه دلوقتي.")
         return
-    await _start_word_game(message, "tafkeek")
-
-
-@Client.on_message(command2(["تجميع", "تجميع كلمة"]) & other_filters)
-async def tagmee3_cmd(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
-        return
-    await _start_word_game(message, "tagmee3")
-
-
-# مستمع للإجابات
-@Client.on_message(filters.group & filters.text & ~filters.via_bot, group=15)
-async def word_answer_listener(client: Client, message: Message):
-    if not message.from_user or message.from_user.is_bot:
-        return
-    state = active_word_games.get(message.chat.id)
-    if not state:
-        return
-    text = (message.text or "").strip()
-    if not text or text.startswith("/"):
-        return
-    # نقارن بدون تشكيل/مسافات
-    norm = re.sub(r"\s+", "", text)
-    if norm == state["word"]:
-        active_word_games.pop(message.chat.id, None)
-        total = _add_points(message.from_user.id, message.from_user.first_name or "عضو", WORD_WIN_POINTS)
-        await message.reply(
-            f"🎉 إجابة صح يا {_mention(message.from_user)}!\n"
-            f"الكلمة: **{state['word']}**\n"
-            f"+{WORD_WIN_POINTS} نقاط — مجموعك: {total} ⭐"
-        )
-
-
-# ═══════════════════════════════════════════════
-# 🎯 لعبة قرعة — يدخل أسماء والبوت يختار واحد
-# الاستخدام:
-#   قرعة محمد، أحمد، علي
-#   قرعة محمد - أحمد - علي
-# ═══════════════════════════════════════════════
-@Client.on_message(command2(["قرعة", "قرعه"]) & other_filters)
-async def qor3a_cmd(client: Client, message: Message):
-    if not message.from_user or not _games_ok(message):
-        return
-    parts = (message.text or "").split(maxsplit=1)
-    if len(parts) < 2:
-        return await message.reply(
-            "✦ اكتب الأسماء بعد الأمر.\n"
-            "مثال: `قرعة محمد، أحمد، علي`"
-        )
-    raw = parts[1]
-    names = [n.strip() for n in re.split(r"[،,\-\n]+", raw) if n.strip()]
-    if len(names) < 2:
-        return await message.reply("✦ لازم اسمين على الأقل.")
-    pick = random.choice(names)
-    pretty = "\n".join(f"• {n}" for n in names)
+    q = random.choice(SARAHA_QUESTIONS)
+    # Replace placeholder if exists, else inject mention
+    target_mention = _mention(target)
+    asked = q.replace("{target}", target_mention)
+    if asked == q:
+        asked = q.replace("فلان", target_mention).replace("الشخص ده", target_mention)
     await message.reply(
-        f"🎯 **القرعة**\n\n{pretty}\n\n"
-        f"🥁 ...\n\n"
-        f"🏆 الفايز هو: **{pick}**"
+        f"🤫 **صراحة**\n\n"
+        f"{_mention(message.from_user)}\n\n"
+        f"عن {target_mention}:\n"
+        f"**{asked}**"
+    )
+
+
+@Client.on_message(phrases(["صراحة معاك", "صراحه معاك"]) & other_filters)
+async def saraha_truth(client: Client, message: Message):
+    if not message.from_user:
+        return
+    target = message.reply_to_message.from_user if (message.reply_to_message and message.reply_to_message.from_user) else message.from_user
+    line = random.choice(SARAHA_TRUTHS)
+    await message.reply(
+        f"💬 {_mention(target)}\n\n**{line}**"
     )
 
 
 # ═══════════════════════════════════════════════
-# 🏆 توب النقاط
+# 🏷️ أمر التاك (Tag)
 # ═══════════════════════════════════════════════
-@Client.on_message(command2(["توب", "توب النقاط", "top", "ترتيب"]) & other_filters)
-async def top_cmd(client: Client, message: Message):
-    if not message.from_user:
-        return
-    data = _load()
-    items = list(data.get("scores", {}).items())
-    if not items:
-        return await message.reply("✦ لسه مفيش نقاط — العب شويه الأول 😄")
-    items.sort(key=lambda kv: int(kv[1].get("points", 0)), reverse=True)
-    top = items[:10]
-    lines = ["🏆 **توب النقاط (تراكمي)**\n"]
-    medals = ["🥇", "🥈", "🥉"] + ["🔹"] * 7
-    for i, (uid, rec) in enumerate(top):
-        lines.append(f"{medals[i]} {_md_escape(rec.get('name','عضو'))} — {rec.get('points',0)}")
-    me = data.get("scores", {}).get(str(message.from_user.id))
-    if me:
-        rank = next((i + 1 for i, (uid, _) in enumerate(items) if uid == str(message.from_user.id)), None)
-        lines.append(f"\n👤 ترتيبك: #{rank} — نقاطك: {me.get('points',0)}")
-    await message.reply("\n".join(lines))
-
-
-@Client.on_message(command2(["نقاطي", "نقطي"]) & other_filters)
-async def my_points(client: Client, message: Message):
-    if not message.from_user:
-        return
-    p = _get_points(message.from_user.id)
-    await message.reply(f"⭐ نقاطك: **{p}**")
-
-
-# ═══════════════════════════════════════════════
-# 🏷️ أمر التاك (Tag) — مش لعبة
-# ═══════════════════════════════════════════════
-TAG_PERM = "tag"
+TAG_PERM = "tag"  # الصلاحية المطلوبة في نظام المدير
 
 
 def _tag_is_enabled(chat_id: int) -> bool:
     data = _load()
     val = data.get("tag_enabled", {}).get(str(chat_id))
+    # افتراضيًا مفعّل
     return True if val is None else bool(val)
 
 
@@ -664,6 +1636,7 @@ def _tag_set(chat_id: int, value: bool) -> None:
 
 
 async def _can_use_tag(client: Client, chat_id: int, user_id: int) -> bool:
+    """الصلاحية: المالك الرسمي / أصحاب البوت / مالك الجروب / مدير عنده صلاحية tag."""
     if user_id in SUDO_USERS or is_master(user_id):
         return True
     if has_permission(chat_id, user_id, TAG_PERM):
@@ -678,7 +1651,7 @@ async def _can_use_tag(client: Client, chat_id: int, user_id: int) -> bool:
     return False
 
 
-@Client.on_message(command2(["تفعيل التاك", "تفعيل تاك"]) & other_filters)
+@Client.on_message(phrases(["تفعيل التاك", "تفعيل تاك"]) & other_filters)
 async def tag_enable(client: Client, message: Message):
     if not message.from_user:
         return
@@ -688,7 +1661,7 @@ async def tag_enable(client: Client, message: Message):
     await message.reply("✔ **تم تفعيل أمر التاك** 🏷️")
 
 
-@Client.on_message(command2(["تعطيل التاك", "تعطيل تاك", "ايقاف التاك"]) & other_filters)
+@Client.on_message(phrases(["تعطيل التاك", "تعطيل تاك", "ايقاف التاك"]) & other_filters)
 async def tag_disable(client: Client, message: Message):
     if not message.from_user:
         return
@@ -703,13 +1676,16 @@ async def tag_cmd(client: Client, message: Message):
     if not message.from_user:
         return
     chat_id = message.chat.id
+
     if not await _can_use_tag(client, chat_id, message.from_user.id):
         return await message.reply(
             "❌ أمر التاك للمالك / أصحاب البوت / مدير الجروب / مدير البوت بصلاحية «التاك»"
         )
+
     if not _tag_is_enabled(chat_id):
         return await message.reply("✘ أمر التاك معطّل في الجروب — فعّله بـ `تفعيل التاك`")
 
+    # تحديد العدد: تاك 30 / تاك الكل
     parts = (message.text or "").split(maxsplit=2)
     count: Optional[int] = None
     note = ""
@@ -724,8 +1700,10 @@ async def tag_cmd(client: Client, message: Message):
             if len(parts) >= 3:
                 note = parts[2].strip()
         else:
+            # مفيش رقم — كل الباقي يبقى ملاحظة
             note = (message.text.split(maxsplit=1)[1]).strip()
 
+    # اجمع الأعضاء (بدون بوتات)
     members = []
     try:
         async for m in client.get_chat_members(chat_id):
@@ -734,6 +1712,7 @@ async def tag_cmd(client: Client, message: Message):
                 continue
             members.append(u)
             if count is None:
+                # الكل — حد أقصى آمن
                 if len(members) >= 500:
                     break
             else:
@@ -744,11 +1723,15 @@ async def tag_cmd(client: Client, message: Message):
 
     if not members:
         return await message.reply("✘ مفيش أعضاء للتاك")
+
     if count is not None:
         members = members[:count]
 
+    # ابعت على دفعات (markdown mention by first name)
     header = f"🏷️ **تاك ({len(members)})**" + (f"\n📝 {note}" if note else "") + "\n\n"
-    chunk = []; chunk_len = 0; sent_first = False
+    chunk = []
+    chunk_len = 0
+    sent_first = False
 
     async def flush():
         nonlocal sent_first, chunk, chunk_len
@@ -760,7 +1743,8 @@ async def tag_cmd(client: Client, message: Message):
         except Exception:
             pass
         sent_first = True
-        chunk = []; chunk_len = 0
+        chunk = []
+        chunk_len = 0
         await asyncio.sleep(0.4)
 
     for u in members:
