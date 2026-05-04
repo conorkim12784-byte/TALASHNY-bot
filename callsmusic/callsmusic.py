@@ -5,6 +5,7 @@ from pytgcalls.types import Update, StreamEnded, MediaStream, AudioQuality, Vide
 from . import queues  # legacy — kept for backwards compatibility
 from driver.queues import QUEUE, pop_an_item, clear_queue, get_queue
 from driver.veez import bot
+from driver.recovery import mark_call_inactive
 from driver.design.thumbnail import thumb
 from driver.design.chatname import CHAT_TITLE
 from program.utils.inline import stream_markup
@@ -62,6 +63,7 @@ async def register_stream_end_handler(call_py):
                 print(f"[leave_call error] {e}")
             clear_queue(chat_id)
             stop_progress(chat_id)
+            mark_call_inactive(chat_id)
             return
 
         # شغّل الأغنية التالية
