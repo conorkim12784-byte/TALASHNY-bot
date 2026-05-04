@@ -13,10 +13,16 @@ import traceback
 from typing import Dict, List, Any
 
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
-from pytgcalls.exceptions import (
-    NoActiveGroupCall,
-    AlreadyJoinedError,
-)
+from pytgcalls.exceptions import NoActiveGroupCall
+
+# AlreadyJoinedError اتشال من الإصدارات الحديثة من pytgcalls.
+# بنحاول نستورده، ولو مش موجود بنعرّف Placeholder عشان الكود يفضل شغال.
+try:
+    from pytgcalls.exceptions import AlreadyJoinedError  # type: ignore
+except ImportError:
+    class AlreadyJoinedError(Exception):  # type: ignore
+        """Fallback: pytgcalls الحديث بيرمي Exception عام بدل ده."""
+        pass
 
 from driver.queues import QUEUE, get_queue, clear_queue
 
