@@ -39,6 +39,7 @@ from pyrogram.types import (
 )
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from driver.veez import call_py, bot, user
+from driver.recovery import watchdog, install_global_exception_guard
 from config import GROUP_SUPPORT, UPDATES_CHANNEL
 from callsmusic import register_stream_end_handler
 
@@ -121,6 +122,11 @@ async def start_bot():
     # الانضمام الذكي — لا يعيد الانضمام لو الحساب موجود بالفعل
     await _safe_join(GROUP_SUPPORT)
     await _safe_join(UPDATES_CHANNEL)
+
+    # 🛡 نظام الإصلاح التلقائي — يرجّع الحساب المساعد لو حصل كراش
+    install_global_exception_guard(user, call_py)
+    asyncio.create_task(watchdog(user, call_py))
+    print("[INFO]: AUTO-RECOVERY WATCHDOG ACTIVATED !!")
 
     await idle()
     print("[INFO]: STOPPING BOT & USERBOT")
